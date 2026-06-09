@@ -9,5 +9,6 @@ namespace DataWarehousePower.Services
         Task<ReportDefinition> CreateReportAsync(ReportManageFormViewModel form);
         Task UpdateReportAsync(ReportManageFormViewModel form);
         Task DeleteReportAsync(int id);
+        Task ToggleActiveAsync(int id);
     }
 }

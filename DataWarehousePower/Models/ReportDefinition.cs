@@ -33,6 +33,12 @@ namespace DataWarehousePower.Models
         [MaxLength(200)]
         public string? SourceSP { get; set; }
 
+        /// <summary>
+        /// When false the report is hidden from the report selection list.
+        /// Defaults to true so all new reports are immediately visible.
+        /// </summary>
+        public bool IsActive { get; set; } = true;
+
         // Navigation
         public ICollection<ReportColumn> Columns { get; set; } = new List<ReportColumn>();
     }

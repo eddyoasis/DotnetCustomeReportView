@@ -54,6 +54,7 @@ namespace DataWarehousePower.Repositories
             existing.ReportName  = report.ReportName;
             existing.SourceTable = report.SourceTable;
             existing.SourceSP    = report.SourceSP;
+            existing.IsActive    = report.IsActive;
 
             // Delete removed columns
             foreach (var colId in deletedColumnIds)
@@ -94,6 +95,15 @@ namespace DataWarehousePower.Repositories
 
             _context.ReportColumns.RemoveRange(report.Columns);
             _context.ReportDefinitions.Remove(report);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task ToggleActiveAsync(int id)
+        {
+            var report = await _context.ReportDefinitions.FindAsync(id);
+            if (report is null) return;
+
+            report.IsActive = !report.IsActive;
             await _context.SaveChangesAsync();
         }
     }

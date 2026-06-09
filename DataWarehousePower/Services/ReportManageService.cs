@@ -42,6 +42,9 @@ namespace DataWarehousePower.Services
         public Task DeleteReportAsync(int id)
             => _repo.DeleteAsync(id);
 
+        public Task ToggleActiveAsync(int id)
+            => _repo.ToggleActiveAsync(id);
+
         // ── Mapping helpers ───────────────────────────────────────────────────
 
         private static ReportManageFormViewModel MapToForm(ReportDefinition r) =>
@@ -51,6 +54,7 @@ namespace DataWarehousePower.Services
                 ReportName  = r.ReportName,
                 SourceTable = r.SourceTable,
                 SourceSP    = r.SourceSP,
+                IsActive    = r.IsActive,
                 Columns     = r.Columns.Select(c => new ReportColumnFormModel
                 {
                     Id           = c.Id,
@@ -68,7 +72,8 @@ namespace DataWarehousePower.Services
                 Id          = form.Id,
                 ReportName  = form.ReportName.Trim(),
                 SourceTable = string.IsNullOrWhiteSpace(form.SourceTable) ? null : form.SourceTable.Trim(),
-                SourceSP    = string.IsNullOrWhiteSpace(form.SourceSP)    ? null : form.SourceSP.Trim()
+                SourceSP    = string.IsNullOrWhiteSpace(form.SourceSP)    ? null : form.SourceSP.Trim(),
+                IsActive    = form.IsActive
             };
 
             var activeColumns = form.Columns

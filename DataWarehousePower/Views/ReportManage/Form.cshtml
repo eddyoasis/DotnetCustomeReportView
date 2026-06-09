@@ -40,6 +40,15 @@
                 <div class="form-text">Stored procedure. Leave blank if using a table.</div>
             </div>
 
+            <div class="col-md-12">
+                <div class="form-check form-switch">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" role="switch" id="chk-active" />
+                    <label class="form-check-label" for="chk-active">
+                        Active <span class="text-muted small">(inactive reports are hidden from the report list)</span>
+                    </label>
+                </div>
+            </div>
+
         </div>
     </div>
 

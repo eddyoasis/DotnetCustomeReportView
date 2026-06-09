@@ -18,6 +18,7 @@ namespace DataWarehousePower.Repositories
         public async Task<List<ReportDefinition>> GetAllReportsAsync()
             => await _context.ReportDefinitions
                              .AsNoTracking()
+                             .Where(r => r.IsActive)
                              .OrderBy(r => r.ReportName)
                              .ToListAsync();
 

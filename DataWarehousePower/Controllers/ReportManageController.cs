@@ -133,5 +133,22 @@ namespace DataWarehousePower.Controllers
             }
             return RedirectToAction(nameof(Index));
         }
+
+        // POST /ReportManage/ToggleActive/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleActive(int id)
+        {
+            try
+            {
+                await _service.ToggleActiveAsync(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to toggle active status for report {ReportId}", id);
+                TempData["Error"] = "Failed to update report status.";
+            }
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

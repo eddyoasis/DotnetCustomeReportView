@@ -9,5 +9,6 @@ namespace DataWarehousePower.Repositories
         Task<ReportDefinition> CreateAsync(ReportDefinition report, IEnumerable<ReportColumn> columns);
         Task UpdateAsync(ReportDefinition report, IEnumerable<ReportColumn> columns, IEnumerable<int> deletedColumnIds);
         Task DeleteAsync(int id);
+        Task ToggleActiveAsync(int id);
     }
 }

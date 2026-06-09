@@ -33,7 +33,7 @@ namespace DataWarehousePower.Data
 
             // ── Seed: Staff Report ────────────────────────────────────────────
             modelBuilder.Entity<ReportDefinition>().HasData(
-                new ReportDefinition { Id = 1, ReportName = "Staff Report", SourceTable = "ReportStaff", SourceSP = null }
+                new ReportDefinition { Id = 1, ReportName = "Staff Report", SourceTable = "ReportStaff", SourceSP = null, IsActive = true }
             );
 
             modelBuilder.Entity<ReportColumn>().HasData(

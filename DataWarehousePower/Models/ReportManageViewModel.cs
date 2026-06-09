@@ -26,6 +26,9 @@ namespace DataWarehousePower.Models
         [Display(Name = "Source Stored Procedure")]
         public string? SourceSP { get; set; }
 
+        [Display(Name = "Active")]
+        public bool IsActive { get; set; } = true;
+
         /// <summary>Columns bound from the dynamic form rows.</summary>
         public List<ReportColumnFormModel> Columns { get; set; } = new();
     }
