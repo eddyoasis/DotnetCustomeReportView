@@ -8,9 +8,16 @@ namespace DataWarehousePower.Repositories
         Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId);
 
         /// <summary>
-        /// Dynamically fetches all rows from the report's SourceTable,
-        /// returning each row as a property-name → value dictionary.
+        /// Fetches data by querying a table directly (SourceTable mode).
+        /// Column names are whitelisted against INFORMATION_SCHEMA before use.
         /// </summary>
-        Task<List<Dictionary<string, object?>>> GetReportDataAsync(string sourceTable, IEnumerable<string> columnNames);
+        Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
+            string sourceTable, IEnumerable<string> columnNames);
+
+        /// <summary>
+        /// Fetches data by executing a stored procedure (SourceSP mode).
+        /// SP name is whitelisted against sys.procedures before use.
+        /// </summary>
+        Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(string sourceSp);
     }
 }

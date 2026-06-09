@@ -49,9 +49,23 @@ namespace DataWarehousePower.Services
             // Apply user preferences
             var displayColumns = await LoadPreferencesAsync(userId, reportId, systemColumns);
 
-            // Fetch data — only query columns that exist in the report definition
-            var columnNames = report.Columns.Select(c => c.PropertyName);
-            var rows        = await _reportRepo.GetReportDataAsync(report.SourceTable, columnNames);
+            // Fetch data — SP mode takes priority over table mode
+            List<Dictionary<string, object?>> rows;
+            if (!string.IsNullOrWhiteSpace(report.SourceSP))
+            {
+                // SP returns its own columns; the ReportColumns definition is used
+                // only for labelling/ordering in the UI — not for filtering SELECT columns
+                rows = await _reportRepo.GetReportDataFromSpAsync(report.SourceSP);
+            }
+            else if (!string.IsNullOrWhiteSpace(report.SourceTable))
+            {
+                var columnNames = report.Columns.Select(c => c.PropertyName);
+                rows = await _reportRepo.GetReportDataFromTableAsync(report.SourceTable, columnNames);
+            }
+            else
+            {
+                rows = new List<Dictionary<string, object?>>();
+            }
 
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync();

@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace DataWarehousePower.Models
 {
     /// <summary>
-    /// Defines a report: its friendly name and the DB table it reads from.
+    /// Defines a report. Set either SourceTable OR SourceSP — not both.
     /// Add a row here to register a new report — no code changes needed.
     /// </summary>
     [Table("ReportDefinitions")]
@@ -19,12 +19,19 @@ namespace DataWarehousePower.Models
         public string ReportName { get; set; } = string.Empty;
 
         /// <summary>
-        /// The exact DB table name to SELECT from (e.g. "ReportStaff").
-        /// Must be an existing table in the same database.
+        /// Direct table query mode: the exact DB table name to SELECT from.
+        /// Leave null when using SourceSP instead.
         /// </summary>
-        [Required]
         [MaxLength(200)]
-        public string SourceTable { get; set; } = string.Empty;
+        public string? SourceTable { get; set; }
+
+        /// <summary>
+        /// Stored procedure mode: the exact SP name to EXEC.
+        /// Leave null when using SourceTable instead.
+        /// When set, the engine calls EXEC [SourceSP] and maps results by column name.
+        /// </summary>
+        [MaxLength(200)]
+        public string? SourceSP { get; set; }
 
         // Navigation
         public ICollection<ReportColumn> Columns { get; set; } = new List<ReportColumn>();
