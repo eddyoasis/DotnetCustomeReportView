@@ -1,0 +1,193 @@
+@model DataWarehousePower.Models.ReportManageFormViewModel
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] = isEdit ? $"Edit Report — {Model.ReportName}" : "New Report";
+}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">← Back</a>
+    <h4 class="mb-0">@(isEdit ? "Edit Report" : "New Report")</h4>
+</div>
+
+<form asp-action="Save" method="post" id="report-form">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div asp-validation-summary="All" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    <!-- ── Report Header ───────────────────────────────────────────────── -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">Report Details</div>
+        <div class="card-body row g-3">
+
+            <div class="col-md-6">
+                <label asp-for="ReportName" class="form-label"></label>
+                <input asp-for="ReportName" class="form-control" placeholder="e.g. Sales Report" />
+                <span asp-validation-for="ReportName" class="text-danger small"></span>
+            </div>
+
+            <div class="col-md-3">
+                <label asp-for="SourceTable" class="form-label"></label>
+                <input asp-for="SourceTable" class="form-control source-input" id="input-source-table"
+                       placeholder="e.g. ReportSales" />
+                <div class="form-text">Direct table query. Leave blank if using a SP.</div>
+            </div>
+
+            <div class="col-md-3">
+                <label asp-for="SourceSP" class="form-label"></label>
+                <input asp-for="SourceSP" class="form-control source-input" id="input-source-sp"
+                       placeholder="e.g. sp_GetSalesReport" />
+                <div class="form-text">Stored procedure. Leave blank if using a table.</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ── Columns ─────────────────────────────────────────────────────── -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>Columns</span>
+            <button type="button" id="btn-add-col" class="btn btn-outline-primary btn-sm">+ Add Column</button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-bordered mb-0" id="columns-table">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:36px;" class="text-center">#</th>
+                        <th>Property Name <span class="text-muted small">(DB column)</span></th>
+                        <th>Default Label <span class="text-muted small">(UI header)</span></th>
+                        <th style="width:110px;">Display Order</th>
+                        <th style="width:70px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="columns-body">
+                    @for (int i = 0; i < Model.Columns.Count; i++)
+                    {
+                        <tr class="col-row" data-index="@i">
+                            <td class="text-center text-muted small row-num align-middle">@(i + 1)</td>
+                            <td>
+                                <input type="hidden" name="Columns[@i].Id" value="@Model.Columns[i].Id" />
+                                <input type="hidden" name="Columns[@i].IsDeleted" value="false" class="is-deleted-input" />
+                                <input name="Columns[@i].PropertyName"
+                                       value="@Model.Columns[i].PropertyName"
+                                       class="form-control form-control-sm"
+                                       placeholder="e.g. SaleAmount" required />
+                            </td>
+                            <td>
+                                <input name="Columns[@i].DefaultLabel"
+                                       value="@Model.Columns[i].DefaultLabel"
+                                       class="form-control form-control-sm"
+                                       placeholder="e.g. Sale Amount" required />
+                            </td>
+                            <td>
+                                <input name="Columns[@i].DisplayOrder"
+                                       value="@Model.Columns[i].DisplayOrder"
+                                       type="number" min="1" max="999"
+                                       class="form-control form-control-sm" required />
+                            </td>
+                            <td class="text-center align-middle">
+                                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div id="no-cols-msg" class="text-center text-muted p-3 small"
+                 style="display:@(Model.Columns.Any() ? "none" : "block")">
+                No columns yet. Click <strong>+ Add Column</strong>.
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">@(isEdit ? "Save Changes" : "Create Report")</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+let rowIndex = @Model.Columns.Count;
+
+// ── Add column row ────────────────────────────────────────────────────────────
+document.getElementById('btn-add-col').addEventListener('click', () => {
+    const body = document.getElementById('columns-body');
+    const tr   = document.createElement('tr');
+    tr.className   = 'col-row';
+    tr.dataset.index = rowIndex;
+    tr.innerHTML = `
+        <td class="text-center text-muted small row-num align-middle">${body.querySelectorAll('tr.col-row:not(.deleted-row)').length + 1}</td>
+        <td>
+            <input type="hidden" name="Columns[${rowIndex}].Id" value="0" />
+            <input type="hidden" name="Columns[${rowIndex}].IsDeleted" value="false" class="is-deleted-input" />
+            <input name="Columns[${rowIndex}].PropertyName"
+                   class="form-control form-control-sm" placeholder="e.g. SaleAmount" required />
+        </td>
+        <td>
+            <input name="Columns[${rowIndex}].DefaultLabel"
+                   class="form-control form-control-sm" placeholder="e.g. Sale Amount" required />
+        </td>
+        <td>
+            <input name="Columns[${rowIndex}].DisplayOrder"
+                   type="number" min="1" max="999" value="${body.querySelectorAll('tr.col-row:not(.deleted-row)').length + 1}"
+                   class="form-control form-control-sm" required />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
+        </td>`;
+    body.appendChild(tr);
+    rowIndex++;
+    refreshRowNumbers();
+    toggleNoColsMessage();
+    tr.querySelector('input[name$=".PropertyName"]').focus();
+});
+
+// ── Remove column row ─────────────────────────────────────────────────────────
+document.getElementById('columns-body').addEventListener('click', e => {
+    const btn = e.target.closest('.btn-remove-col');
+    if (!btn) return;
+    const tr        = btn.closest('tr');
+    const deletedInput = tr.querySelector('.is-deleted-input');
+
+    if (deletedInput && deletedInput.value === 'false') {
+        // Mark as deleted — hide row, set flag, remove required so form submits
+        deletedInput.value = 'true';
+        tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+        tr.classList.add('deleted-row');
+        tr.style.display = 'none';
+    } else {
+        // New row (Id=0) — just remove from DOM entirely
+        tr.remove();
+    }
+    refreshRowNumbers();
+    toggleNoColsMessage();
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function refreshRowNumbers() {
+    let n = 1;
+    document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+        tr.querySelector('.row-num').textContent = n++;
+    });
+}
+
+function toggleNoColsMessage() {
+    const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+    document.getElementById('no-cols-msg').style.display = visible === 0 ? 'block' : 'none';
+}
+
+// ── Mutual exclusivity hint for SourceTable / SourceSP ───────────────────────
+const tableInput = document.getElementById('input-source-table');
+const spInput    = document.getElementById('input-source-sp');
+
+function highlightSource() {
+    const hasTable = tableInput.value.trim() !== '';
+    const hasSP    = spInput.value.trim() !== '';
+    tableInput.classList.toggle('border-warning', hasTable && hasSP);
+    spInput.classList.toggle('border-warning',    hasTable && hasSP);
+}
+
+tableInput.addEventListener('input', highlightSource);
+spInput.addEventListener('input',    highlightSource);
+</script>
+}

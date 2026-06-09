@@ -13,10 +13,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IReportStaffRepository,      ReportStaffRepository>();
 builder.Services.AddScoped<IColumnPreferenceRepository, ColumnPreferenceRepository>();
 builder.Services.AddScoped<IReportRepository,           ReportRepository>();
+builder.Services.AddScoped<IReportManageRepository,     ReportManageRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
 builder.Services.AddScoped<IColumnPreferenceService, ColumnPreferenceService>();
+builder.Services.AddScoped<IReportManageService,     ReportManageService>();
 
 // ── MVC ───────────────────────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
@@ -64,6 +66,12 @@ app.MapControllerRoute(
     name: "report",
     pattern: "Report/{id:int}/{action=Index}",
     defaults: new { controller = "Report" });
+
+// /ReportManage  (CRUD management)
+app.MapControllerRoute(
+    name: "reportManage",
+    pattern: "ReportManage/{action=Index}/{id?}",
+    defaults: new { controller = "ReportManage" });
 
 // Fallback default route
 app.MapControllerRoute(

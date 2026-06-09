@@ -1,0 +1,54 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace DataWarehousePower.Models
+{
+    /// <summary>List view — all report definitions.</summary>
+    public class ReportManageListViewModel
+    {
+        public List<ReportDefinition> Reports { get; set; } = new();
+    }
+
+    /// <summary>Create / Edit form for a ReportDefinition + its columns.</summary>
+    public class ReportManageFormViewModel
+    {
+        public int Id { get; set; }
+
+        [Required(ErrorMessage = "Report name is required.")]
+        [MaxLength(200)]
+        [Display(Name = "Report Name")]
+        public string ReportName { get; set; } = string.Empty;
+
+        [MaxLength(200)]
+        [Display(Name = "Source Table")]
+        public string? SourceTable { get; set; }
+
+        [MaxLength(200)]
+        [Display(Name = "Source Stored Procedure")]
+        public string? SourceSP { get; set; }
+
+        /// <summary>Columns bound from the dynamic form rows.</summary>
+        public List<ReportColumnFormModel> Columns { get; set; } = new();
+    }
+
+    public class ReportColumnFormModel
+    {
+        public int Id { get; set; }   // 0 = new row
+
+        [Required(ErrorMessage = "Property name is required.")]
+        [MaxLength(100)]
+        [Display(Name = "Property Name (DB column)")]
+        public string PropertyName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Label is required.")]
+        [MaxLength(100)]
+        [Display(Name = "Default Label")]
+        public string DefaultLabel { get; set; } = string.Empty;
+
+        [Range(1, 999)]
+        [Display(Name = "Display Order")]
+        public int DisplayOrder { get; set; } = 1;
+
+        /// <summary>Marked true by the UI when the user removes a row.</summary>
+        public bool IsDeleted { get; set; } = false;
+    }
+}
