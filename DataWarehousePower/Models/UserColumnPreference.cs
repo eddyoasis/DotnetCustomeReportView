@@ -4,28 +4,24 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace DataWarehousePower.Models
 {
     /// <summary>
-    /// One row per user. All column preferences are stored as a JSON array in ColumnJson.
+    /// One row per user per report. Column preferences stored as JSON.
     /// JSON shape: [{"PropertyName":"Id","IsVisible":true,"DisplayOrder":1,"CustomName":"ID"}]
     /// </summary>
     [Table("UserColumnPreferences")]
     public class UserColumnPreference
     {
-        /// <summary>UserId (UUID v4 string from browser cookie) is the primary key.</summary>
-        [Key]
+        [Key, Column(Order = 0)]
         [MaxLength(128)]
         public string UserId { get; set; } = string.Empty;
 
-        /// <summary>
-        /// JSON array of column preference entries.
-        /// Serialised/deserialised by the service layer.
-        /// </summary>
+        [Key, Column(Order = 1)]
+        public int ReportDefinitionId { get; set; }
+
         [Required]
         public string ColumnJson { get; set; } = "[]";
     }
 
-    /// <summary>
-    /// Represents one column entry inside the ColumnJson array.
-    /// </summary>
+    /// <summary>One entry inside the ColumnJson array.</summary>
     public class ColumnJsonEntry
     {
         public string PropertyName { get; set; } = string.Empty;

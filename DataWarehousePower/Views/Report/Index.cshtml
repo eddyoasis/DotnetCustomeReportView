@@ -1,0 +1,273 @@
+@model DataWarehousePower.Models.ReportViewModel
+@{
+    ViewData["Title"] = Model.ReportName;
+}
+
+<div class="row">
+
+    <!-- ── Sidebar: report list ─────────────────────────────────── -->
+    <div class="col-md-2 pe-0">
+        <div class="card shadow-sm h-100">
+            <div class="card-header fw-semibold small">Reports</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var r in Model.AllReports)
+                {
+                    <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
+                        <a href="/Report/@r.Id"
+                           class="text-decoration-none @(r.Id == Model.ReportId ? "text-white" : "")"
+                           style="font-size:.85rem;">
+                            @r.ReportName
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <!-- ── Main content ─────────────────────────────────────────── -->
+    <div class="col-md-10">
+
+        <h4 class="mb-3">@Model.ReportName</h4>
+
+        <!-- ════════ COLUMN CUSTOMISER ════════ -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                <span>Column Customiser</span>
+                <span class="badge bg-secondary" style="font-size:.75rem;">drag · rename · toggle</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Drag chips to reorder &nbsp;|&nbsp;
+                    The <span class="badge bg-light text-secondary border" style="font-size:.7rem;">grey badge</span>
+                    shows the original column name &nbsp;→&nbsp; type in the box to rename it &nbsp;|&nbsp;
+                    Use the checkbox to show/hide. Click <strong>Save &amp; Apply</strong> to persist.
+                </p>
+
+                <ul id="sortable-columns" class="list-unstyled d-flex flex-wrap gap-2 mb-3" style="min-height:48px;">
+                    @{
+                        var visible  = Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order).ToList();
+                        var hiddenCols = Model.AvailableColumns
+                            .Where(sys => !visible.Any(v => v.Key == sys.Key))
+                            .Select(sys => new DataWarehousePower.Models.ColumnDefinition
+                            {
+                                Key = sys.Key, DefaultLabel = sys.DefaultLabel,
+                                DisplayLabel = sys.DefaultLabel, IsVisible = false, Order = 999
+                            });
+                        var allChips = visible.Concat(hiddenCols).ToList();
+                    }
+                    @foreach (var col in allChips)
+                    {
+                        <li class="chip border rounded px-2 py-1 bg-white shadow-sm d-flex align-items-center gap-2 @(col.IsVisible ? "" : "opacity-50")"
+                            data-key="@col.Key"
+                            data-default-label="@col.DefaultLabel"
+                            draggable="true"
+                            style="cursor:grab; user-select:none;">
+                            <span class="drag-handle text-muted" style="cursor:grab;">&#9776;</span>
+                            <span class="badge bg-light text-secondary border"
+                                  style="font-size:.7rem; white-space:nowrap;"
+                                  title="Original column name">@col.DefaultLabel</span>
+                            <span class="text-muted" style="font-size:.8rem;">→</span>
+                            <input type="text"
+                                   class="form-control form-control-sm label-input border-0 p-0"
+                                   style="width:110px; background:transparent;"
+                                   value="@col.DisplayLabel"
+                                   maxlength="100"
+                                   placeholder="@col.DefaultLabel"
+                                   title="Display name (original: @col.DefaultLabel)"
+                                   aria-label="Display label for @col.DefaultLabel" />
+                            <input type="checkbox"
+                                   class="form-check-input m-0 col-visible-toggle"
+                                   @(col.IsVisible ? "checked" : "")
+                                   title="Show / hide column"
+                                   aria-label="Show @col.DefaultLabel" />
+                        </li>
+                    }
+                </ul>
+
+                <div id="label-error" class="text-danger small mb-2" style="display:none;"></div>
+                <div class="d-flex gap-2">
+                    <button id="btn-apply" class="btn btn-primary btn-sm">Save &amp; Apply</button>
+                    <button id="btn-reset" class="btn btn-outline-secondary btn-sm">Reset to Defaults</button>
+                    <span   id="save-status" class="small align-self-center ms-1"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ════════ DATA TABLE ════════ -->
+        <div class="table-responsive shadow-sm">
+            <table class="table table-bordered table-hover align-middle" id="report-table">
+                <thead class="table-dark">
+                    <tr id="table-header-row">
+                        @foreach (var col in Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order))
+                        {
+                            <th data-key="@col.Key">@col.DisplayLabel</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            @foreach (var col in Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order))
+                            {
+                                <td>@(row.ContainsKey(col.Key) ? row[col.Key]?.ToString() : "")</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+    </div><!-- /col -->
+</div><!-- /row -->
+
+@section Scripts {
+<script>
+const reportId = @Model.ReportId;
+
+// Embed all rows as JSON for client-side re-render
+const allRows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Rows));
+
+// ── Drag-and-drop ─────────────────────────────────────────────────────────────
+const sortable = document.getElementById('sortable-columns');
+let dragSrc = null;
+
+sortable.addEventListener('dragstart', e => {
+    dragSrc = e.target.closest('li.chip');
+    if (dragSrc) e.dataTransfer.effectAllowed = 'move';
+});
+sortable.addEventListener('dragover', e => {
+    e.preventDefault();
+    const target = e.target.closest('li.chip');
+    if (target && target !== dragSrc) {
+        const mid = target.getBoundingClientRect().left + target.getBoundingClientRect().width / 2;
+        sortable.insertBefore(dragSrc, e.clientX < mid ? target : target.nextSibling);
+    }
+});
+sortable.addEventListener('dragend', () => { dragSrc = null; });
+
+// ── Visibility toggle ─────────────────────────────────────────────────────────
+sortable.addEventListener('change', e => {
+    const chk = e.target.closest('.col-visible-toggle');
+    if (!chk) return;
+    chk.closest('li.chip').classList.toggle('opacity-50', !chk.checked);
+});
+
+// ── Save & Apply ─────────────────────────────────────────────────────────────
+document.getElementById('btn-apply').addEventListener('click', async () => {
+    const errorEl  = document.getElementById('label-error');
+    const statusEl = document.getElementById('save-status');
+    errorEl.style.display = 'none';
+
+    const chips = [...sortable.querySelectorAll('li.chip')];
+
+    let hasError = false;
+    chips.forEach(chip => {
+        const input = chip.querySelector('.label-input');
+        const bad   = chip.querySelector('.col-visible-toggle').checked && !input.value.trim();
+        input.classList.toggle('border', bad);
+        input.classList.toggle('border-danger', bad);
+        if (bad) hasError = true;
+    });
+
+    if (hasError) {
+        errorEl.textContent = 'Column label cannot be blank.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    const columns = chips.map((chip, i) => ({
+        key:          chip.dataset.key,
+        isVisible:    chip.querySelector('.col-visible-toggle').checked,
+        order:        i + 1,
+        displayLabel: chip.querySelector('.label-input').value.trim() || chip.dataset.defaultLabel
+    }));
+
+    statusEl.textContent = 'Saving…';
+    statusEl.className   = 'small align-self-center ms-1 text-muted';
+
+    try {
+        const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ columns })
+        });
+        const json = await resp.json();
+        if (resp.ok && json.success) {
+            statusEl.textContent = '✓ Saved';
+            statusEl.className   = 'small align-self-center ms-1 text-success';
+            renderTable(columns);
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        } else {
+            statusEl.textContent = '✗ ' + (json.error || 'Save failed');
+            statusEl.className   = 'small align-self-center ms-1 text-danger';
+        }
+    } catch {
+        statusEl.textContent = '✗ Network error';
+        statusEl.className   = 'small align-self-center ms-1 text-danger';
+    }
+});
+
+// ── Reset to defaults ─────────────────────────────────────────────────────────
+document.getElementById('btn-reset').addEventListener('click', async () => {
+    const statusEl = document.getElementById('save-status');
+
+    const chips = [...sortable.querySelectorAll('li.chip')];
+    chips.forEach(chip => {
+        chip.querySelector('.label-input').value = chip.dataset.defaultLabel;
+        chip.querySelector('.col-visible-toggle').checked = true;
+        chip.classList.remove('opacity-50');
+        chip.querySelector('.label-input').classList.remove('border', 'border-danger');
+    });
+
+    // Restore original DB order (data-order attribute not needed — just re-sort by default label order)
+    // Easiest: reload the page after saving defaults
+    const defaultColumns = chips.map((chip, i) => ({
+        key:          chip.dataset.key,
+        isVisible:    true,
+        order:        i + 1,
+        displayLabel: chip.dataset.defaultLabel
+    }));
+
+    statusEl.textContent = 'Resetting…';
+    statusEl.className   = 'small align-self-center ms-1 text-muted';
+
+    try {
+        const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ columns: defaultColumns })
+        });
+        const json = await resp.json();
+        if (resp.ok && json.success) {
+            statusEl.textContent = '✓ Reset & saved';
+            statusEl.className   = 'small align-self-center ms-1 text-success';
+            renderTable(defaultColumns);
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        }
+    } catch { /* silent */ }
+});
+
+// ── Re-render table ───────────────────────────────────────────────────────────
+function renderTable(cols) {
+    const vis = cols.filter(c => c.isVisible);
+
+    document.getElementById('table-header-row').innerHTML =
+        vis.map(c => `<th data-key="${esc(c.key)}">${esc(c.displayLabel)}</th>`).join('');
+
+    document.getElementById('table-body').innerHTML =
+        allRows.map(row => {
+            const cells = vis.map(c => {
+                // keys in allRows use original casing from DB
+                const val = Object.entries(row).find(([k]) => k.toLowerCase() === c.key.toLowerCase())?.[1];
+                return `<td>${val != null ? esc(String(val)) : ''}</td>`;
+            }).join('');
+            return `<tr>${cells}</tr>`;
+        }).join('');
+}
+
+function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+}

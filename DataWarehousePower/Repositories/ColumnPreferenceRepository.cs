@@ -13,16 +13,17 @@ namespace DataWarehousePower.Repositories
             _context = context;
         }
 
-        public async Task<UserColumnPreference?> GetByUserIdAsync(string userId)
+        public async Task<UserColumnPreference?> GetAsync(string userId, int reportDefinitionId)
             => await _context.UserColumnPreferences
                              .AsNoTracking()
-                             .FirstOrDefaultAsync(p => p.UserId == userId);
+                             .FirstOrDefaultAsync(p => p.UserId == userId
+                                                    && p.ReportDefinitionId == reportDefinitionId);
 
         public async Task UpsertAsync(UserColumnPreference preference)
         {
             var existing = await _context.UserColumnPreferences
-                                         .FirstOrDefaultAsync(p => p.UserId == preference.UserId);
-
+                .FirstOrDefaultAsync(p => p.UserId             == preference.UserId
+                                       && p.ReportDefinitionId == preference.ReportDefinitionId);
             if (existing is null)
                 _context.UserColumnPreferences.Add(preference);
             else
