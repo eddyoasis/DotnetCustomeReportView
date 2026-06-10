@@ -44,15 +44,36 @@
                     <label for="client-code-select" class="form-label small fw-semibold mb-1">Client Code</label>
                     <div class="d-flex flex-column gap-2">
                         <div class="d-flex gap-2 align-items-center">
-                        <select id="client-code-select" class="form-select form-select-sm">
-                            <option value="">Default</option>
-                            @foreach (var availableClientCode in Model.AvailableClientCodes)
-                            {
-                                <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
-                            }
-                        </select>
-                        <button id="btn-client-apply" type="button" class="btn btn-sm btn-outline-primary">Load</button>
-                        <button id="btn-client-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
+                            <select id="client-code-select" class="d-none" aria-hidden="true">
+                                <option value="">Default</option>
+                                @foreach (var availableClientCode in Model.AvailableClientCodes)
+                                {
+                                    <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                                }
+                            </select>
+
+                            <div class="dropdown flex-grow-1">
+                                <button id="client-code-dropdown-toggle"
+                                        class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                                        type="button"
+                                        data-bs-toggle="dropdown"
+                                        data-bs-auto-close="outside"
+                                        aria-expanded="false">
+                                    Default
+                                </button>
+                                <div class="dropdown-menu p-2 w-100" style="min-width: 260px;">
+                                    <input id="client-code-search"
+                                           type="text"
+                                           class="form-control form-control-sm mb-2"
+                                           maxlength="128"
+                                           placeholder="Search client code"
+                                           autocomplete="off" />
+                                    <div id="client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+
+                            <button id="btn-client-apply" type="button" class="btn btn-sm btn-outline-primary">Load</button>
+                            <button id="btn-client-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <input id="client-code-new"
@@ -213,6 +234,9 @@
 <script>
 const reportId = @Model.ReportId;
 const initialClientCode = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCode));
+const clientCodeSearchInput = document.getElementById('client-code-search');
+const clientCodeDropdownToggle = document.getElementById('client-code-dropdown-toggle');
+const clientCodeOptions = document.getElementById('client-code-options');
 const clientCodeSelect = document.getElementById('client-code-select');
 const clientCodeNewInput = document.getElementById('client-code-new');
 const clientApplyButton = document.getElementById('btn-client-apply');
@@ -236,10 +260,10 @@ clientClearButton.addEventListener('click', () => {
     navigateToClientCode('');
 });
 
-clientCodeSelect.addEventListener('change', e => {
+clientCodeSearchInput.addEventListener('input', e => {
     hideClientCodeError();
-    const selectedClientCode = e.target instanceof HTMLSelectElement ? e.target.value : '';
-    navigateToClientCode(selectedClientCode);
+    const searchValue = e.target instanceof HTMLInputElement ? e.target.value : '';
+    renderClientCodeOptions(searchValue);
 });
 
 clientCreateButton.addEventListener('click', async () => {
@@ -502,15 +526,52 @@ function upsertClientCodeOption(value) {
     newOption.value = normalizedValue;
     newOption.textContent = normalizedValue;
     clientCodeSelect.appendChild(newOption);
+    renderClientCodeOptions(clientCodeSearchInput.value);
 }
 
 function syncClientCodeUi(value) {
     const normalizedValue = value.trim();
     clientCodeSelect.value = normalizedValue;
     clientCodeNewInput.value = normalizedValue;
+    clientCodeDropdownToggle.textContent = normalizedValue || 'Default';
+    renderClientCodeOptions(clientCodeSearchInput.value);
 
     const scopeLabel = normalizedValue || 'Default';
     clientCodeStatus.innerHTML = `Preference scope: <strong>${esc(scopeLabel)}</strong>`;
+}
+
+function renderClientCodeOptions(searchValue) {
+    const normalizedSearch = searchValue.trim().toLocaleLowerCase();
+    const selectedValue = clientCodeSelect.value;
+    clientCodeOptions.innerHTML = '';
+
+    [...clientCodeSelect.options].forEach((option, index) => {
+        const isDefault = index === 0;
+        const isMatch = !normalizedSearch || option.text.toLocaleLowerCase().includes(normalizedSearch);
+        const isSelected = option.value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0;
+        if (!(isDefault || isMatch || isSelected)) {
+            return;
+        }
+
+        const optionButton = document.createElement('button');
+        optionButton.type = 'button';
+        optionButton.className = `list-group-item list-group-item-action py-1 px-2${isSelected ? ' active' : ''}`;
+        optionButton.textContent = option.text;
+        optionButton.addEventListener('click', () => {
+            hideClientCodeError();
+            clientCodeSelect.value = option.value;
+            syncClientCodeUi(option.value);
+            navigateToClientCode(option.value);
+        });
+        clientCodeOptions.appendChild(optionButton);
+    });
+
+    if (!clientCodeOptions.children.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-muted small px-2 py-1';
+        empty.textContent = 'No matches';
+        clientCodeOptions.appendChild(empty);
+    }
 }
 
 function showClientCodeError(message) {
