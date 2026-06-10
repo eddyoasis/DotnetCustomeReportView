@@ -54,7 +54,11 @@ namespace DataWarehousePower.Repositories
 
         // ── Stored procedure mode ─────────────────────────────────────────────
 
-        public async Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(string sourceSp)
+        public async Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(
+            string sourceSp,
+            string? filterClientCode = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null)
         {
             var conn = _context.Database.GetDbConnection();
             if (conn.State != ConnectionState.Open)
@@ -65,17 +69,38 @@ namespace DataWarehousePower.Repositories
             if (string.IsNullOrEmpty(safeSp))
                 return new();
 
-            return await ExecuteReaderAsync(conn, $"[{safeSp}]", CommandType.StoredProcedure);
+            var spParameterNames = await GetStoredProcedureParameterNamesAsync(conn, safeSp);
+            var parameters = new Dictionary<string, object?>();
+
+            if (spParameterNames.Contains("@ClientCode"))
+                parameters["@ClientCode"] = string.IsNullOrWhiteSpace(filterClientCode) ? DBNull.Value : filterClientCode;
+
+            if (spParameterNames.Contains("@DateFrom"))
+                parameters["@DateFrom"] = dateFrom.HasValue ? dateFrom.Value.Date : DBNull.Value;
+
+            if (spParameterNames.Contains("@DateTo"))
+                parameters["@DateTo"] = dateTo.HasValue ? dateTo.Value.Date : DBNull.Value;
+
+            return await ExecuteReaderAsync(conn, $"[{safeSp}]", CommandType.StoredProcedure, parameters);
         }
 
         // ── Shared reader helper ──────────────────────────────────────────────
 
         private static async Task<List<Dictionary<string, object?>>> ExecuteReaderAsync(
-            DbConnection conn, string commandText, CommandType commandType)
+            DbConnection conn,
+            string commandText,
+            CommandType commandType,
+            IReadOnlyDictionary<string, object?>? parameters = null)
         {
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = commandText;
             cmd.CommandType = commandType;
+
+            if (parameters is not null)
+            {
+                foreach (var parameter in parameters)
+                    AddParam(cmd, parameter.Key, parameter.Value);
+            }
 
             var rows = new List<Dictionary<string, object?>>();
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -126,11 +151,29 @@ namespace DataWarehousePower.Repositories
             return await cmd.ExecuteScalarAsync() as string;
         }
 
-        private static void AddParam(System.Data.Common.DbCommand cmd, string name, string value)
+        private static async Task<HashSet<string>> GetStoredProcedureParameterNamesAsync(DbConnection conn, string spName)
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT p.name " +
+                "FROM sys.parameters p " +
+                "INNER JOIN sys.procedures sp ON p.object_id = sp.object_id " +
+                "WHERE sp.name = @name";
+            AddParam(cmd, "@name", spName);
+
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                names.Add(reader.GetString(0));
+
+            return names;
+        }
+
+        private static void AddParam(System.Data.Common.DbCommand cmd, string name, object? value)
         {
             var p = cmd.CreateParameter();
             p.ParameterName = name;
-            p.Value         = value;
+            p.Value         = value ?? DBNull.Value;
             cmd.Parameters.Add(p);
         }
     }

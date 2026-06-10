@@ -8,6 +8,9 @@ namespace DataWarehousePower.Models
         public int    ReportId   { get; set; }
         public string ReportName { get; set; } = string.Empty;
         public string ClientCode { get; set; } = string.Empty;
+        public string FilterClientCode { get; set; } = string.Empty;
+        public DateTime? FilterDateFrom { get; set; }
+        public DateTime? FilterDateTo { get; set; }
         public List<string> AvailableClientCodes { get; set; } = new();
 
         /// <summary>All columns defined for this report (from ReportColumns table).</summary>

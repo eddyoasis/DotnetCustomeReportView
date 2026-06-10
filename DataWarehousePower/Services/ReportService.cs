@@ -30,9 +30,16 @@ namespace DataWarehousePower.Services
         public Task<List<ReportDefinition>> GetAllReportsAsync()
             => _reportRepo.GetAllReportsAsync();
 
-        public async Task<ReportViewModel?> BuildReportViewModelAsync(int reportId, string userId, string? clientCode = null)
+        public async Task<ReportViewModel?> BuildReportViewModelAsync(
+            int reportId,
+            string userId,
+            string? clientCode = null,
+            string? filterClientCode = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null)
         {
             string normalizedClientCode = NormalizeClientCode(clientCode);
+            string normalizedFilterClientCode = NormalizeNullableClientCode(filterClientCode);
             var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
             if (report is null) return null;
 
@@ -58,7 +65,11 @@ namespace DataWarehousePower.Services
             {
                 // SP returns its own columns; the ReportColumns definition is used
                 // only for labelling/ordering in the UI — not for filtering SELECT columns
-                rows = await _reportRepo.GetReportDataFromSpAsync(report.SourceSP);
+                rows = await _reportRepo.GetReportDataFromSpAsync(
+                    report.SourceSP,
+                    normalizedFilterClientCode,
+                    dateFrom,
+                    dateTo);
             }
             else if (!string.IsNullOrWhiteSpace(report.SourceTable))
             {
@@ -83,6 +94,9 @@ namespace DataWarehousePower.Services
                 ReportId         = report.Id,
                 ReportName       = report.ReportName,
                 ClientCode       = normalizedClientCode,
+                FilterClientCode = normalizedFilterClientCode ?? string.Empty,
+                FilterDateFrom   = dateFrom,
+                FilterDateTo     = dateTo,
                 AvailableClientCodes = availableClientCodes,
                 AvailableColumns = systemColumns,
                 DisplayColumns   = displayColumns,
@@ -182,6 +196,12 @@ namespace DataWarehousePower.Services
 
         private static string NormalizeClientCode(string? clientCode)
             => clientCode?.Trim() ?? string.Empty;
+
+        private static string? NormalizeNullableClientCode(string? clientCode)
+        {
+            string normalized = clientCode?.Trim() ?? string.Empty;
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+        }
 
         private static List<string> BuildAvailableClientCodes(
             string currentClientCode,

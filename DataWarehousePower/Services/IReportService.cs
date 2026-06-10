@@ -11,7 +11,13 @@ namespace DataWarehousePower.Services
         /// loads the report definition, applies user preferences, and fetches data.
         /// Returns null if the reportId does not exist.
         /// </summary>
-        Task<ReportViewModel?> BuildReportViewModelAsync(int reportId, string userId, string? clientCode = null);
+        Task<ReportViewModel?> BuildReportViewModelAsync(
+            int reportId,
+            string userId,
+            string? clientCode = null,
+            string? filterClientCode = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null);
 
         /// <summary>
         /// Persists the user's column preferences for a specific report.

@@ -18,6 +18,10 @@ namespace DataWarehousePower.Repositories
         /// Fetches data by executing a stored procedure (SourceSP mode).
         /// SP name is whitelisted against sys.procedures before use.
         /// </summary>
-        Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(string sourceSp);
+        Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(
+            string sourceSp,
+            string? filterClientCode = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null);
     }
 }

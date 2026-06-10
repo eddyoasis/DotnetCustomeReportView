@@ -24,10 +24,15 @@ namespace DataWarehousePower.Controllers
         }
 
         // GET /Report/{id}
-        public async Task<IActionResult> Index(int id, string? clientCode = null)
+        public async Task<IActionResult> Index(
+            int id,
+            string? clientCode = null,
+            string? filterClientCode = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, clientCode);
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, clientCode, filterClientCode, dateFrom, dateTo);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -36,13 +41,17 @@ namespace DataWarehousePower.Controllers
         }
 
         // GET /Report/List → redirect to first available report
-        public async Task<IActionResult> List(string? clientCode = null)
+        public async Task<IActionResult> List(
+            string? clientCode = null,
+            string? filterClientCode = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null)
         {
             var reports = await _reportService.GetAllReportsAsync();
             if (reports.Count == 0)
                 return View("NoReports");
 
-            return RedirectToAction(nameof(Index), new { id = reports[0].Id, clientCode });
+            return RedirectToAction(nameof(Index), new { id = reports[0].Id, clientCode, filterClientCode, dateFrom, dateTo });
         }
 
         // POST /Report/{id}/SavePreferences  (AJAX)

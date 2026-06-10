@@ -13,7 +13,14 @@
                 @foreach (var r in Model.AllReports)
                 {
                     <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
-                                <a href="@Url.Action("Index", "Report", new { id = r.Id, clientCode = Model.ClientCode })"
+                                <a href="@Url.Action("Index", "Report", new
+                                         {
+                                             id = r.Id,
+                                             clientCode = Model.ClientCode,
+                                             filterClientCode = Model.FilterClientCode,
+                                             dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
+                                             dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")
+                                         })"
                            class="text-decoration-none @(r.Id == Model.ReportId ? "text-white" : "")"
                            style="font-size:.85rem;">
                             @r.ReportName
@@ -64,6 +71,50 @@
         <div id="client-code-status" class="alert alert-light border small py-2 px-3 mb-3">
             Preference scope:
             <strong>@(string.IsNullOrWhiteSpace(Model.ClientCode) ? "Default" : Model.ClientCode)</strong>
+        </div>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header fw-semibold">Data Filters</div>
+            <div class="card-body">
+                <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
+                    <input type="hidden" name="clientCode" value="@Model.ClientCode" />
+
+                    <div class="col-md-4">
+                        <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
+                        <input id="filter-client-code"
+                               name="filterClientCode"
+                               type="text"
+                               class="form-control form-control-sm"
+                               maxlength="128"
+                               value="@Model.FilterClientCode"
+                               placeholder="Enter client code" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="filter-date-from" class="form-label small fw-semibold">DateFrom</label>
+                        <input id="filter-date-from"
+                               name="dateFrom"
+                               type="date"
+                               class="form-control form-control-sm"
+                               value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="filter-date-to" class="form-label small fw-semibold">DateTo</label>
+                        <input id="filter-date-to"
+                               name="dateTo"
+                               type="date"
+                               class="form-control form-control-sm"
+                               value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                    </div>
+
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
+                        <a class="btn btn-sm btn-outline-secondary w-100"
+                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, clientCode = Model.ClientCode })">Clear</a>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- ════════ COLUMN CUSTOMISER ════════ -->
