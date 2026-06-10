@@ -24,10 +24,10 @@ namespace DataWarehousePower.Controllers
         }
 
         // GET /Report/{id}
-        public async Task<IActionResult> Index(int id)
+        public async Task<IActionResult> Index(int id, string? clientCode = null)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId);
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, clientCode);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -36,13 +36,13 @@ namespace DataWarehousePower.Controllers
         }
 
         // GET /Report/List → redirect to first available report
-        public async Task<IActionResult> List()
+        public async Task<IActionResult> List(string? clientCode = null)
         {
             var reports = await _reportService.GetAllReportsAsync();
             if (reports.Count == 0)
                 return View("NoReports");
 
-            return RedirectToAction(nameof(Index), new { id = reports[0].Id });
+            return RedirectToAction(nameof(Index), new { id = reports[0].Id, clientCode });
         }
 
         // POST /Report/{id}/SavePreferences  (AJAX)
@@ -56,18 +56,18 @@ namespace DataWarehousePower.Controllers
             var userId = _prefService.ResolveUserId(HttpContext);
 
             // Load the system columns for this report to validate against
-            var vm = await _reportService.BuildReportViewModelAsync(id, userId);
+            var vm = await _reportService.BuildReportViewModelAsync(id, userId, request?.ClientCode);
             if (vm is null)
                 return NotFound(new { success = false, error = "Report not found." });
 
             try
             {
-                await _prefService.SavePreferencesAsync(userId, id, request.Columns, vm.AvailableColumns);
+                await _prefService.SavePreferencesAsync(userId, id, request.ClientCode, request.Columns, vm.AvailableColumns);
                 return Ok(new { success = true });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to save preferences for user {UserId} report {ReportId}", userId, id);
+                _logger.LogError(ex, "Failed to save preferences for user {UserId} report {ReportId} client code {ClientCode}", userId, id, request?.ClientCode);
                 return StatusCode(500, new { success = false, error = "Failed to save preferences." });
             }
         }
@@ -75,6 +75,7 @@ namespace DataWarehousePower.Controllers
 
     public class SavePreferencesRequest
     {
+        public string? ClientCode { get; set; }
         public List<SaveColumnRequest> Columns { get; set; } = new();
     }
 }

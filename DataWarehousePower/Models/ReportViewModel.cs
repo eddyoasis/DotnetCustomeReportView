@@ -7,6 +7,8 @@ namespace DataWarehousePower.Models
     {
         public int    ReportId   { get; set; }
         public string ReportName { get; set; } = string.Empty;
+        public string ClientCode { get; set; } = string.Empty;
+        public List<string> AvailableClientCodes { get; set; } = new();
 
         /// <summary>All columns defined for this report (from ReportColumns table).</summary>
         public List<ColumnDefinition> AvailableColumns { get; set; } = new();

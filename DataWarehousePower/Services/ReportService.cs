@@ -11,6 +11,8 @@ namespace DataWarehousePower.Services
         private static readonly JsonSerializerOptions _jsonOpts =
             new() { PropertyNameCaseInsensitive = true };
 
+        private static readonly string[] _clientCodeKeys = ["ClientCode", "clientCode", "ClintCode", "clintCode"];
+
         private readonly IReportRepository              _reportRepo;
         private readonly IColumnPreferenceRepository    _prefRepo;
         private readonly ILogger<ReportService>         _logger;
@@ -28,8 +30,9 @@ namespace DataWarehousePower.Services
         public Task<List<ReportDefinition>> GetAllReportsAsync()
             => _reportRepo.GetAllReportsAsync();
 
-        public async Task<ReportViewModel?> BuildReportViewModelAsync(int reportId, string userId)
+        public async Task<ReportViewModel?> BuildReportViewModelAsync(int reportId, string userId, string? clientCode = null)
         {
+            string normalizedClientCode = NormalizeClientCode(clientCode);
             var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
             if (report is null) return null;
 
@@ -47,7 +50,7 @@ namespace DataWarehousePower.Services
                 .ToList();
 
             // Apply user preferences
-            var displayColumns = await LoadPreferencesAsync(userId, reportId, systemColumns);
+            var displayColumns = await LoadPreferencesAsync(userId, reportId, normalizedClientCode, systemColumns);
 
             // Fetch data — SP mode takes priority over table mode
             List<Dictionary<string, object?>> rows;
@@ -69,11 +72,18 @@ namespace DataWarehousePower.Services
 
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync();
+            List<string> savedClientCodes = await _prefRepo.GetClientCodesAsync(userId, reportId);
+            List<string> availableClientCodes = BuildAvailableClientCodes(
+                normalizedClientCode,
+                ExtractClientCodes(rows),
+                savedClientCodes);
 
             return new ReportViewModel
             {
                 ReportId         = report.Id,
                 ReportName       = report.ReportName,
+                ClientCode       = normalizedClientCode,
+                AvailableClientCodes = availableClientCodes,
                 AvailableColumns = systemColumns,
                 DisplayColumns   = displayColumns,
                 Rows             = rows,
@@ -84,9 +94,11 @@ namespace DataWarehousePower.Services
         public async Task SavePreferencesAsync(
             int reportId,
             string userId,
+            string? clientCode,
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns)
         {
+            string normalizedClientCode = NormalizeClientCode(clientCode);
             var validKeys = systemColumns.Select(c => c.Key)
                                          .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -115,6 +127,7 @@ namespace DataWarehousePower.Services
             {
                 UserId             = userId,
                 ReportDefinitionId = reportId,
+                ClientCode         = normalizedClientCode,
                 ColumnJson         = JsonSerializer.Serialize(entries)
             });
         }
@@ -124,11 +137,12 @@ namespace DataWarehousePower.Services
         private async Task<List<ColumnDefinition>> LoadPreferencesAsync(
             string userId,
             int reportId,
+            string clientCode,
             List<ColumnDefinition> systemColumns)
         {
             try
             {
-                var row = await _prefRepo.GetAsync(userId, reportId);
+                var row = await _prefRepo.GetAsync(userId, reportId, clientCode);
                 if (row is null) return BuildDefaults(systemColumns);
 
                 var entries = JsonSerializer.Deserialize<List<ColumnJsonEntry>>(row.ColumnJson, _jsonOpts)
@@ -160,10 +174,54 @@ namespace DataWarehousePower.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "Failed to load preferences for user {UserId} report {ReportId}. Using defaults.",
-                    userId, reportId);
+                    "Failed to load preferences for user {UserId} report {ReportId} client code {ClientCode}. Using defaults.",
+                    userId, reportId, clientCode);
                 return BuildDefaults(systemColumns);
             }
+        }
+
+        private static string NormalizeClientCode(string? clientCode)
+            => clientCode?.Trim() ?? string.Empty;
+
+        private static List<string> BuildAvailableClientCodes(
+            string currentClientCode,
+            IEnumerable<string> rowClientCodes,
+            IEnumerable<string> savedClientCodes)
+            => rowClientCodes
+                .Concat(savedClientCodes)
+                .Append(currentClientCode)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        private static List<string> ExtractClientCodes(IEnumerable<Dictionary<string, object?>> rows)
+            => rows.Select(FindClientCodeValue)
+                   .Where(value => !string.IsNullOrWhiteSpace(value))
+                   .Select(value => value!)
+                   .Distinct(StringComparer.OrdinalIgnoreCase)
+                   .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                   .ToList();
+
+        private static string? FindClientCodeValue(Dictionary<string, object?> row)
+        {
+            foreach (string clientCodeKey in _clientCodeKeys)
+            {
+                KeyValuePair<string, object?>? match = row.FirstOrDefault(entry =>
+                    entry.Key.Equals(clientCodeKey, StringComparison.OrdinalIgnoreCase));
+
+                if (match.HasValue && match.Value.Value is not null)
+                {
+                    string clientCode = match.Value.Value.ToString()?.Trim() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(clientCode))
+                    {
+                        return clientCode;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static List<ColumnDefinition> BuildDefaults(List<ColumnDefinition> systemColumns)

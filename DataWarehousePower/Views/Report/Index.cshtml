@@ -13,7 +13,7 @@
                 @foreach (var r in Model.AllReports)
                 {
                     <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
-                        <a href="/Report/@r.Id"
+                                <a href="@Url.Action("Index", "Report", new { id = r.Id, clientCode = Model.ClientCode })"
                            class="text-decoration-none @(r.Id == Model.ReportId ? "text-white" : "")"
                            style="font-size:.85rem;">
                             @r.ReportName
@@ -27,7 +27,44 @@
     <!-- ── Main content ─────────────────────────────────────────── -->
     <div class="col-md-10">
 
-        <h4 class="mb-3">@Model.ReportName</h4>
+        <div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-3">
+            <div>
+                <h4 class="mb-1">@Model.ReportName</h4>
+                <div class="text-muted small">Choose a client code to load and save a separate column layout.</div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body py-2 px-3">
+                    <label for="client-code-select" class="form-label small fw-semibold mb-1">Client Code</label>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="d-flex gap-2 align-items-center">
+                        <select id="client-code-select" class="form-select form-select-sm">
+                            <option value="">Default</option>
+                            @foreach (var availableClientCode in Model.AvailableClientCodes)
+                            {
+                                <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                            }
+                        </select>
+                        <button id="btn-client-apply" type="button" class="btn btn-sm btn-outline-primary">Load</button>
+                        <button id="btn-client-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input id="client-code-new"
+                                   type="text"
+                                   class="form-control form-control-sm"
+                                   maxlength="128"
+                                   placeholder="Create new client code" />
+                            <button id="btn-client-create" type="button" class="btn btn-sm btn-primary">Use New</button>
+                        </div>
+                        <div id="client-code-error" class="text-danger small" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="client-code-status" class="alert alert-light border small py-2 px-3 mb-3">
+            Preference scope:
+            <strong>@(string.IsNullOrWhiteSpace(Model.ClientCode) ? "Default" : Model.ClientCode)</strong>
+        </div>
 
         <!-- ════════ COLUMN CUSTOMISER ════════ -->
         <div class="card mb-4 shadow-sm">
@@ -124,9 +161,46 @@
 @section Scripts {
 <script>
 const reportId = @Model.ReportId;
+const initialClientCode = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCode));
+const clientCodeSelect = document.getElementById('client-code-select');
+const clientCodeNewInput = document.getElementById('client-code-new');
+const clientApplyButton = document.getElementById('btn-client-apply');
+const clientClearButton = document.getElementById('btn-client-clear');
+const clientCreateButton = document.getElementById('btn-client-create');
+const clientCodeError = document.getElementById('client-code-error');
+const clientCodeStatus = document.getElementById('client-code-status');
 
 // Embed all rows as JSON for client-side re-render
 const allRows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Rows));
+
+clientApplyButton.addEventListener('click', () => {
+    hideClientCodeError();
+    navigateToClientCode(getActiveClientCode());
+});
+
+clientClearButton.addEventListener('click', () => {
+    hideClientCodeError();
+    clientCodeSelect.value = '';
+    clientCodeNewInput.value = '';
+    navigateToClientCode('');
+});
+
+clientCodeSelect.addEventListener('change', e => {
+    hideClientCodeError();
+    const selectedClientCode = e.target instanceof HTMLSelectElement ? e.target.value : '';
+    navigateToClientCode(selectedClientCode);
+});
+
+clientCreateButton.addEventListener('click', async () => {
+    await applyNewClientCodeAsync();
+});
+
+clientCodeNewInput.addEventListener('keydown', async e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        await applyNewClientCodeAsync();
+    }
+});
 
 // ── Drag-and-drop ─────────────────────────────────────────────────────────────
 const sortable = document.getElementById('sortable-columns');
@@ -157,6 +231,7 @@ sortable.addEventListener('change', e => {
 document.getElementById('btn-apply').addEventListener('click', async () => {
     const errorEl  = document.getElementById('label-error');
     const statusEl = document.getElementById('save-status');
+    const activeClientCode = getActiveClientCode();
     errorEl.style.display = 'none';
 
     const chips = [...sortable.querySelectorAll('li.chip')];
@@ -176,12 +251,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
         return;
     }
 
-    const columns = chips.map((chip, i) => ({
-        key:          chip.dataset.key,
-        isVisible:    chip.querySelector('.col-visible-toggle').checked,
-        order:        i + 1,
-        displayLabel: chip.querySelector('.label-input').value.trim() || chip.dataset.defaultLabel
-    }));
+    const columns = buildColumnsFromChips(chips);
 
     statusEl.textContent = 'Saving…';
     statusEl.className   = 'small align-self-center ms-1 text-muted';
@@ -190,10 +260,12 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
         const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ columns })
+            body:    JSON.stringify({ clientCode: activeClientCode, columns })
         });
         const json = await resp.json();
         if (resp.ok && json.success) {
+            upsertClientCodeOption(activeClientCode);
+            syncClientCodeUi(activeClientCode);
             statusEl.textContent = '✓ Saved';
             statusEl.className   = 'small align-self-center ms-1 text-success';
             renderTable(columns);
@@ -211,6 +283,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
 // ── Reset to defaults ─────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', async () => {
     const statusEl = document.getElementById('save-status');
+    const activeClientCode = getActiveClientCode();
 
     const chips = [...sortable.querySelectorAll('li.chip')];
     chips.forEach(chip => {
@@ -236,10 +309,12 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
         const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ columns: defaultColumns })
+            body:    JSON.stringify({ clientCode: activeClientCode, columns: defaultColumns })
         });
         const json = await resp.json();
         if (resp.ok && json.success) {
+            upsertClientCodeOption(activeClientCode);
+            syncClientCodeUi(activeClientCode);
             statusEl.textContent = '✓ Reset & saved';
             statusEl.className   = 'small align-self-center ms-1 text-success';
             renderTable(defaultColumns);
@@ -269,5 +344,134 @@ function renderTable(cols) {
 function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function navigateToClientCode(value) {
+    const trimmed = value.trim();
+    const url = new URL(window.location.href);
+
+    if (trimmed) {
+        url.searchParams.set('clientCode', trimmed);
+    } else {
+        url.searchParams.delete('clientCode');
+    }
+
+    window.location.href = url.toString();
+}
+
+function applyNewClientCode() {
+    return applyNewClientCodeAsync();
+}
+
+async function applyNewClientCodeAsync() {
+    hideClientCodeError();
+
+    const newClientCode = clientCodeNewInput.value.trim();
+    if (!newClientCode) {
+        showClientCodeError('New client code cannot be blank.');
+        return;
+    }
+
+    const existingOption = [...clientCodeSelect.options].find(option =>
+        option.value.localeCompare(newClientCode, undefined, { sensitivity: 'accent' }) === 0);
+
+    if (existingOption) {
+        clientCodeSelect.value = existingOption.value;
+        navigateToClientCode(existingOption.value);
+        return;
+    }
+
+    const statusEl = document.getElementById('save-status');
+    const chips = [...sortable.querySelectorAll('li.chip')];
+    const columns = buildColumnsFromChips(chips);
+
+    statusEl.textContent = 'Creating scope…';
+    statusEl.className   = 'small align-self-center ms-1 text-muted';
+
+    try {
+        const response = await fetch(`/Report/${reportId}/SavePreferences`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientCode: newClientCode, columns })
+        });
+
+        const json = await response.json();
+        if (!response.ok || !json.success) {
+            showClientCodeError(json.error || 'Failed to create client code.');
+            statusEl.textContent = '✗ ' + (json.error || 'Create failed');
+            statusEl.className   = 'small align-self-center ms-1 text-danger';
+            return;
+        }
+
+        upsertClientCodeOption(newClientCode);
+        syncClientCodeUi(newClientCode);
+        statusEl.textContent = '✓ Scope created';
+        statusEl.className   = 'small align-self-center ms-1 text-success';
+        navigateToClientCode(newClientCode);
+    } catch {
+        showClientCodeError('Network error while creating client code.');
+        statusEl.textContent = '✗ Network error';
+        statusEl.className   = 'small align-self-center ms-1 text-danger';
+    }
+}
+
+function getActiveClientCode() {
+    const newClientCode = clientCodeNewInput.value.trim();
+    if (newClientCode.length > 0) {
+        return newClientCode;
+    }
+
+    return clientCodeSelect.value.trim();
+}
+
+function buildColumnsFromChips(chips) {
+    return chips.map((chip, i) => ({
+        key:          chip.dataset.key,
+        isVisible:    chip.querySelector('.col-visible-toggle').checked,
+        order:        i + 1,
+        displayLabel: chip.querySelector('.label-input').value.trim() || chip.dataset.defaultLabel
+    }));
+}
+
+function upsertClientCodeOption(value) {
+    const normalizedValue = value.trim();
+    if (!normalizedValue) {
+        return;
+    }
+
+    const existingOption = [...clientCodeSelect.options].find(option =>
+        option.value.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0);
+
+    if (existingOption) {
+        existingOption.value = normalizedValue;
+        existingOption.textContent = normalizedValue;
+        return;
+    }
+
+    const newOption = document.createElement('option');
+    newOption.value = normalizedValue;
+    newOption.textContent = normalizedValue;
+    clientCodeSelect.appendChild(newOption);
+}
+
+function syncClientCodeUi(value) {
+    const normalizedValue = value.trim();
+    clientCodeSelect.value = normalizedValue;
+    clientCodeNewInput.value = normalizedValue;
+
+    const scopeLabel = normalizedValue || 'Default';
+    clientCodeStatus.innerHTML = `Preference scope: <strong>${esc(scopeLabel)}</strong>`;
+}
+
+function showClientCodeError(message) {
+    clientCodeError.textContent = message;
+    clientCodeError.style.display = 'block';
+}
+
+function hideClientCodeError() {
+    clientCodeError.textContent = '';
+    clientCodeError.style.display = 'none';
+}
+
+syncClientCodeUi(initialClientCode);
 </script>
 }

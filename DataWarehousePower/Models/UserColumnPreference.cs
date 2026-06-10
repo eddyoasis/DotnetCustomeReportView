@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace DataWarehousePower.Models
 {
     /// <summary>
-    /// One row per user per report. Column preferences stored as JSON.
+    /// One row per user per report per client code. Column preferences stored as JSON.
     /// JSON shape: [{"PropertyName":"Id","IsVisible":true,"DisplayOrder":1,"CustomName":"ID"}]
     /// </summary>
     [Table("UserColumnPreferences")]
@@ -16,6 +16,10 @@ namespace DataWarehousePower.Models
 
         [Key, Column(Order = 1)]
         public int ReportDefinitionId { get; set; }
+
+        [Key, Column(Order = 2)]
+        [MaxLength(128)]
+        public string ClientCode { get; set; } = string.Empty;
 
         [Required]
         public string ColumnJson { get; set; } = "[]";
