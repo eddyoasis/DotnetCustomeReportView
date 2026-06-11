@@ -10,11 +10,13 @@
     <PackageReference Include="ClosedXML" Version="0.104.1" />
     <PackageReference Include="ICSharpCode.SharpZipLib" Version="0.86.0.518" />
     <PackageReference Include="log4net" Version="2.0.17" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="8.0.6" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="System.DirectoryServices.AccountManagement" Version="8.0.0" />
     <PackageReference Include="QuestPDF" Version="2024.7.1" />
   </ItemGroup>
 

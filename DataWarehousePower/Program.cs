@@ -1,7 +1,10 @@
 using DataWarehousePower.Data;
+using DataWarehousePower.Middleware;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
 using log4net.Config;
+using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,9 +26,28 @@ builder.Services.AddScoped<IReportService,           ReportService>();
 builder.Services.AddScoped<IReportExportService,     ReportExportService>();
 builder.Services.AddScoped<IColumnPreferenceService, ColumnPreferenceService>();
 builder.Services.AddScoped<IReportManageService,     ReportManageService>();
+builder.Services.AddScoped<IActiveDirectoryUserService, ActiveDirectoryUserService>();
+
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(8);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
 // ── MVC ───────────────────────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
+
+// ── Authentication / Authorization (Windows AD) ─────────────────────────────
+builder.Services
+    .AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+    .AddNegotiate();
+
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
 
 var app = builder.Build();
 
@@ -54,6 +76,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseSession();
+app.UseAuthentication();
+app.UseMiddleware<UserDisplayNameSessionMiddleware>();
 app.UseAuthorization();
 
 // Root "/" → redirect to /Report/List which picks the first report

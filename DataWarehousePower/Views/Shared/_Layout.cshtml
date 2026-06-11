@@ -9,6 +9,18 @@
     <link rel="stylesheet" href="~/DataWarehousePower.styles.css" asp-append-version="true" />
 </head>
 <body>
+    @{
+        string? displayName = Context.Session.GetString("UserDisplayName");
+        string? department = Context.Session.GetString("UserDepartment");
+        string? role = Context.Session.GetString("UserRole");
+
+        string userLabel = string.IsNullOrWhiteSpace(displayName)
+            ? (User?.Identity?.Name ?? "Unknown")
+            : displayName;
+
+        string departmentLabel = string.IsNullOrWhiteSpace(department) ? "N/A" : department;
+        string roleLabel = string.IsNullOrWhiteSpace(role) ? "N/A" : role;
+    }
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
@@ -29,6 +41,10 @@
                             <a class="nav-link text-dark" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage Reports</a>
                         </li>
                     </ul>
+                    <div class="navbar-text ms-auto text-end text-dark">
+                        <div>User: @userLabel</div>
+                        <small>Department: @departmentLabel | Role: @roleLabel</small>
+                    </div>
                 </div>
             </div>
         </nav>
