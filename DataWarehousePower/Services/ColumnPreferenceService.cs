@@ -1,4 +1,5 @@
 using DataWarehousePower.Models;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 
 namespace DataWarehousePower.Services
@@ -24,19 +25,23 @@ namespace DataWarehousePower.Services
 
         public string ResolveUserId(HttpContext httpContext)
         {
-            if (httpContext.Request.Cookies.TryGetValue(CookieName, out var existing)
-                && IsValidUserId(existing))
-                return existing;
-
-            var newId = Guid.NewGuid().ToString();
-            httpContext.Response.Cookies.Append(CookieName, newId, new CookieOptions
+            string? loginUserId = ExtractLoginUserId(httpContext.User);
+            if (IsValidUserId(loginUserId ?? string.Empty))
             {
-                Expires     = DateTimeOffset.UtcNow.AddDays(CookieDays),
-                HttpOnly    = true,
-                SameSite    = SameSiteMode.Lax,
-                IsEssential = true
-            });
-            return newId;
+                string resolvedUserId = loginUserId!;
+                WriteUserCookie(httpContext, resolvedUserId);
+                return resolvedUserId;
+            }
+
+            if (httpContext.Request.Cookies.TryGetValue(CookieName, out string? existing)
+                && IsValidUserId(existing))
+            {
+                return existing;
+            }
+
+            const string fallbackUserId = "anonymous";
+            WriteUserCookie(httpContext, fallbackUserId);
+            return fallbackUserId;
         }
 
         public Task<int> SavePreferencesAsync(string userId, int reportId, string? clientCode,
@@ -55,5 +60,72 @@ namespace DataWarehousePower.Services
             => !string.IsNullOrWhiteSpace(value)
                && value.Length <= MaxUserIdLen
                && _asciiPrintable.IsMatch(value);
+
+        private static void WriteUserCookie(HttpContext httpContext, string userId)
+        {
+            httpContext.Response.Cookies.Append(CookieName, userId, new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddDays(CookieDays),
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                IsEssential = true
+            });
+        }
+
+        private static string? ExtractLoginUserId(ClaimsPrincipal? user)
+        {
+            if (user?.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            string? nameIdentifier = user.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (TryNormalizeIdentity(nameIdentifier, out string? normalizedFromClaim))
+            {
+                return normalizedFromClaim;
+            }
+
+            string? identityName = user.Identity?.Name;
+            if (TryNormalizeIdentity(identityName, out string? normalizedFromIdentity))
+            {
+                return normalizedFromIdentity;
+            }
+
+            return null;
+        }
+
+        private static bool TryNormalizeIdentity(string? identity, out string? normalized)
+        {
+            normalized = null;
+            if (string.IsNullOrWhiteSpace(identity))
+            {
+                return false;
+            }
+
+            string trimmedIdentity = identity.Trim();
+            string candidate = trimmedIdentity;
+
+            int slashIndex = trimmedIdentity.LastIndexOf('\\');
+            if (slashIndex >= 0 && slashIndex < trimmedIdentity.Length - 1)
+            {
+                candidate = trimmedIdentity[(slashIndex + 1)..];
+            }
+            else
+            {
+                int atIndex = trimmedIdentity.IndexOf('@');
+                if (atIndex > 0)
+                {
+                    candidate = trimmedIdentity[..atIndex];
+                }
+            }
+
+            if (!IsValidUserId(candidate))
+            {
+                return false;
+            }
+
+            normalized = candidate;
+            return true;
+        }
     }
 }

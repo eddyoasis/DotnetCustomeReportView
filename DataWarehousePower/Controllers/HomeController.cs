@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using DataWarehousePower.Models;
 
 namespace DataWarehousePower.Controllers;
@@ -19,6 +20,12 @@ public class HomeController : Controller
     }
 
     public IActionResult Privacy()
+    {
+        return View();
+    }
+
+    [AllowAnonymous]
+    public IActionResult Unauthorized()
     {
         return View();
     }

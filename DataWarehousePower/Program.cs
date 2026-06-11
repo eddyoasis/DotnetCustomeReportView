@@ -50,6 +50,7 @@ builder.Services.AddAuthorizationBuilder()
         .Build());
 
 var app = builder.Build();
+const string ChallengeCookieName = "dw_auth_challenge";
 
 // ── Auto-migrate on startup ───────────────────────────────────────────────────
 try
@@ -77,7 +78,61 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseSession();
+app.UseStatusCodePages(async context =>
+{
+    var request = context.HttpContext.Request;
+    var response = context.HttpContext.Response;
+    var user = context.HttpContext.User;
+
+    // Clear stale marker once authentication succeeds.
+    if (user?.Identity?.IsAuthenticated == true && request.Cookies.ContainsKey(ChallengeCookieName))
+    {
+        response.Cookies.Delete(ChallengeCookieName);
+    }
+
+    if (response.StatusCode == StatusCodes.Status401Unauthorized ||
+        response.StatusCode == StatusCodes.Status403Forbidden)
+    {
+        bool hasAuthorizationHeader = request.Headers.ContainsKey("Authorization");
+        bool hasChallengeMarker = request.Cookies.ContainsKey(ChallengeCookieName);
+
+        // Step 1: issue Negotiate challenge without redirect so domain users can auto-login.
+        if (!hasAuthorizationHeader && !hasChallengeMarker)
+        {
+            response.Cookies.Append(
+                ChallengeCookieName,
+                "1",
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = request.IsHttps,
+                    IsEssential = true,
+                    SameSite = SameSiteMode.Lax,
+                    MaxAge = TimeSpan.FromMinutes(2)
+                });
+
+            return;
+        }
+
+        // If credentials were attempted and still failed, or no credentials arrived after the
+        // initial challenge, redirect to Unauthorized page.
+        if (hasAuthorizationHeader || hasChallengeMarker)
+        {
+            response.Cookies.Delete(ChallengeCookieName);
+            response.Redirect("/Home/Unauthorized");
+        }
+    }
+});
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true && context.Request.Cookies.ContainsKey(ChallengeCookieName))
+    {
+        context.Response.Cookies.Delete(ChallengeCookieName);
+    }
+
+    await next();
+});
 app.UseMiddleware<UserDisplayNameSessionMiddleware>();
 app.UseAuthorization();
 
