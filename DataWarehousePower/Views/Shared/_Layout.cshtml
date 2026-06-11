@@ -1,4 +1,8 @@
-﻿<!DOCTYPE html>
+﻿@using DataWarehousePower.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -20,6 +24,17 @@
 
         string departmentLabel = string.IsNullOrWhiteSpace(department) ? "N/A" : department;
         string roleLabel = string.IsNullOrWhiteSpace(role) ? "N/A" : role;
+
+        bool canViewReports = false;
+        bool canManageReports = false;
+        bool canViewAudilog = false;
+
+        if (User?.Identity?.IsAuthenticated == true)
+        {
+            canViewReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportAccess)).Succeeded;
+            canManageReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportManageAccess)).Succeeded;
+            canViewAudilog = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.AuditlogAccess)).Succeeded;
+        }
     }
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
@@ -34,15 +49,24 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Report" asp-action="List">Reports</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage Reports</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="AuditLog" asp-action="Index">Audit Logs</a>
-                        </li>
+                        @if (canViewReports)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Report" asp-action="List">Reports</a>
+                            </li>
+                        }
+                        @if (canManageReports)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage Reports</a>
+                            </li>
+                        }
+                        @if (canViewAudilog)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="AuditLog" asp-action="Index">Audit Logs</a>
+                            </li>
+                        }
                     </ul>
                     <div class="navbar-text ms-auto text-end text-dark">
                         <div>User: @userLabel</div>
