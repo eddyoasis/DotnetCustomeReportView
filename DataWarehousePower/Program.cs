@@ -1,3 +1,4 @@
+using DataWarehousePower.Authorization;
 using DataWarehousePower.Data;
 using DataWarehousePower.Middleware;
 using DataWarehousePower.Repositories;
@@ -31,6 +32,9 @@ builder.Services.AddScoped<IActiveDirectoryUserService, ActiveDirectoryUserServi
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<DepartmentAuthorizationOptions>(
+    builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
+builder.Services.AddSingleton<IAuthorizationHandler, DepartmentAccessAuthorizationHandler>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -48,10 +52,22 @@ builder.Services
     .AddAuthentication(NegotiateDefaults.AuthenticationScheme)
     .AddNegotiate();
 
-builder.Services.AddAuthorizationBuilder()
+AuthorizationBuilder authorizationBuilder = builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build());
+
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.ReportAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("Report")));
+
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.ReportManageAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("ReportManage")));
 
 var app = builder.Build();
 const string ChallengeCookieName = "dw_auth_challenge";
@@ -94,8 +110,13 @@ app.UseStatusCodePages(async context =>
         response.Cookies.Delete(ChallengeCookieName);
     }
 
-    if (response.StatusCode == StatusCodes.Status401Unauthorized ||
-        response.StatusCode == StatusCodes.Status403Forbidden)
+    if (response.StatusCode == StatusCodes.Status403Forbidden)
+    {
+        response.Redirect("/Home/NoPermission");
+        return;
+    }
+
+    if (response.StatusCode == StatusCodes.Status401Unauthorized)
     {
         bool hasAuthorizationHeader = request.Headers.ContainsKey("Authorization");
         bool hasChallengeMarker = request.Cookies.ContainsKey(ChallengeCookieName);

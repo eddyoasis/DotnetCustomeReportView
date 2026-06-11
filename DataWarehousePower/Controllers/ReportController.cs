@@ -1,5 +1,7 @@
+using DataWarehousePower.Authorization;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DataWarehousePower.Controllers
@@ -7,6 +9,7 @@ namespace DataWarehousePower.Controllers
     /// <summary>
     /// Generic report controller — serves any report defined in ReportDefinitions table.
     /// </summary>
+    [Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
     public class ReportController : Controller
     {
         private readonly IReportService          _reportService;

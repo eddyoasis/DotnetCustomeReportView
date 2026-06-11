@@ -1,5 +1,7 @@
+using DataWarehousePower.Authorization;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DataWarehousePower.Controllers
@@ -8,6 +10,7 @@ namespace DataWarehousePower.Controllers
     /// CRUD management for ReportDefinitions and their ReportColumns.
     /// Route: /ReportManage
     /// </summary>
+    [Authorize(Policy = DepartmentAuthorizationPolicies.ReportManageAccess)]
     public class ReportManageController : Controller
     {
         private readonly IReportManageService _service;
