@@ -69,6 +69,12 @@ authorizationBuilder.AddPolicy(
         .RequireAuthenticatedUser()
         .AddRequirements(new DepartmentAccessRequirement("ReportManage")));
 
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.AuditlogAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("Auditlog")));
+
 var app = builder.Build();
 const string ChallengeCookieName = "dw_auth_challenge";
 

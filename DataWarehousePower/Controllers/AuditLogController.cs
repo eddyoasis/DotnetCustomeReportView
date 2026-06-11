@@ -1,9 +1,12 @@
+using DataWarehousePower.Authorization;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DataWarehousePower.Controllers
 {
+    [Authorize(Policy = DepartmentAuthorizationPolicies.AuditlogAccess)]
     public class AuditLogController : Controller
     {
         private readonly IAuditLogQueryService _service;

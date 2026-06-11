@@ -4,4 +4,5 @@ public static class DepartmentAuthorizationPolicies
 {
     public const string ReportAccess = "Department.ReportAccess";
     public const string ReportManageAccess = "Department.ReportManageAccess";
+    public const string AuditlogAccess = "Department.AuditlogAccess";
 }
