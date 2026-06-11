@@ -1,5 +1,6 @@
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
+using log4net;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DataWarehousePower.Controllers
@@ -9,17 +10,22 @@ namespace DataWarehousePower.Controllers
     /// </summary>
     public class ReportController : Controller
     {
+        private static readonly ILog AuditLog = LogManager.GetLogger("AuditLogger");
+
         private readonly IReportService          _reportService;
         private readonly IColumnPreferenceService _prefService;
+        private readonly IReportExportService _exportService;
         private readonly ILogger<ReportController> _logger;
 
         public ReportController(
             IReportService reportService,
             IColumnPreferenceService prefService,
+            IReportExportService exportService,
             ILogger<ReportController> logger)
         {
             _reportService = reportService;
             _prefService   = prefService;
+            _exportService = exportService;
             _logger        = logger;
         }
 
@@ -79,6 +85,123 @@ namespace DataWarehousePower.Controllers
                 _logger.LogError(ex, "Failed to save preferences for user {UserId} report {ReportId} client code {ClientCode}", userId, id, request?.ClientCode);
                 return StatusCode(500, new { success = false, error = "Failed to save preferences." });
             }
+        }
+
+        // POST /Report/{id}/Export
+        [HttpPost]
+        public async Task<IActionResult> Export(int id, [FromBody] ExportReportRequest? request, CancellationToken cancellationToken)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string correlationId = HttpContext.TraceIdentifier;
+
+            if (request is null)
+            {
+                WriteAuditLog("ExportRejected", userId, correlationId, id, "unknown", string.Empty, "Request body is missing.");
+                return BadRequest(new { success = false, error = "Export request is required." });
+            }
+
+            string normalizedFormat = request.Format?.Trim().ToLowerInvariant() ?? string.Empty;
+            if (normalizedFormat is not ("csv" or "excel" or "pdf"))
+            {
+                WriteAuditLog("ExportRejected", userId, correlationId, id, normalizedFormat, request.ClientCode, "Invalid format.");
+                return BadRequest(new { success = false, error = "Invalid format. Use CSV, Excel, or PDF." });
+            }
+
+            string? passwordValidationError = ValidatePasswordStrength(request.Password);
+            if (passwordValidationError is not null)
+            {
+                WriteAuditLog("ExportRejected", userId, correlationId, id, normalizedFormat, request.ClientCode, passwordValidationError);
+                return BadRequest(new { success = false, error = passwordValidationError });
+            }
+
+            ReportViewModel? vm = await _reportService.BuildReportViewModelAsync(
+                id,
+                userId,
+                request.ClientCode,
+                request.FilterClientCode,
+                request.DateFrom,
+                request.DateTo);
+
+            if (vm is null)
+            {
+                WriteAuditLog("ExportRejected", userId, correlationId, id, normalizedFormat, request.ClientCode, "Report not found.");
+                return NotFound(new { success = false, error = "Report not found." });
+            }
+
+            try
+            {
+                byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
+                    vm,
+                    normalizedFormat,
+                    request.Password,
+                    cancellationToken);
+
+                string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                string zipFileName = $"{reportName}_export.zip";
+
+                WriteAuditLog("ExportSucceeded", userId, correlationId, id, normalizedFormat, request.ClientCode, "ZIP generated and returned.");
+
+                return File(zipBytes, "application/zip", zipFileName);
+            }
+            catch (ArgumentException argumentException)
+            {
+                _logger.LogWarning(argumentException, "Invalid export request for report {ReportId}", id);
+                WriteAuditLog("ExportFailed", userId, correlationId, id, normalizedFormat, request.ClientCode, argumentException.Message);
+                return BadRequest(new { success = false, error = argumentException.Message });
+            }
+            catch (InvalidOperationException invalidOperationException)
+            {
+                _logger.LogWarning(invalidOperationException, "Export validation failed for report {ReportId}", id);
+                WriteAuditLog("ExportFailed", userId, correlationId, id, normalizedFormat, request.ClientCode, invalidOperationException.Message);
+                return BadRequest(new { success = false, error = invalidOperationException.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to export report {ReportId}", id);
+                WriteAuditLog("ExportFailed", userId, correlationId, id, normalizedFormat, request.ClientCode, "Unexpected export error.");
+                return StatusCode(500, new { success = false, error = "Failed to export report." });
+            }
+        }
+
+        private static string? ValidatePasswordStrength(string? password)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                return "Password is required.";
+            }
+
+            string trimmed = password.Trim();
+            if (trimmed.Length < 8)
+            {
+                return "Password must be at least 8 characters.";
+            }
+
+            bool hasUpper = trimmed.Any(char.IsUpper);
+            bool hasLower = trimmed.Any(char.IsLower);
+            bool hasDigit = trimmed.Any(char.IsDigit);
+            bool hasSymbol = trimmed.Any(character => !char.IsLetterOrDigit(character));
+
+            if (!hasUpper || !hasLower || !hasDigit || !hasSymbol)
+            {
+                return "Password must include uppercase, lowercase, number, and symbol.";
+            }
+
+            return null;
+        }
+
+        private static void WriteAuditLog(
+            string action,
+            string userId,
+            string correlationId,
+            int reportId,
+            string? format,
+            string? clientCode,
+            string detail)
+        {
+            string normalizedFormat = string.IsNullOrWhiteSpace(format) ? "unknown" : format.Trim().ToLowerInvariant();
+            string normalizedClientCode = string.IsNullOrWhiteSpace(clientCode) ? "Default" : clientCode.Trim();
+
+            AuditLog.Info($"action={action};userId={userId};reportId={reportId};format={normalizedFormat};clientCode={normalizedClientCode};correlationId={correlationId};detail={detail}");
         }
     }
 

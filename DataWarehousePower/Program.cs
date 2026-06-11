@@ -1,9 +1,12 @@
 using DataWarehousePower.Data;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
+using log4net.Config;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+XmlConfigurator.Configure(new FileInfo(Path.Combine(AppContext.BaseDirectory, "log4net.config")));
 
 // ── EF Core ───────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -17,6 +20,7 @@ builder.Services.AddScoped<IReportManageRepository,     ReportManageRepository>(
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
+builder.Services.AddScoped<IReportExportService,     ReportExportService>();
 builder.Services.AddScoped<IColumnPreferenceService, ColumnPreferenceService>();
 builder.Services.AddScoped<IReportManageService,     ReportManageService>();
 

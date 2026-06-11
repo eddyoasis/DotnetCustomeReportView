@@ -138,6 +138,57 @@
             </div>
         </div>
 
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header fw-semibold">Export</div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label for="export-format" class="form-label small fw-semibold">Format</label>
+                        <select id="export-format" class="form-select form-select-sm">
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel (.xlsx)</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8 d-flex gap-2">
+                        <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
+                        <span id="export-status" class="small align-self-center"></span>
+                    </div>
+                </div>
+                <div class="text-muted small mt-2">
+                    Choose a format, set a strong password, and download the report as a protected ZIP.
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="export-password-modal" tabindex="-1" aria-labelledby="export-password-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="export-password-title">Export Password</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label for="export-password-input" class="form-label small fw-semibold">ZIP Password</label>
+                        <input id="export-password-input"
+                               type="password"
+                               class="form-control"
+                               maxlength="128"
+                               autocomplete="new-password"
+                               placeholder="Enter strong password" />
+                        <div class="form-text">
+                            Minimum 8 characters with uppercase, lowercase, number, and symbol.
+                        </div>
+                        <div id="export-password-error" class="text-danger small mt-2" style="display:none;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button id="btn-export-confirm" type="button" class="btn btn-success">Export</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ════════ COLUMN CUSTOMISER ════════ -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header fw-semibold d-flex align-items-center gap-2">
@@ -244,6 +295,17 @@ const clientClearButton = document.getElementById('btn-client-clear');
 const clientCreateButton = document.getElementById('btn-client-create');
 const clientCodeError = document.getElementById('client-code-error');
 const clientCodeStatus = document.getElementById('client-code-status');
+const exportButton = document.getElementById('btn-export');
+const exportFormatSelect = document.getElementById('export-format');
+const exportStatus = document.getElementById('export-status');
+const filterClientCodeInput = document.getElementById('filter-client-code');
+const filterDateFromInput = document.getElementById('filter-date-from');
+const filterDateToInput = document.getElementById('filter-date-to');
+const exportPasswordModalElement = document.getElementById('export-password-modal');
+const exportPasswordInput = document.getElementById('export-password-input');
+const exportPasswordError = document.getElementById('export-password-error');
+const exportConfirmButton = document.getElementById('btn-export-confirm');
+const exportPasswordModal = new bootstrap.Modal(exportPasswordModalElement);
 
 // Embed all rows as JSON for client-side re-render
 const allRows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Rows));
@@ -274,6 +336,34 @@ clientCodeNewInput.addEventListener('keydown', async e => {
     if (e.key === 'Enter') {
         e.preventDefault();
         await applyNewClientCodeAsync();
+    }
+});
+
+exportButton.addEventListener('click', async () => {
+    hideExportPasswordError();
+    exportPasswordInput.value = '';
+    exportPasswordModal.show();
+    exportPasswordInput.focus();
+});
+
+exportConfirmButton.addEventListener('click', async () => {
+    const password = exportPasswordInput.value.trim();
+    const passwordValidationError = getPasswordValidationError(password);
+
+    if (passwordValidationError) {
+        showExportPasswordError(passwordValidationError);
+        return;
+    }
+
+    hideExportPasswordError();
+    exportPasswordModal.hide();
+    await exportReportAsync(exportFormatSelect.value, password);
+});
+
+exportPasswordInput.addEventListener('keydown', async e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        exportConfirmButton.click();
     }
 });
 
@@ -582,6 +672,89 @@ function showClientCodeError(message) {
 function hideClientCodeError() {
     clientCodeError.textContent = '';
     clientCodeError.style.display = 'none';
+}
+
+function showExportPasswordError(message) {
+    exportPasswordError.textContent = message;
+    exportPasswordError.style.display = 'block';
+}
+
+function hideExportPasswordError() {
+    exportPasswordError.textContent = '';
+    exportPasswordError.style.display = 'none';
+}
+
+function getPasswordValidationError(password) {
+    if (!password) {
+        return 'Password is required.';
+    }
+
+    if (password.length < 8) {
+        return 'Password must be at least 8 characters.';
+    }
+
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSymbol = /[^A-Za-z0-9]/.test(password);
+
+    if (!(hasUpper && hasLower && hasNumber && hasSymbol)) {
+        return 'Password must include uppercase, lowercase, number, and symbol.';
+    }
+
+    return '';
+}
+
+async function exportReportAsync(format, password) {
+    exportStatus.textContent = 'Exporting...';
+    exportStatus.className = 'small align-self-center text-muted';
+    exportButton.disabled = true;
+
+    const payload = {
+        format,
+        password,
+        clientCode: getActiveClientCode(),
+        filterClientCode: filterClientCodeInput.value.trim() || null,
+        dateFrom: filterDateFromInput.value || null,
+        dateTo: filterDateToInput.value || null
+    };
+
+    try {
+        const response = await fetch(`/Report/${reportId}/Export`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            exportStatus.textContent = 'Export failed: ' + (errorBody.error || response.statusText);
+            exportStatus.className = 'small align-self-center text-danger';
+            return;
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        const contentDisposition = response.headers.get('content-disposition') || '';
+        const fileNameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+        const fileName = fileNameMatch ? decodeURIComponent(fileNameMatch[1]) : 'report_export.zip';
+
+        anchor.href = downloadUrl;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        exportStatus.textContent = 'ZIP download started.';
+        exportStatus.className = 'small align-self-center text-success';
+    } catch {
+        exportStatus.textContent = 'Network error during export.';
+        exportStatus.className = 'small align-self-center text-danger';
+    } finally {
+        exportButton.disabled = false;
+    }
 }
 
 syncClientCodeUi(initialClientCode);
