@@ -121,15 +121,35 @@ namespace DataWarehousePower.Repositories
             if (existing is null)
                 throw new InvalidOperationException("Preference scope not found.");
 
-            bool duplicateScopeExists = await _context.UserColumnPreferences
-                .AnyAsync(p => p.Id != existing.Id
-                            && p.UserId == userId
-                            && p.ReportDefinitionId == reportDefinitionId
-                            && p.ClientCode == normalizedClientCode);
-            if (duplicateScopeExists)
-                throw new InvalidOperationException("Client code scope already exists.");
+            string currentClientCode = existing.ClientCode;
+            List<UserColumnPreference> matchingPreferences = await _context.UserColumnPreferences
+                .Where(p => p.UserId == userId
+                         && p.ClientCode == currentClientCode)
+                .ToListAsync();
 
-            existing.ClientCode = normalizedClientCode;
+            if (matchingPreferences.Count == 0)
+                throw new InvalidOperationException("Preference scope not found.");
+
+            List<int> matchingPreferenceIds = matchingPreferences
+                .Select(p => p.Id)
+                .ToList();
+            List<int> matchingReportIds = matchingPreferences
+                .Select(p => p.ReportDefinitionId)
+                .Distinct()
+                .ToList();
+
+            bool duplicateScopeExists = await _context.UserColumnPreferences
+                .AnyAsync(p => p.UserId == userId
+                            && matchingReportIds.Contains(p.ReportDefinitionId)
+                            && p.ClientCode == normalizedClientCode
+                            && !matchingPreferenceIds.Contains(p.Id));
+            if (duplicateScopeExists)
+                throw new InvalidOperationException("Client code scope already exists for one or more reports.");
+
+            foreach (UserColumnPreference preference in matchingPreferences)
+            {
+                preference.ClientCode = normalizedClientCode;
+            }
 
             await _context.SaveChangesAsync();
         }
