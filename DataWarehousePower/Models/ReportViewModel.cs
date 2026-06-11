@@ -8,10 +8,12 @@ namespace DataWarehousePower.Models
         public int    ReportId   { get; set; }
         public string ReportName { get; set; } = string.Empty;
         public string ClientCode { get; set; } = string.Empty;
+        public int? ActivePreferenceId { get; set; }
         public string FilterClientCode { get; set; } = string.Empty;
         public DateTime? FilterDateFrom { get; set; }
         public DateTime? FilterDateTo { get; set; }
         public List<string> AvailableClientCodes { get; set; } = new();
+        public Dictionary<string, int> ClientCodePreferenceIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>All columns defined for this report (from ReportColumns table).</summary>
         public List<ColumnDefinition> AvailableColumns { get; set; } = new();

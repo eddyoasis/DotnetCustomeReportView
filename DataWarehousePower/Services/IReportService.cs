@@ -22,8 +22,12 @@ namespace DataWarehousePower.Services
         /// <summary>
         /// Persists the user's column preferences for a specific report.
         /// </summary>
-        Task SavePreferencesAsync(int reportId, string userId, string? clientCode,
+        Task<int> SavePreferencesAsync(int reportId, string userId, string? clientCode,
+            int? preferenceId,
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns);
+
+        Task UpdateClientCodeAsync(int reportId, string userId, int preferenceId, string newClientCode);
+        Task DeletePreferenceAsync(int reportId, string userId, int preferenceId);
     }
 }

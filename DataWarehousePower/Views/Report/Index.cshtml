@@ -73,6 +73,8 @@
 
                     <button id="btn-client-apply" type="button" class="btn btn-sm btn-outline-primary">Load</button>
                     <button id="btn-client-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
+                      <button id="btn-client-rename" type="button" class="btn btn-sm btn-outline-warning">Rename</button>
+                      <button id="btn-client-delete" type="button" class="btn btn-sm btn-outline-danger">Delete</button>
 
                     <input id="client-code-new"
                            type="text"
@@ -282,6 +284,9 @@
 <script>
 const reportId = @Model.ReportId;
 const initialClientCode = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCode));
+const initialPreferenceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ActivePreferenceId));
+const clientCodePreferenceIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCodePreferenceIds));
+let activePreferenceId = initialPreferenceId;
 const clientCodeSearchInput = document.getElementById('client-code-search');
 const clientCodeDropdownToggle = document.getElementById('client-code-dropdown-toggle');
 const clientCodeOptions = document.getElementById('client-code-options');
@@ -289,6 +294,8 @@ const clientCodeSelect = document.getElementById('client-code-select');
 const clientCodeNewInput = document.getElementById('client-code-new');
 const clientApplyButton = document.getElementById('btn-client-apply');
 const clientClearButton = document.getElementById('btn-client-clear');
+const clientRenameButton = document.getElementById('btn-client-rename');
+const clientDeleteButton = document.getElementById('btn-client-delete');
 const clientCreateButton = document.getElementById('btn-client-create');
 const clientCodeError = document.getElementById('client-code-error');
 const clientCodeStatus = document.getElementById('client-code-status');
@@ -327,6 +334,14 @@ clientCodeSearchInput.addEventListener('input', e => {
 
 clientCreateButton.addEventListener('click', async () => {
     await applyNewClientCodeAsync();
+});
+
+clientRenameButton.addEventListener('click', async () => {
+    await renameClientCodeAsync();
+});
+
+clientDeleteButton.addEventListener('click', async () => {
+    await deleteClientCodeAsync();
 });
 
 clientCodeNewInput.addEventListener('keydown', async e => {
@@ -422,11 +437,14 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
         const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ clientCode: activeClientCode, columns })
+            body:    JSON.stringify({ clientCode: activeClientCode, preferenceId: activePreferenceId, columns })
         });
         const json = await resp.json();
         if (resp.ok && json.success) {
-            upsertClientCodeOption(activeClientCode);
+            if (typeof json.preferenceId === 'number') {
+                activePreferenceId = json.preferenceId;
+                upsertClientCodeOption(activeClientCode, json.preferenceId);
+            }
             syncClientCodeUi(activeClientCode);
             statusEl.textContent = '✓ Saved';
             statusEl.className   = 'small align-self-center ms-1 text-success';
@@ -471,11 +489,14 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
         const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ clientCode: activeClientCode, columns: defaultColumns })
+            body:    JSON.stringify({ clientCode: activeClientCode, preferenceId: activePreferenceId, columns: defaultColumns })
         });
         const json = await resp.json();
         if (resp.ok && json.success) {
-            upsertClientCodeOption(activeClientCode);
+            if (typeof json.preferenceId === 'number') {
+                activePreferenceId = json.preferenceId;
+                upsertClientCodeOption(activeClientCode, json.preferenceId);
+            }
             syncClientCodeUi(activeClientCode);
             statusEl.textContent = '✓ Reset & saved';
             statusEl.className   = 'small align-self-center ms-1 text-success';
@@ -553,7 +574,7 @@ async function applyNewClientCodeAsync() {
         const response = await fetch(`/Report/${reportId}/SavePreferences`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientCode: newClientCode, columns })
+            body: JSON.stringify({ clientCode: newClientCode, preferenceId: null, columns })
         });
 
         const json = await response.json();
@@ -564,7 +585,10 @@ async function applyNewClientCodeAsync() {
             return;
         }
 
-        upsertClientCodeOption(newClientCode);
+        if (typeof json.preferenceId === 'number') {
+            activePreferenceId = json.preferenceId;
+        }
+        upsertClientCodeOption(newClientCode, activePreferenceId);
         syncClientCodeUi(newClientCode);
         statusEl.textContent = '✓ Scope created';
         statusEl.className   = 'small align-self-center ms-1 text-success';
@@ -594,10 +618,17 @@ function buildColumnsFromChips(chips) {
     }));
 }
 
-function upsertClientCodeOption(value) {
+function upsertClientCodeOption(value, preferenceId) {
     const normalizedValue = value.trim();
     if (!normalizedValue) {
         return;
+    }
+
+    if (typeof preferenceId === 'number') {
+        Object.keys(clientCodePreferenceIds)
+            .filter(key => key.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0 && key !== normalizedValue)
+            .forEach(key => delete clientCodePreferenceIds[key]);
+        clientCodePreferenceIds[normalizedValue] = preferenceId;
     }
 
     const existingOption = [...clientCodeSelect.options].find(option =>
@@ -620,11 +651,146 @@ function syncClientCodeUi(value) {
     const normalizedValue = value.trim();
     clientCodeSelect.value = normalizedValue;
     clientCodeNewInput.value = normalizedValue;
+    activePreferenceId = getPreferenceIdForClientCode(normalizedValue);
     clientCodeDropdownToggle.textContent = normalizedValue || 'Default';
     renderClientCodeOptions(clientCodeSearchInput.value);
 
     const scopeLabel = normalizedValue || 'Default';
     clientCodeStatus.innerHTML = `Preference scope: <strong>${esc(scopeLabel)}</strong>`;
+}
+
+function getPreferenceIdForClientCode(clientCode) {
+    const normalized = clientCode.trim();
+    if (!normalized) {
+        return null;
+    }
+
+    const exactKey = Object.keys(clientCodePreferenceIds).find(key =>
+        key.localeCompare(normalized, undefined, { sensitivity: 'accent' }) === 0);
+
+    return typeof exactKey === 'string' ? clientCodePreferenceIds[exactKey] : null;
+}
+
+async function renameClientCodeAsync() {
+    hideClientCodeError();
+
+    if (typeof activePreferenceId !== 'number') {
+        showClientCodeError('Save this client code first before renaming.');
+        return;
+    }
+
+    const currentClientCode = clientCodeSelect.value.trim();
+    const newClientCode = clientCodeNewInput.value.trim();
+    if (!newClientCode) {
+        showClientCodeError('New client code cannot be blank.');
+        return;
+    }
+
+    const existingId = getPreferenceIdForClientCode(newClientCode);
+    if (typeof existingId === 'number' && existingId !== activePreferenceId) {
+        showClientCodeError('Client code already exists.');
+        return;
+    }
+
+    const statusEl = document.getElementById('save-status');
+    statusEl.textContent = 'Renaming…';
+    statusEl.className   = 'small align-self-center ms-1 text-muted';
+
+    try {
+        const response = await fetch(`/Report/${reportId}/UpdateClientCode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preferenceId: activePreferenceId, newClientCode })
+        });
+
+        const json = await response.json();
+        if (!response.ok || !json.success) {
+            showClientCodeError(json.error || 'Failed to rename client code.');
+            statusEl.textContent = '✗ ' + (json.error || 'Rename failed');
+            statusEl.className   = 'small align-self-center ms-1 text-danger';
+            return;
+        }
+
+        if (currentClientCode) {
+            delete clientCodePreferenceIds[currentClientCode];
+            removeClientCodeOption(currentClientCode);
+        }
+
+        activePreferenceId = json.preferenceId;
+        upsertClientCodeOption(json.clientCode, activePreferenceId);
+        syncClientCodeUi(json.clientCode);
+        statusEl.textContent = '✓ Renamed';
+        statusEl.className   = 'small align-self-center ms-1 text-success';
+        navigateToClientCode(json.clientCode);
+    } catch {
+        showClientCodeError('Network error while renaming client code.');
+        statusEl.textContent = '✗ Network error';
+        statusEl.className   = 'small align-self-center ms-1 text-danger';
+    }
+}
+
+async function deleteClientCodeAsync() {
+    hideClientCodeError();
+
+    if (typeof activePreferenceId !== 'number') {
+        showClientCodeError('No saved client code scope selected.');
+        return;
+    }
+
+    const selectedClientCode = clientCodeSelect.value.trim();
+    if (!selectedClientCode) {
+        showClientCodeError('Default scope cannot be deleted.');
+        return;
+    }
+
+    if (!window.confirm(`Delete preference scope "${selectedClientCode}"?`)) {
+        return;
+    }
+
+    const statusEl = document.getElementById('save-status');
+    statusEl.textContent = 'Deleting…';
+    statusEl.className   = 'small align-self-center ms-1 text-muted';
+
+    try {
+        const response = await fetch(`/Report/${reportId}/DeleteClientCode`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preferenceId: activePreferenceId })
+        });
+
+        const json = await response.json();
+        if (!response.ok || !json.success) {
+            showClientCodeError(json.error || 'Failed to delete client code.');
+            statusEl.textContent = '✗ ' + (json.error || 'Delete failed');
+            statusEl.className   = 'small align-self-center ms-1 text-danger';
+            return;
+        }
+
+        delete clientCodePreferenceIds[selectedClientCode];
+        removeClientCodeOption(selectedClientCode);
+        activePreferenceId = null;
+        statusEl.textContent = '✓ Deleted';
+        statusEl.className   = 'small align-self-center ms-1 text-success';
+        navigateToClientCode('');
+    } catch {
+        showClientCodeError('Network error while deleting client code.');
+        statusEl.textContent = '✗ Network error';
+        statusEl.className   = 'small align-self-center ms-1 text-danger';
+    }
+}
+
+function removeClientCodeOption(value) {
+    const normalizedValue = value.trim();
+    if (!normalizedValue) {
+        return;
+    }
+
+    const option = [...clientCodeSelect.options].find(item =>
+        item.value.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0);
+
+    if (option) {
+        option.remove();
+    }
 }
 
 function renderClientCodeOptions(searchValue) {

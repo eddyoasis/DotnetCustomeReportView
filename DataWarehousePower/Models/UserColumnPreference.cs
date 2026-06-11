@@ -10,14 +10,15 @@ namespace DataWarehousePower.Models
     [Table("UserColumnPreferences")]
     public class UserColumnPreference
     {
-        [Key, Column(Order = 0)]
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
         [MaxLength(128)]
         public string UserId { get; set; } = string.Empty;
 
-        [Key, Column(Order = 1)]
         public int ReportDefinitionId { get; set; }
 
-        [Key, Column(Order = 2)]
         [MaxLength(128)]
         public string ClientCode { get; set; } = string.Empty;
 

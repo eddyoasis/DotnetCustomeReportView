@@ -39,10 +39,17 @@ namespace DataWarehousePower.Services
             return newId;
         }
 
-        public Task SavePreferencesAsync(string userId, int reportId, string? clientCode,
+        public Task<int> SavePreferencesAsync(string userId, int reportId, string? clientCode,
+            int? preferenceId,
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns)
-            => _reportService.SavePreferencesAsync(reportId, userId, clientCode, columns, systemColumns);
+            => _reportService.SavePreferencesAsync(reportId, userId, clientCode, preferenceId, columns, systemColumns);
+
+        public Task UpdateClientCodeAsync(string userId, int reportId, int preferenceId, string newClientCode)
+            => _reportService.UpdateClientCodeAsync(reportId, userId, preferenceId, newClientCode);
+
+        public Task DeletePreferenceAsync(string userId, int reportId, int preferenceId)
+            => _reportService.DeletePreferenceAsync(reportId, userId, preferenceId);
 
         private static bool IsValidUserId(string value)
             => !string.IsNullOrWhiteSpace(value)

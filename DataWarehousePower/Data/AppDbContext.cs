@@ -16,15 +16,17 @@ namespace DataWarehousePower.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // ── UserColumnPreference: composite PK (UserId + ReportDefinitionId + ClientCode) ──
+            // ── UserColumnPreference: identity PK with unique scope key ──
             modelBuilder.Entity<UserColumnPreference>(e =>
             {
-                e.HasKey(p => new { p.UserId, p.ReportDefinitionId, p.ClientCode });
+                e.HasKey(p => p.Id);
+                e.Property(p => p.Id).ValueGeneratedOnAdd();
                 e.Property(p => p.ClientCode)
                     .HasMaxLength(128)
                     .HasDefaultValue(string.Empty);
                 e.Property(p => p.ColumnJson).HasColumnType("nvarchar(max)");
                 e.HasIndex(p => p.UserId);
+                e.HasIndex(p => new { p.UserId, p.ReportDefinitionId, p.ClientCode }).IsUnique();
             });
 
             // ── ReportDefinition ──────────────────────────────────────────────

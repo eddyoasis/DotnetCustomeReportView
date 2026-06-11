@@ -77,13 +77,70 @@ namespace DataWarehousePower.Controllers
 
             try
             {
-                await _prefService.SavePreferencesAsync(userId, id, request.ClientCode, request.Columns, vm.AvailableColumns);
-                return Ok(new { success = true });
+                int preferenceId = await _prefService.SavePreferencesAsync(userId, id, request.ClientCode, request.PreferenceId, request.Columns, vm.AvailableColumns);
+                return Ok(new { success = true, preferenceId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, error = ex.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to save preferences for user {UserId} report {ReportId} client code {ClientCode}", userId, id, request?.ClientCode);
                 return StatusCode(500, new { success = false, error = "Failed to save preferences." });
+            }
+        }
+
+        // POST /Report/{id}/UpdateClientCode  (AJAX)
+        [HttpPost]
+        public async Task<IActionResult> UpdateClientCode(int id, [FromBody] UpdateClientCodeRequest? request)
+        {
+            if (request is null || request.PreferenceId <= 0)
+                return BadRequest(new { success = false, error = "Valid preference id is required." });
+
+            if (string.IsNullOrWhiteSpace(request.NewClientCode))
+                return BadRequest(new { success = false, error = "New client code cannot be blank." });
+
+            string userId = _prefService.ResolveUserId(HttpContext);
+
+            try
+            {
+                await _prefService.UpdateClientCodeAsync(userId, id, request.PreferenceId, request.NewClientCode);
+                return Ok(new { success = true, preferenceId = request.PreferenceId, clientCode = request.NewClientCode.Trim() });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update preference scope for user {UserId} report {ReportId} preference {PreferenceId}", userId, id, request.PreferenceId);
+                return StatusCode(500, new { success = false, error = "Failed to update client code scope." });
+            }
+        }
+
+        // DELETE /Report/{id}/DeleteClientCode  (AJAX)
+        [HttpDelete]
+        public async Task<IActionResult> DeleteClientCode(int id, [FromBody] DeleteClientCodeRequest? request)
+        {
+            if (request is null || request.PreferenceId <= 0)
+                return BadRequest(new { success = false, error = "Valid preference id is required." });
+
+            string userId = _prefService.ResolveUserId(HttpContext);
+
+            try
+            {
+                await _prefService.DeletePreferenceAsync(userId, id, request.PreferenceId);
+                return Ok(new { success = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete preference scope for user {UserId} report {ReportId} preference {PreferenceId}", userId, id, request.PreferenceId);
+                return StatusCode(500, new { success = false, error = "Failed to delete client code scope." });
             }
         }
 
@@ -208,6 +265,18 @@ namespace DataWarehousePower.Controllers
     public class SavePreferencesRequest
     {
         public string? ClientCode { get; set; }
+        public int? PreferenceId { get; set; }
         public List<SaveColumnRequest> Columns { get; set; } = new();
+    }
+
+    public class UpdateClientCodeRequest
+    {
+        public int PreferenceId { get; set; }
+        public string NewClientCode { get; set; } = string.Empty;
+    }
+
+    public class DeleteClientCodeRequest
+    {
+        public int PreferenceId { get; set; }
     }
 }

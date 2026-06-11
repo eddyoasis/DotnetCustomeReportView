@@ -7,9 +7,13 @@ namespace DataWarehousePower.Services
         string ResolveUserId(HttpContext httpContext);
 
         // Kept for direct use by the controller — delegates to ReportService internally
-        Task SavePreferencesAsync(string userId, int reportId, string? clientCode,
+        Task<int> SavePreferencesAsync(string userId, int reportId, string? clientCode,
+            int? preferenceId,
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns);
+
+        Task UpdateClientCodeAsync(string userId, int reportId, int preferenceId, string newClientCode);
+        Task DeletePreferenceAsync(string userId, int reportId, int preferenceId);
     }
 
     public class SaveColumnRequest

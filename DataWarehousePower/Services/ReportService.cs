@@ -57,7 +57,8 @@ namespace DataWarehousePower.Services
                 .ToList();
 
             // Apply user preferences
-            var displayColumns = await LoadPreferencesAsync(userId, reportId, normalizedClientCode, systemColumns);
+            (List<ColumnDefinition> displayColumns, int? activePreferenceId) =
+                await LoadPreferencesAsync(userId, reportId, normalizedClientCode, systemColumns);
 
             // Fetch data — SP mode takes priority over table mode
             List<Dictionary<string, object?>> rows;
@@ -84,6 +85,7 @@ namespace DataWarehousePower.Services
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync();
             List<string> savedClientCodes = await _prefRepo.GetClientCodesAsync(userId, reportId);
+            Dictionary<string, int> clientCodePreferenceIds = await _prefRepo.GetClientCodePreferenceIdsAsync(userId, reportId);
             List<string> availableClientCodes = BuildAvailableClientCodes(
                 normalizedClientCode,
                 ExtractClientCodes(rows),
@@ -94,10 +96,12 @@ namespace DataWarehousePower.Services
                 ReportId         = report.Id,
                 ReportName       = report.ReportName,
                 ClientCode       = normalizedClientCode,
+                ActivePreferenceId = activePreferenceId,
                 FilterClientCode = normalizedFilterClientCode ?? string.Empty,
                 FilterDateFrom   = dateFrom,
                 FilterDateTo     = dateTo,
                 AvailableClientCodes = availableClientCodes,
+                ClientCodePreferenceIds = clientCodePreferenceIds,
                 AvailableColumns = systemColumns,
                 DisplayColumns   = displayColumns,
                 Rows             = rows,
@@ -105,10 +109,11 @@ namespace DataWarehousePower.Services
             };
         }
 
-        public async Task SavePreferencesAsync(
+        public async Task<int> SavePreferencesAsync(
             int reportId,
             string userId,
             string? clientCode,
+            int? preferenceId,
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns)
         {
@@ -137,18 +142,24 @@ namespace DataWarehousePower.Services
                 })
                 .ToList();
 
-            await _prefRepo.UpsertAsync(new UserColumnPreference
+            return await _prefRepo.UpsertAsync(new UserColumnPreference
             {
                 UserId             = userId,
                 ReportDefinitionId = reportId,
                 ClientCode         = normalizedClientCode,
                 ColumnJson         = JsonSerializer.Serialize(entries)
-            });
+            }, preferenceId);
         }
+
+        public Task UpdateClientCodeAsync(int reportId, string userId, int preferenceId, string newClientCode)
+            => _prefRepo.UpdateClientCodeAsync(userId, reportId, preferenceId, newClientCode);
+
+        public Task DeletePreferenceAsync(int reportId, string userId, int preferenceId)
+            => _prefRepo.DeleteAsync(userId, reportId, preferenceId);
 
         // ── Private helpers ───────────────────────────────────────────────────
 
-        private async Task<List<ColumnDefinition>> LoadPreferencesAsync(
+        private async Task<(List<ColumnDefinition> Columns, int? PreferenceId)> LoadPreferencesAsync(
             string userId,
             int reportId,
             string clientCode,
@@ -157,7 +168,7 @@ namespace DataWarehousePower.Services
             try
             {
                 var row = await _prefRepo.GetAsync(userId, reportId, clientCode);
-                if (row is null) return BuildDefaults(systemColumns);
+                if (row is null) return (BuildDefaults(systemColumns), null);
 
                 var entries = JsonSerializer.Deserialize<List<ColumnJsonEntry>>(row.ColumnJson, _jsonOpts)
                               ?? new List<ColumnJsonEntry>();
@@ -166,9 +177,9 @@ namespace DataWarehousePower.Services
                 var validEntries = entries.Where(e => validKeys.Contains(e.PropertyName)).ToList();
 
                 if (!systemColumns.All(c => validEntries.Any(e => e.PropertyName == c.Key)))
-                    return BuildDefaults(systemColumns);
+                    return (BuildDefaults(systemColumns), row.Id);
 
-                return validEntries
+                return (validEntries
                     .OrderBy(e => e.DisplayOrder)
                     .Select(e =>
                     {
@@ -183,14 +194,14 @@ namespace DataWarehousePower.Services
                             Order        = e.DisplayOrder
                         };
                     })
-                    .ToList();
+                    .ToList(), row.Id);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
                     "Failed to load preferences for user {UserId} report {ReportId} client code {ClientCode}. Using defaults.",
                     userId, reportId, clientCode);
-                return BuildDefaults(systemColumns);
+                return (BuildDefaults(systemColumns), null);
             }
         }
 
