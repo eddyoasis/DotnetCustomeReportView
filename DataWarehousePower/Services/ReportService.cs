@@ -86,6 +86,7 @@ namespace DataWarehousePower.Services
             var allReports = await _reportRepo.GetAllReportsAsync();
             List<string> savedClientCodes = await _prefRepo.GetClientCodesAsync(userId, reportId);
             Dictionary<string, int> clientCodePreferenceIds = await _prefRepo.GetClientCodePreferenceIdsAsync(userId, reportId);
+            Dictionary<int, List<string>> reportClientCodesByReportId = await BuildReportClientCodesByReportIdAsync(userId, allReports);
             List<string> availableClientCodes = BuildAvailableClientCodes(
                 normalizedClientCode,
                 ExtractClientCodes(rows),
@@ -102,6 +103,7 @@ namespace DataWarehousePower.Services
                 FilterDateTo     = dateTo,
                 AvailableClientCodes = availableClientCodes,
                 ClientCodePreferenceIds = clientCodePreferenceIds,
+                ReportClientCodesByReportId = reportClientCodesByReportId,
                 AvailableColumns = systemColumns,
                 DisplayColumns   = displayColumns,
                 Rows             = rows,
@@ -234,6 +236,20 @@ namespace DataWarehousePower.Services
                    .Distinct(StringComparer.OrdinalIgnoreCase)
                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                    .ToList();
+
+        private async Task<Dictionary<int, List<string>>> BuildReportClientCodesByReportIdAsync(
+            string userId,
+            IEnumerable<ReportDefinition> reports)
+        {
+            Dictionary<int, List<string>> clientCodesByReportId = new();
+
+            foreach (ReportDefinition report in reports)
+            {
+                clientCodesByReportId[report.Id] = await _prefRepo.GetClientCodesAsync(userId, report.Id);
+            }
+
+            return clientCodesByReportId;
+        }
 
         private static string? FindClientCodeValue(Dictionary<string, object?> row)
         {

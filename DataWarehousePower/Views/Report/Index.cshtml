@@ -12,11 +12,17 @@
             <ul class="list-group list-group-flush">
                 @foreach (var r in Model.AllReports)
                 {
+                    var targetClientCode = !string.IsNullOrWhiteSpace(Model.ClientCode)
+                        && Model.ReportClientCodesByReportId.TryGetValue(r.Id, out var reportClientCodes)
+                        && reportClientCodes.Any(code => code.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase))
+                            ? Model.ClientCode
+                            : null;
+
                     <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
                                 <a href="@Url.Action("Index", "Report", new
                                          {
                                              id = r.Id,
-                                             clientCode = Model.ClientCode,
+                                             clientCode = targetClientCode,
                                              filterClientCode = Model.FilterClientCode,
                                              dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
                                              dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")

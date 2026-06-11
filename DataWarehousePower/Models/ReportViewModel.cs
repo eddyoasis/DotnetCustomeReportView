@@ -14,6 +14,7 @@ namespace DataWarehousePower.Models
         public DateTime? FilterDateTo { get; set; }
         public List<string> AvailableClientCodes { get; set; } = new();
         public Dictionary<string, int> ClientCodePreferenceIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<int, List<string>> ReportClientCodesByReportId { get; set; } = new();
 
         /// <summary>All columns defined for this report (from ReportColumns table).</summary>
         public List<ColumnDefinition> AvailableColumns { get; set; } = new();
