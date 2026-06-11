@@ -20,6 +20,7 @@ builder.Services.AddScoped<IReportStaffRepository,      ReportStaffRepository>()
 builder.Services.AddScoped<IColumnPreferenceRepository, ColumnPreferenceRepository>();
 builder.Services.AddScoped<IReportRepository,           ReportRepository>();
 builder.Services.AddScoped<IReportManageRepository,     ReportManageRepository>();
+builder.Services.AddScoped<IAuditLogRepository,         AuditLogRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
@@ -27,6 +28,9 @@ builder.Services.AddScoped<IReportExportService,     ReportExportService>();
 builder.Services.AddScoped<IColumnPreferenceService, ColumnPreferenceService>();
 builder.Services.AddScoped<IReportManageService,     ReportManageService>();
 builder.Services.AddScoped<IActiveDirectoryUserService, ActiveDirectoryUserService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -156,6 +160,12 @@ app.MapControllerRoute(
     name: "reportManage",
     pattern: "ReportManage/{action=Index}/{id?}",
     defaults: new { controller = "ReportManage" });
+
+// /AuditLog
+app.MapControllerRoute(
+    name: "auditLog",
+    pattern: "AuditLog/{action=Index}/{id?}",
+    defaults: new { controller = "AuditLog" });
 
 // Fallback default route
 app.MapControllerRoute(

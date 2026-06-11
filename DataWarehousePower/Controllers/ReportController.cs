@@ -1,6 +1,5 @@
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
-using log4net;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DataWarehousePower.Controllers
@@ -10,22 +9,23 @@ namespace DataWarehousePower.Controllers
     /// </summary>
     public class ReportController : Controller
     {
-        private static readonly ILog AuditLog = LogManager.GetLogger("AuditLogger");
-
         private readonly IReportService          _reportService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IReportExportService _exportService;
+        private readonly IAuditLogService _auditLogService;
         private readonly ILogger<ReportController> _logger;
 
         public ReportController(
             IReportService reportService,
             IColumnPreferenceService prefService,
             IReportExportService exportService,
+            IAuditLogService auditLogService,
             ILogger<ReportController> logger)
         {
             _reportService = reportService;
             _prefService   = prefService;
             _exportService = exportService;
+            _auditLogService = auditLogService;
             _logger        = logger;
         }
 
@@ -149,25 +149,26 @@ namespace DataWarehousePower.Controllers
         public async Task<IActionResult> Export(int id, [FromBody] ExportReportRequest? request, CancellationToken cancellationToken)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
+            string username = GetAuditUsername();
             string correlationId = HttpContext.TraceIdentifier;
 
             if (request is null)
             {
-                WriteAuditLog("ExportRejected", userId, correlationId, id, "unknown", string.Empty, "Request body is missing.");
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", null, null, null, null, "Request body is missing.", cancellationToken);
                 return BadRequest(new { success = false, error = "Export request is required." });
             }
 
             string normalizedFormat = request.Format?.Trim().ToLowerInvariant() ?? string.Empty;
             if (normalizedFormat is not ("csv" or "excel" or "pdf"))
             {
-                WriteAuditLog("ExportRejected", userId, correlationId, id, normalizedFormat, request.ClientCode, "Invalid format.");
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
                 return BadRequest(new { success = false, error = "Invalid format. Use CSV, Excel, or PDF." });
             }
 
             string? passwordValidationError = ValidatePasswordStrength(request.Password);
             if (passwordValidationError is not null)
             {
-                WriteAuditLog("ExportRejected", userId, correlationId, id, normalizedFormat, request.ClientCode, passwordValidationError);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
                 return BadRequest(new { success = false, error = passwordValidationError });
             }
 
@@ -181,7 +182,7 @@ namespace DataWarehousePower.Controllers
 
             if (vm is null)
             {
-                WriteAuditLog("ExportRejected", userId, correlationId, id, normalizedFormat, request.ClientCode, "Report not found.");
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
                 return NotFound(new { success = false, error = "Report not found." });
             }
 
@@ -196,26 +197,26 @@ namespace DataWarehousePower.Controllers
                 string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
                 string zipFileName = $"{reportName}_export.zip";
 
-                WriteAuditLog("ExportSucceeded", userId, correlationId, id, normalizedFormat, request.ClientCode, "ZIP generated and returned.");
+                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
 
                 return File(zipBytes, "application/zip", zipFileName);
             }
             catch (ArgumentException argumentException)
             {
                 _logger.LogWarning(argumentException, "Invalid export request for report {ReportId}", id);
-                WriteAuditLog("ExportFailed", userId, correlationId, id, normalizedFormat, request.ClientCode, argumentException.Message);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = argumentException.Message });
             }
             catch (InvalidOperationException invalidOperationException)
             {
                 _logger.LogWarning(invalidOperationException, "Export validation failed for report {ReportId}", id);
-                WriteAuditLog("ExportFailed", userId, correlationId, id, normalizedFormat, request.ClientCode, invalidOperationException.Message);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = invalidOperationException.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to export report {ReportId}", id);
-                WriteAuditLog("ExportFailed", userId, correlationId, id, normalizedFormat, request.ClientCode, "Unexpected export error.");
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
                 return StatusCode(500, new { success = false, error = "Failed to export report." });
             }
         }
@@ -246,19 +247,15 @@ namespace DataWarehousePower.Controllers
             return null;
         }
 
-        private static void WriteAuditLog(
-            string action,
-            string userId,
-            string correlationId,
-            int reportId,
-            string? format,
-            string? clientCode,
-            string detail)
+        private string GetAuditUsername()
         {
-            string normalizedFormat = string.IsNullOrWhiteSpace(format) ? "unknown" : format.Trim().ToLowerInvariant();
-            string normalizedClientCode = string.IsNullOrWhiteSpace(clientCode) ? "Default" : clientCode.Trim();
+            string? displayName = HttpContext.Session.GetString("UserDisplayName");
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                return displayName.Trim();
+            }
 
-            AuditLog.Info($"action={action};userId={userId};reportId={reportId};format={normalizedFormat};clientCode={normalizedClientCode};correlationId={correlationId};detail={detail}");
+            return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Anonymous" : User.Identity!.Name!.Trim();
         }
     }
 

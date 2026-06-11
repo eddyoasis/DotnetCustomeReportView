@@ -1,0 +1,151 @@
+@model AuditLogListViewModel
+@{
+    ViewData["Title"] = "Audit Logs";
+    string BuildPageLink(int page)
+    {
+        var routeValues = new Dictionary<string, string?>
+        {
+            ["userId"] = Model.Filter.UserId,
+            ["actionType"] = Model.Filter.ActionType,
+            ["entityName"] = Model.Filter.EntityName,
+            ["dateFromUtc"] = Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd"),
+            ["dateToUtc"] = Model.Filter.DateToUtc?.ToString("yyyy-MM-dd"),
+            ["search"] = Model.Filter.Search,
+            ["pageNumber"] = page.ToString(),
+            ["pageSize"] = Model.PageSize.ToString()
+        };
+
+        string query = string.Join("&", routeValues
+            .Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value!)}"));
+
+        return $"/AuditLog?{query}";
+    }
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Audit Logs</h4>
+    <span class="badge bg-secondary">Total: @Model.TotalCount</span>
+</div>
+
+<form method="get" asp-controller="AuditLog" asp-action="Index" class="card card-body shadow-sm mb-3">
+    <div class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label">User</label>
+            <select class="form-select" name="userId">
+                <option value="">All users</option>
+                @foreach (string user in Model.AvailableUsers)
+                {
+                    <option value="@user" selected="@(Model.Filter.UserId == user)">@user</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Action</label>
+            <select class="form-select" name="actionType">
+                <option value="">All actions</option>
+                @foreach (string action in Model.AvailableActionTypes)
+                {
+                    <option value="@action" selected="@(Model.Filter.ActionType == action)">@action</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Entity</label>
+            <select class="form-select" name="entityName">
+                <option value="">All entities</option>
+                @foreach (string entity in Model.AvailableEntityNames)
+                {
+                    <option value="@entity" selected="@(Model.Filter.EntityName == entity)">@entity</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Keyword</label>
+            <input class="form-control" type="text" name="search" value="@Model.Filter.Search" placeholder="user/action/entity/metadata" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Date From (UTC)</label>
+            <input class="form-control" type="date" name="dateFromUtc" value="@Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Date To (UTC)</label>
+            <input class="form-control" type="date" name="dateToUtc" value="@Model.Filter.DateToUtc?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Page Size</label>
+            <select class="form-select" name="pageSize">
+                @foreach (int size in new[] { 25, 50, 100 })
+                {
+                    <option value="@size" selected="@(Model.PageSize == size)">@size</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end gap-2">
+            <button class="btn btn-primary" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" asp-controller="AuditLog" asp-action="Index">Reset</a>
+        </div>
+    </div>
+</form>
+
+@if (!Model.Items.Any())
+{
+    <div class="alert alert-info">No audit logs found for the selected filters.</div>
+}
+else
+{
+    <div class="table-responsive shadow-sm">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th style="width: 170px;">Timestamp (UTC)</th>
+                    <th style="width: 160px;">Username</th>
+                    <th style="width: 220px;">Description</th>
+                    <th style="width: 160px;">Action</th>
+                    <th style="width: 120px;">Entity</th>
+                    <th style="width: 120px;">Entity Id</th>
+                    <th style="width: 110px;">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (AuditLogListItemViewModel row in Model.Items)
+                {
+                    <tr>
+                        <td>@row.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>
+                            <div class="fw-semibold">@row.Username</div>
+                            <div class="text-muted small">@row.UserId</div>
+                        </td>
+                        <td class="text-break">@row.Description</td>
+                        <td>@row.ActionType</td>
+                        <td>@row.EntityName</td>
+                        <td><span class="text-break">@row.EntityId</span></td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary"
+                               asp-controller="AuditLog"
+                               asp-action="Details"
+                               asp-route-id="@row.Id">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="mt-3">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : "")">
+                    <a class="page-link" href="@BuildPageLink(Model.PageNumber - 1)">Previous</a>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">Page @Model.PageNumber of @Model.TotalPages</span>
+                </li>
+                <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                    <a class="page-link" href="@BuildPageLink(Model.PageNumber + 1)">Next</a>
+                </li>
+            </ul>
+        </nav>
+    }
+}
