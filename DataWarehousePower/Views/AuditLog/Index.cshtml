@@ -98,12 +98,12 @@ else
         <table class="table table-bordered table-hover table-sm align-middle mb-0">
             <thead class="table-dark">
                 <tr>
-                    <th style="width: 170px;">Timestamp (UTC)</th>
-                    <th style="width: 160px;">Username</th>
-                    <th style="width: 220px;">Description</th>
-                    <th style="width: 160px;">Action</th>
                     <th style="width: 120px;">Entity</th>
-                    <th style="width: 120px;">Entity Id</th>
+                    <th style="width: 160px;">Action</th>
+                    <th style="width: 220px;">Description</th>
+                    <th style="width: 160px;">Username</th>
+                    <th style="width: 170px;">Timestamp (UTC)</th>
+                    @* <th style="width: 120px;">Entity Id</th> *@
                     <th style="width: 110px;">Details</th>
                 </tr>
             </thead>
@@ -111,15 +111,15 @@ else
                 @foreach (AuditLogListItemViewModel row in Model.Items)
                 {
                     <tr>
-                        <td>@row.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@row.EntityName</td>
+                        <td>@row.ActionType</td>
+                        <td class="text-break">@row.Description</td>
                         <td>
                             <div class="fw-semibold">@row.Username</div>
                             <div class="text-muted small">@row.UserId</div>
                         </td>
-                        <td class="text-break">@row.Description</td>
-                        <td>@row.ActionType</td>
-                        <td>@row.EntityName</td>
-                        <td><span class="text-break">@row.EntityId</span></td>
+                        <td>@row.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        @* <td><span class="text-break">@row.EntityId</span></td> *@
                         <td>
                             <a class="btn btn-sm btn-outline-primary"
                                asp-controller="AuditLog"

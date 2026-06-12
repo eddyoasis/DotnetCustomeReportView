@@ -78,7 +78,8 @@ namespace DataWarehousePower.Services
                 Detail = detail
             };
 
-            string description = BuildDescription(username, actionType, "ReportExport", reportName ?? $"Report #{reportId}", detail);
+            string reportLabel = BuildExportEntityLabel(reportName, reportId, clientCode, filterClientCode);
+            string description = BuildDescription(username, actionType, "ReportExport", reportLabel, detail);
 
             AuditLog auditLog = new()
             {
@@ -96,6 +97,45 @@ namespace DataWarehousePower.Services
             _context.AuditLogs.Add(auditLog);
             await _context.SaveChangesAsync(cancellationToken);
         }
+
+        private static string BuildExportEntityLabel(string? reportName, int reportId, string? clientCode, string? filterClientCode)
+        {
+            string normalizedReportName = string.IsNullOrWhiteSpace(reportName)
+                ? $"Report #{reportId}"
+                : reportName.Trim();
+
+            string? normalizedClientCode = string.IsNullOrWhiteSpace(clientCode)
+                ? "Default"
+                : clientCode.Trim();
+
+            string? normalizedFilterClientCode = string.IsNullOrWhiteSpace(filterClientCode)
+                ? "All"
+                : filterClientCode.Trim();
+
+            return $"{normalizedReportName}({normalizedClientCode}) - {normalizedFilterClientCode}";
+        }
+
+        //private static string BuildExportEntityLabel(string? reportName, int reportId, string? clientCode, string? filterClientCode)
+        //{
+        //    string normalizedReportName = string.IsNullOrWhiteSpace(reportName)
+        //        ? $"Report #{reportId}"
+        //        : reportName.Trim();
+
+        //    string? normalizedClientCode = string.IsNullOrWhiteSpace(clientCode)
+        //        ? null
+        //        : clientCode.Trim();
+
+        //    if (string.IsNullOrWhiteSpace(normalizedClientCode))
+        //    {
+        //        normalizedClientCode = string.IsNullOrWhiteSpace(filterClientCode)
+        //            ? null
+        //            : filterClientCode.Trim();
+        //    }
+
+        //    return string.IsNullOrWhiteSpace(normalizedClientCode)
+        //        ? normalizedReportName
+        //        : $"{normalizedReportName} - {normalizedClientCode}";
+        //}
 
         private static string BuildDescription(string username, string actionType, string entityName, string? entityLabel, string? detail)
         {

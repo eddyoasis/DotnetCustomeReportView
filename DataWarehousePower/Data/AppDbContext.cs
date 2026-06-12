@@ -300,9 +300,15 @@ namespace DataWarehousePower.Data
             Dictionary<string, object?> oldValues,
             DateTime timestampUtc)
         {
+            string? preferredEntityLabel = ResolvePreferredEntityLabel(entityName, actionType, newValues, oldValues);
             string resourceLabel = keyValues.Count > 0
                 ? string.Join(", ", keyValues.Select(pair => $"{pair.Key}={pair.Value ?? "null"}"))
                 : entityName;
+
+            if (!string.IsNullOrWhiteSpace(preferredEntityLabel))
+            {
+                resourceLabel = preferredEntityLabel;
+            }
 
             string actionLabel = actionType.ToLowerInvariant() switch
             {
@@ -334,6 +340,61 @@ namespace DataWarehousePower.Data
             }
 
             return $"{username} {actionLabel} {entityName} ({resourceLabel}) at {timestampUtc:yyyy-MM-dd HH:mm:ss} UTC.";
+        }
+
+        private static string? ResolvePreferredEntityLabel(
+            string entityName,
+            string actionType,
+            Dictionary<string, object?> newValues,
+            Dictionary<string, object?> oldValues)
+        {
+            // For report-column audit entries, show column name instead of identity key.
+            if (!string.Equals(actionType, "Create", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            if (!string.Equals(entityName, "TBL_ReportColumns", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            if (TryResolveNonEmptyString(newValues, "PropertyName", out string propertyName))
+            {
+                return propertyName;
+            }
+
+            if (TryResolveNonEmptyString(newValues, "DefaultLabel", out string defaultLabel))
+            {
+                return defaultLabel;
+            }
+
+            if (TryResolveNonEmptyString(oldValues, "PropertyName", out propertyName))
+            {
+                return propertyName;
+            }
+
+            if (TryResolveNonEmptyString(oldValues, "DefaultLabel", out defaultLabel))
+            {
+                return defaultLabel;
+            }
+
+            return null;
+        }
+
+        private static bool TryResolveNonEmptyString(
+            Dictionary<string, object?> values,
+            string key,
+            out string result)
+        {
+            if (values.TryGetValue(key, out object? value) && value is string text && !string.IsNullOrWhiteSpace(text))
+            {
+                result = text.Trim();
+                return true;
+            }
+
+            result = string.Empty;
+            return false;
         }
 
         private sealed class PendingAuditEntry(EntityEntry entry)
