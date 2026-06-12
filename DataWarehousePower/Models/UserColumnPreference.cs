@@ -7,7 +7,7 @@ namespace DataWarehousePower.Models
     /// One row per user per report per client code. Column preferences stored as JSON.
     /// JSON shape: [{"PropertyName":"Id","IsVisible":true,"DisplayOrder":1,"CustomName":"ID"}]
     /// </summary>
-    [Table("UserColumnPreferences")]
+    [Table("TBL_UserColumnPreferences")]
     public class UserColumnPreference
     {
         [Key]

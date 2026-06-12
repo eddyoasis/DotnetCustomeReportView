@@ -81,9 +81,9 @@ const string ChallengeCookieName = "dw_auth_challenge";
 // ── Auto-migrate on startup ───────────────────────────────────────────────────
 try
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    //using var scope = app.Services.CreateScope();
+    //var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    //db.Database.Migrate();
 }
 catch (Exception ex)
 {

@@ -1,0 +1,20 @@
+@{
+    ViewData["Title"] = "No Reports";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-md-10">
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body p-4 text-center">
+                <h2 class="h4 mb-2">No reports are available</h2>
+                <p class="text-muted mb-4">
+                    There are currently no active report definitions configured for your access.
+                </p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Back to Home</a>
+                    <a asp-controller="ReportManage" asp-action="Index" class="btn btn-outline-secondary">Manage Reports</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

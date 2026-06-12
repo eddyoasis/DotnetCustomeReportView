@@ -7,7 +7,7 @@ namespace DataWarehousePower.Models
     /// A column belonging to a ReportDefinition.
     /// PropertyName must match the exact column name in the SourceTable.
     /// </summary>
-    [Table("ReportColumns")]
+    [Table("TBL_ReportColumns")]
     public class ReportColumn
     {
         [Key]

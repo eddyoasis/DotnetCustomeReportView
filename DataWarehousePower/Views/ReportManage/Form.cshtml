@@ -95,6 +95,9 @@
                                        class="form-control form-control-sm" required />
                             </td>
                             <td class="text-center align-middle">
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
+                            </td>
+                            <td class="text-center align-middle">
                                 <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
                             </td>
                         </tr>
@@ -119,7 +122,7 @@
 let rowIndex = @Model.Columns.Count;
 
 // ── Add column row ────────────────────────────────────────────────────────────
-document.getElementById('btn-add-col').addEventListener('click', () => {
+function addColumnRow() {
     const body = document.getElementById('columns-body');
     const tr   = document.createElement('tr');
     tr.className   = 'col-row';
@@ -142,6 +145,9 @@ document.getElementById('btn-add-col').addEventListener('click', () => {
                    class="form-control form-control-sm" required />
         </td>
         <td class="text-center align-middle">
+            <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
+        </td>
+        <td class="text-center align-middle">
             <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
         </td>`;
     body.appendChild(tr);
@@ -149,6 +155,13 @@ document.getElementById('btn-add-col').addEventListener('click', () => {
     refreshRowNumbers();
     toggleNoColsMessage();
     tr.querySelector('input[name$=".PropertyName"]').focus();
+}
+
+document.getElementById('btn-add-col').addEventListener('click', addColumnRow);
+document.getElementById('columns-body').addEventListener('click', e => {
+    if (e.target.closest('.btn-add-col-inline')) {
+        addColumnRow();
+    }
 });
 
 // ── Remove column row ─────────────────────────────────────────────────────────

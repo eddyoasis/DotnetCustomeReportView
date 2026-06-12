@@ -7,7 +7,7 @@ namespace DataWarehousePower.Models
     /// Defines a report. Set either SourceTable OR SourceSP — not both.
     /// Add a row here to register a new report — no code changes needed.
     /// </summary>
-    [Table("ReportDefinitions")]
+    [Table("TBL_ReportDefinitions")]
     public class ReportDefinition
     {
         [Key]

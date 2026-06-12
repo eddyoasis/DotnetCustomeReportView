@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DataWarehousePower.Models
 {
-    [Table("AuditLogs")]
+    [Table("TBL_AuditLogs")]
     public class AuditLog
     {
         [Key]
