@@ -9,6 +9,7 @@ namespace DataWarehousePower.Services
             string correlationId,
             string entityName,
             string? entityId,
+            string? entityLabel,
             object? oldValues,
             object? newValues,
             string? detail,

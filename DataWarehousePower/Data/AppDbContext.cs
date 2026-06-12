@@ -217,6 +217,10 @@ namespace DataWarehousePower.Data
                     continue;
                 }
 
+                pendingAuditEntry.ResourceLabel = entry.Entity is ReportColumn
+                    ? ResolveReportColumnResourceLabel(entry, pendingAuditEntry.ActionType, pendingAuditEntry.NewValues, pendingAuditEntry.OldValues)
+                    : null;
+
                 pendingAuditEntries.Add(pendingAuditEntry);
             }
 
@@ -295,6 +299,7 @@ namespace DataWarehousePower.Data
             string username,
             string actionType,
             string entityName,
+            string? resourceLabelOverride,
             Dictionary<string, object?> keyValues,
             Dictionary<string, object?> newValues,
             Dictionary<string, object?> oldValues,
@@ -305,7 +310,12 @@ namespace DataWarehousePower.Data
                 ? string.Join(", ", keyValues.Select(pair => $"{pair.Key}={pair.Value ?? "null"}"))
                 : entityName;
 
-            if (!string.IsNullOrWhiteSpace(preferredEntityLabel))
+            if (!string.IsNullOrWhiteSpace(resourceLabelOverride))
+            {
+                resourceLabel = resourceLabelOverride;
+            }
+
+            if (string.IsNullOrWhiteSpace(resourceLabelOverride) && !string.IsNullOrWhiteSpace(preferredEntityLabel))
             {
                 resourceLabel = preferredEntityLabel;
             }
@@ -348,8 +358,35 @@ namespace DataWarehousePower.Data
             Dictionary<string, object?> newValues,
             Dictionary<string, object?> oldValues)
         {
-            // For report-column audit entries, show column name instead of identity key.
-            if (!string.Equals(actionType, "Create", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(entityName, "TBL_ReportDefinitions", StringComparison.OrdinalIgnoreCase))
+            {
+                Dictionary<string, object?> reportValues = string.Equals(actionType, "Create", StringComparison.OrdinalIgnoreCase)
+                    ? newValues
+                    : string.Equals(actionType, "Delete", StringComparison.OrdinalIgnoreCase)
+                        ? oldValues
+                        : oldValues.Count > 0 ? oldValues : newValues;
+
+                if (TryResolveNonEmptyString(reportValues, "ReportName", out string reportName))
+                {
+                    return reportName;
+                }
+
+                if (TryResolveNonEmptyString(reportValues, "SourceTable", out string sourceTable))
+                {
+                    return sourceTable;
+                }
+
+                if (TryResolveNonEmptyString(reportValues, "SourceSP", out string sourceSp))
+                {
+                    return sourceSp;
+                }
+
+                return null;
+            }
+
+            // For report column audit entries, show the business name instead of the identity key.
+            if (!string.Equals(actionType, "Create", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(actionType, "Delete", StringComparison.OrdinalIgnoreCase))
             {
                 return null;
             }
@@ -359,22 +396,16 @@ namespace DataWarehousePower.Data
                 return null;
             }
 
-            if (TryResolveNonEmptyString(newValues, "PropertyName", out string propertyName))
+            Dictionary<string, object?> candidateValues = string.Equals(actionType, "Create", StringComparison.OrdinalIgnoreCase)
+                ? newValues
+                : oldValues;
+
+            if (TryResolveNonEmptyString(candidateValues, "PropertyName", out string propertyName))
             {
                 return propertyName;
             }
 
-            if (TryResolveNonEmptyString(newValues, "DefaultLabel", out string defaultLabel))
-            {
-                return defaultLabel;
-            }
-
-            if (TryResolveNonEmptyString(oldValues, "PropertyName", out propertyName))
-            {
-                return propertyName;
-            }
-
-            if (TryResolveNonEmptyString(oldValues, "DefaultLabel", out defaultLabel))
+            if (TryResolveNonEmptyString(candidateValues, "DefaultLabel", out string defaultLabel))
             {
                 return defaultLabel;
             }
@@ -397,6 +428,70 @@ namespace DataWarehousePower.Data
             return false;
         }
 
+        private string? ResolveReportColumnResourceLabel(
+            EntityEntry entry,
+            string actionType,
+            Dictionary<string, object?> newValues,
+            Dictionary<string, object?> oldValues)
+        {
+            ReportColumn? reportColumn = entry.Entity as ReportColumn;
+            int? reportDefinitionId = reportColumn?.ReportDefinitionId > 0
+                ? reportColumn.ReportDefinitionId
+                : null;
+
+            if (reportDefinitionId is null &&
+                entry.Properties.FirstOrDefault(property => string.Equals(property.Metadata.Name, nameof(ReportColumn.ReportDefinitionId), StringComparison.OrdinalIgnoreCase)) is PropertyEntry reportDefinitionProperty)
+            {
+                if (reportDefinitionProperty.CurrentValue is int currentReportDefinitionId && currentReportDefinitionId > 0)
+                {
+                    reportDefinitionId = currentReportDefinitionId;
+                }
+                else if (reportDefinitionProperty.OriginalValue is int originalReportDefinitionId && originalReportDefinitionId > 0)
+                {
+                    reportDefinitionId = originalReportDefinitionId;
+                }
+            }
+
+            string? reportName = reportColumn?.Report?.ReportName;
+            if (string.IsNullOrWhiteSpace(reportName) && reportDefinitionId is not null)
+            {
+                reportName = ReportDefinitions.AsNoTracking()
+                    .Where(report => report.Id == reportDefinitionId.Value)
+                    .Select(report => report.ReportName)
+                    .FirstOrDefault();
+            }
+
+            Dictionary<string, object?> columnValues = string.Equals(actionType, "Delete", StringComparison.OrdinalIgnoreCase)
+                ? oldValues
+                : newValues.Count > 0 ? newValues : oldValues;
+
+            string? columnLabel = ResolveReportColumnLabel(columnValues);
+
+            if (!string.IsNullOrWhiteSpace(reportName) && !string.IsNullOrWhiteSpace(columnLabel))
+            {
+                return $"{reportName.Trim()} - {columnLabel}";
+            }
+
+            return string.IsNullOrWhiteSpace(reportName)
+                ? columnLabel
+                : reportName.Trim();
+        }
+
+        private static string? ResolveReportColumnLabel(Dictionary<string, object?> values)
+        {
+            if (TryResolveNonEmptyString(values, nameof(ReportColumn.PropertyName), out string propertyName))
+            {
+                return propertyName;
+            }
+
+            if (TryResolveNonEmptyString(values, nameof(ReportColumn.DefaultLabel), out string defaultLabel))
+            {
+                return defaultLabel;
+            }
+
+            return null;
+        }
+
         private sealed class PendingAuditEntry(EntityEntry entry)
         {
             public EntityEntry Entry { get; } = entry;
@@ -412,6 +507,7 @@ namespace DataWarehousePower.Data
             public Dictionary<string, object?> NewValues { get; } = new();
             public List<string> ChangedColumns { get; } = new();
             public List<PropertyEntry> TemporaryProperties { get; } = new();
+            public string? ResourceLabel { get; set; }
 
             public AuditLog ToAuditLog()
             {
@@ -421,7 +517,7 @@ namespace DataWarehousePower.Data
                     Username = Username,
                     ActionType = ActionType,
                     Description = string.IsNullOrWhiteSpace(Description)
-                        ? BuildDescription(Username, ActionType, EntityName, KeyValues, NewValues, OldValues, TimestampUtc)
+                        ? BuildDescription(Username, ActionType, EntityName, ResourceLabel, KeyValues, NewValues, OldValues, TimestampUtc)
                         : Description,
                     EntityName = EntityName,
                     EntityId = KeyValues.Count == 0 ? null : JsonSerializer.Serialize(KeyValues),

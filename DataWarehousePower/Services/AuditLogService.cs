@@ -20,6 +20,7 @@ namespace DataWarehousePower.Services
             string correlationId,
             string entityName,
             string? entityId,
+            string? entityLabel,
             object? oldValues,
             object? newValues,
             string? detail,
@@ -30,7 +31,7 @@ namespace DataWarehousePower.Services
                 Detail = detail
             };
 
-            string description = BuildDescription(username, actionType, entityName, entityId, detail);
+            string description = BuildDescription(username, actionType, entityName, entityId, entityLabel, detail);
 
             AuditLog auditLog = new()
             {
@@ -79,7 +80,7 @@ namespace DataWarehousePower.Services
             };
 
             string reportLabel = BuildExportEntityLabel(reportName, reportId, clientCode, filterClientCode);
-            string description = BuildDescription(username, actionType, "ReportExport", reportLabel, detail);
+            string description = BuildDescription(username, actionType, "ReportExport", reportId.ToString(), reportLabel, detail);
 
             AuditLog auditLog = new()
             {
@@ -137,7 +138,7 @@ namespace DataWarehousePower.Services
         //        : $"{normalizedReportName} - {normalizedClientCode}";
         //}
 
-        private static string BuildDescription(string username, string actionType, string entityName, string? entityLabel, string? detail)
+        private static string BuildDescription(string username, string actionType, string entityName, string? entityId, string? entityLabel, string? detail)
         {
             string actionLabel = actionType switch
             {
@@ -148,7 +149,9 @@ namespace DataWarehousePower.Services
                 _ => "performed"
             };
 
-            string targetLabel = string.IsNullOrWhiteSpace(entityLabel) ? entityName : entityLabel;
+            string targetLabel = string.IsNullOrWhiteSpace(entityLabel)
+                ? string.IsNullOrWhiteSpace(entityId) ? entityName : entityId
+                : entityLabel;
             string suffix = string.IsNullOrWhiteSpace(detail) ? string.Empty : $" Detail: {detail}";
             return $"{username} {actionLabel} {entityName} ({targetLabel}).{suffix}";
         }

@@ -120,6 +120,7 @@ namespace DataWarehousePower.Controllers
                         correlationId: correlationId,
                         entityName: "ReportDefinition",
                         entityId: created.Id.ToString(),
+                        entityLabel: created.ReportName,
                         oldValues: null,
                         newValues: new
                         {
@@ -151,6 +152,7 @@ namespace DataWarehousePower.Controllers
                         correlationId: correlationId,
                         entityName: "ReportDefinition",
                         entityId: form.Id.ToString(),
+                        entityLabel: form.ReportName,
                         oldValues: existing is null ? null : new
                         {
                             existing.Id,
@@ -186,6 +188,7 @@ namespace DataWarehousePower.Controllers
                     correlationId: correlationId,
                     entityName: "ReportDefinition",
                     entityId: form.Id == 0 ? null : form.Id.ToString(),
+                    entityLabel: form.ReportName,
                     oldValues: null,
                     newValues: new
                     {
@@ -230,6 +233,7 @@ namespace DataWarehousePower.Controllers
                     correlationId: correlationId,
                     entityName: "ReportDefinition",
                     entityId: id.ToString(),
+                    entityLabel: existing?.ReportName,
                     oldValues: existing is null ? null : new
                     {
                         existing.Id,
@@ -252,6 +256,7 @@ namespace DataWarehousePower.Controllers
                     correlationId: correlationId,
                     entityName: "ReportDefinition",
                     entityId: id.ToString(),
+                    entityLabel: existing?.ReportName,
                     oldValues: existing is null ? null : new
                     {
                         existing.Id,
@@ -298,6 +303,7 @@ namespace DataWarehousePower.Controllers
                     correlationId: correlationId,
                     entityName: "ReportDefinition",
                     entityId: id.ToString(),
+                    entityLabel: existing?.ReportName,
                     oldValues: existing is null ? null : new { existing.Id, existing.IsActive },
                     newValues: newIsActive is null ? null : new { Id = id, IsActive = newIsActive.Value },
                     detail: "Report active status toggled.");
@@ -312,6 +318,7 @@ namespace DataWarehousePower.Controllers
                     correlationId: correlationId,
                     entityName: "ReportDefinition",
                     entityId: id.ToString(),
+                    entityLabel: existing?.ReportName,
                     oldValues: existing is null ? null : new { existing.Id, existing.IsActive },
                     newValues: null,
                     detail: ex.Message);
