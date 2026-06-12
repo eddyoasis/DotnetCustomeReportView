@@ -7,3 +7,5 @@
 /DataWarehousePower/bin
 /DataWarehousePower/obj
 /.vscode
+/DataWarehousePower/Properties/PublishProfiles
+/DataWarehousePower/DataWarehousePower.csproj.user
