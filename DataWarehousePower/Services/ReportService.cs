@@ -175,28 +175,33 @@ namespace DataWarehousePower.Services
                 var entries = JsonSerializer.Deserialize<List<ColumnJsonEntry>>(row.ColumnJson, _jsonOpts)
                               ?? new List<ColumnJsonEntry>();
 
-                var validKeys    = systemColumns.Select(c => c.Key).ToHashSet();
-                var validEntries = entries.Where(e => validKeys.Contains(e.PropertyName)).ToList();
+                var entryLookup = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.PropertyName))
+                    .GroupBy(e => e.PropertyName, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-                if (!systemColumns.All(c => validEntries.Any(e => e.PropertyName == c.Key)))
-                    return (BuildDefaults(systemColumns), row.Id);
-
-                return (validEntries
-                    .OrderBy(e => e.DisplayOrder)
-                    .Select(e =>
+                var mergedColumns = systemColumns
+                    .OrderBy(c => c.Order)
+                    .Select(c =>
                     {
-                        var sys = systemColumns.First(c => c.Key == e.PropertyName);
+                        bool hasSavedEntry = entryLookup.TryGetValue(c.Key, out ColumnJsonEntry? savedEntry);
+                        bool isVisible = hasSavedEntry ? savedEntry!.IsVisible : true;
+                        string displayLabel = hasSavedEntry && !string.IsNullOrWhiteSpace(savedEntry!.CustomName)
+                            ? savedEntry.CustomName
+                            : c.DefaultLabel;
+
                         return new ColumnDefinition
                         {
-                            Key          = e.PropertyName,
-                            DefaultLabel = sys.DefaultLabel,
-                            DisplayLabel = string.IsNullOrWhiteSpace(e.CustomName)
-                                               ? sys.DefaultLabel : e.CustomName,
-                            IsVisible    = e.IsVisible,
-                            Order        = e.DisplayOrder
+                            Key = c.Key,
+                            DefaultLabel = c.DefaultLabel,
+                            DisplayLabel = displayLabel,
+                            IsVisible = isVisible,
+                            Order = c.Order
                         };
                     })
-                    .ToList(), row.Id);
+                    .ToList();
+
+                return (mergedColumns, row.Id);
             }
             catch (Exception ex)
             {
