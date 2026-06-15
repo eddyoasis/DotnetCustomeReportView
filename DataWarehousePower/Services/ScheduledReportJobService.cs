@@ -9,6 +9,7 @@ namespace DataWarehousePower.Services;
 public sealed class ScheduledReportJobService(
     IScheduledReportJobRepository scheduledJobRepository,
     IReportRepository reportRepository,
+    IColumnPreferenceRepository columnPreferenceRepository,
     IRecurringJobManager recurringJobManager,
     IHangfireDataProtectionService dataProtectionService,
     IOptions<HangfireOptions> hangfireOptions,
@@ -28,6 +29,8 @@ public sealed class ScheduledReportJobService(
                 ReportDefinitionId = entity.ReportDefinitionId,
                 ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
                 Format = entity.Format,
+                ClientCode = entity.ClientCode,
+                FilterClientCode = entity.FilterClientCode,
                 CronExpression = entity.CronExpression,
                 ScheduleDisplay = BuildScheduleDisplay(entity.CronExpression),
                 IsActive = entity.IsActive,
@@ -38,8 +41,11 @@ public sealed class ScheduledReportJobService(
         return viewModel;
     }
 
-    public async Task<ScheduledJobFormViewModel> GetCreateFormAsync()
+    public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId)
     {
+        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
+        Dictionary<int, List<string>> availableClientCodesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
+
         return new ScheduledJobFormViewModel
         {
             IsActive = true,
@@ -48,14 +54,19 @@ public sealed class ScheduledReportJobService(
             DailyTime = "08:30",
             EveryMinutes = 5,
             CronExpression = "0 8 * * *",
-            AvailableReports = await GetReportLookupAsync()
+            AvailableReports = availableReports,
+            AvailableClientCodesByReportId = availableClientCodesByReportId,
+            AvailableClientCodes = []
         };
     }
 
-    public async Task<ScheduledJobFormViewModel> GetEditFormAsync(int id)
+    public async Task<ScheduledJobFormViewModel> GetEditFormAsync(int id, string userId)
     {
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdAsync(id)
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
+
+        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
+        Dictionary<int, List<string>> availableClientCodesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
 
         ScheduledJobFormViewModel form = new()
         {
@@ -69,7 +80,13 @@ public sealed class ScheduledReportJobService(
             DateFrom = entity.DateFrom,
             DateTo = entity.DateTo,
             IsActive = entity.IsActive,
-            AvailableReports = await GetReportLookupAsync()
+            AvailableReports = availableReports,
+            AvailableClientCodesByReportId = availableClientCodesByReportId,
+            AvailableClientCodes = BuildAvailableClientCodes(
+                entity.ClientCode,
+                availableClientCodesByReportId.TryGetValue(entity.ReportDefinitionId, out List<string>? reportClientCodes)
+                    ? reportClientCodes
+                    : [])
         };
 
         ApplyScheduleFromCron(form, entity.CronExpression);
@@ -191,6 +208,29 @@ public sealed class ScheduledReportJobService(
             .Select(report => new ReportDefinitionLookupItem { Id = report.Id, ReportName = report.ReportName })
             .ToList();
     }
+
+    private async Task<Dictionary<int, List<string>>> GetClientCodesLookupAsync(
+        string userId,
+        IEnumerable<ReportDefinitionLookupItem> reports)
+    {
+        Dictionary<int, List<string>> clientCodesByReportId = [];
+
+        foreach (ReportDefinitionLookupItem report in reports)
+        {
+            clientCodesByReportId[report.Id] = await columnPreferenceRepository.GetClientCodesAsync(userId, report.Id);
+        }
+
+        return clientCodesByReportId;
+    }
+
+    private static List<string> BuildAvailableClientCodes(string? currentClientCode, IEnumerable<string> savedClientCodes)
+        => savedClientCodes
+            .Append(currentClientCode ?? string.Empty)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private static string BuildHangfireJobId(int id)
     {

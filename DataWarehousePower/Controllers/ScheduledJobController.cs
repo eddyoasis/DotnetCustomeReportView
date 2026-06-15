@@ -20,7 +20,8 @@ public sealed class ScheduledJobController(
 
     public async Task<IActionResult> Create()
     {
-        ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync();
+        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId);
         return View("Form", viewModel);
     }
 
@@ -28,7 +29,8 @@ public sealed class ScheduledJobController(
     {
         try
         {
-            ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id);
+            string userId = columnPreferenceService.ResolveUserId(HttpContext);
+            ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId);
             return View("Form", viewModel);
         }
         catch (InvalidOperationException)
@@ -41,13 +43,19 @@ public sealed class ScheduledJobController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save(ScheduledJobFormViewModel form)
     {
+        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+
         if (!ModelState.IsValid)
         {
-            form.AvailableReports = (await scheduledReportJobService.GetCreateFormAsync()).AvailableReports;
+            ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
+            form.AvailableReports = lookupForm.AvailableReports;
+            form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
+            form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
+                ? reportClientCodes
+                : [];
             return View("Form", form);
         }
 
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
         string username = ResolveAuditUsername();
 
         try
@@ -69,14 +77,24 @@ public sealed class ScheduledJobController(
         {
             logger.LogWarning(ex, "Validation failed when saving scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, ex.Message);
-            form.AvailableReports = (await scheduledReportJobService.GetCreateFormAsync()).AvailableReports;
+            ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
+            form.AvailableReports = lookupForm.AvailableReports;
+            form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
+            form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
+                ? reportClientCodes
+                : [];
             return View("Form", form);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, "An unexpected error occurred while saving the job.");
-            form.AvailableReports = (await scheduledReportJobService.GetCreateFormAsync()).AvailableReports;
+            ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
+            form.AvailableReports = lookupForm.AvailableReports;
+            form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
+            form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
+                ? reportClientCodes
+                : [];
             return View("Form", form);
         }
     }
@@ -105,11 +123,12 @@ public sealed class ScheduledJobController(
     {
         try
         {
-            ScheduledJobFormViewModel form = await scheduledReportJobService.GetEditFormAsync(id);
+            string userId = columnPreferenceService.ResolveUserId(HttpContext);
+            ScheduledJobFormViewModel form = await scheduledReportJobService.GetEditFormAsync(id, userId);
             form.IsActive = !form.IsActive;
             await scheduledReportJobService.UpdateAsync(
                 form,
-                columnPreferenceService.ResolveUserId(HttpContext),
+                userId,
                 ResolveAuditUsername());
             TempData["Success"] = "Scheduled job status updated.";
         }

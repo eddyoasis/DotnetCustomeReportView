@@ -10,6 +10,8 @@ public sealed class ScheduledJobListItemViewModel
     public int ReportDefinitionId { get; set; }
     public string ReportName { get; set; } = string.Empty;
     public string Format { get; set; } = string.Empty;
+    public string? ClientCode { get; set; }
+    public string? FilterClientCode { get; set; }
     public string CronExpression { get; set; } = string.Empty;
     public string ScheduleDisplay { get; set; } = string.Empty;
     public bool IsActive { get; set; }
@@ -82,6 +84,9 @@ public sealed class ScheduledJobFormViewModel
     public bool IsActive { get; set; } = true;
 
     public List<ReportDefinitionLookupItem> AvailableReports { get; set; } = [];
+    public List<string> AvailableClientCodes { get; set; } = [];
+
+    public Dictionary<int, List<string>> AvailableClientCodesByReportId { get; set; } = [];
 }
 
 public sealed class ReportDefinitionLookupItem

@@ -83,8 +83,41 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label asp-for="ClientCode" class="form-label"></label>
-                    <input asp-for="ClientCode" class="form-control" />
+                    @* <label asp-for="ClientCode" class="form-label"></label> *@
+                    <label class="form-label">Schema Template</label>
+                    <input asp-for="ClientCode" type="hidden" />
+
+                    <select id="scheduled-client-code-select" class="d-none" aria-hidden="true">
+                        <option value="">Default</option>
+                        @foreach (string availableClientCode in Model.AvailableClientCodes)
+                        {
+                            <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                        }
+                    </select>
+
+                    <div class="d-flex gap-2 align-items-center flex-nowrap">
+                        <div class="dropdown flex-grow-1">
+                            <button id="scheduled-client-code-dropdown-toggle"
+                                    class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside"
+                                    aria-expanded="false">
+                                Default
+                            </button>
+                            <div class="dropdown-menu p-2 w-100" style="min-width: 260px;">
+                                <input id="scheduled-client-code-search"
+                                       type="text"
+                                       class="form-control form-control-sm mb-2"
+                                       maxlength="128"
+                                       placeholder="Search client code"
+                                       autocomplete="off" />
+                                <div id="scheduled-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+
+                        <button id="scheduled-client-code-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
+                    </div>
                     <span asp-validation-for="ClientCode" class="text-danger"></span>
                 </div>
 
@@ -130,6 +163,14 @@
             const everyMinutesGroup = document.getElementById('everyMinutesGroup');
             const dailyTimeGroup = document.getElementById('dailyTimeGroup');
             const cronGroup = document.getElementById('cronGroup');
+            const reportDefinitionSelect = document.getElementById('ReportDefinitionId');
+            const clientCodeHiddenInput = document.getElementById('ClientCode');
+            const clientCodeSelect = document.getElementById('scheduled-client-code-select');
+            const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
+            const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
+            const clientCodeOptions = document.getElementById('scheduled-client-code-options');
+            const clientCodeClearButton = document.getElementById('scheduled-client-code-clear');
+            const availableClientCodesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodesByReportId));
 
             if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !cronGroup) {
                 return;
@@ -142,8 +183,116 @@
                 cronGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron' ? '' : 'none';
             }
 
+            function updateClientCodeSelectOptions() {
+                if (!reportDefinitionSelect || !clientCodeSelect) {
+                    return;
+                }
+
+                const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
+                const reportClientCodes = Number.isFinite(selectedReportId)
+                    ? (availableClientCodesByReportId[selectedReportId] || [])
+                    : [];
+
+                const distinctClientCodes = [...new Set(reportClientCodes
+                    .map(clientCode => (clientCode || '').trim())
+                    .filter(clientCode => clientCode.length > 0)
+                    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' })))];
+
+                const currentValue = (clientCodeHiddenInput?.value || '').trim();
+
+                clientCodeSelect.innerHTML = '';
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Default';
+                clientCodeSelect.appendChild(defaultOption);
+
+                distinctClientCodes.forEach(clientCode => {
+                    const option = document.createElement('option');
+                    option.value = clientCode;
+                    option.textContent = clientCode;
+                    clientCodeSelect.appendChild(option);
+                });
+
+                if (currentValue && !distinctClientCodes.some(value => value.localeCompare(currentValue, undefined, { sensitivity: 'accent' }) === 0)) {
+                    const option = document.createElement('option');
+                    option.value = currentValue;
+                    option.textContent = currentValue;
+                    clientCodeSelect.appendChild(option);
+                }
+
+                syncClientCodeUi(currentValue);
+            }
+
+            function syncClientCodeUi(value) {
+                if (!clientCodeHiddenInput || !clientCodeSelect || !clientCodeDropdownToggle) {
+                    return;
+                }
+
+                const normalizedValue = (value || '').trim();
+                clientCodeHiddenInput.value = normalizedValue;
+                clientCodeSelect.value = normalizedValue;
+                clientCodeDropdownToggle.textContent = normalizedValue || 'Default';
+                renderClientCodeOptions(clientCodeSearchInput?.value || '');
+            }
+
+            function renderClientCodeOptions(searchValue) {
+                if (!clientCodeOptions || !clientCodeSelect) {
+                    return;
+                }
+
+                const normalizedSearch = (searchValue || '').trim().toLocaleLowerCase();
+                const selectedValue = clientCodeSelect.value;
+                clientCodeOptions.innerHTML = '';
+
+                [...clientCodeSelect.options].forEach((option, index) => {
+                    const isDefault = index === 0;
+                    const isMatch = !normalizedSearch || option.text.toLocaleLowerCase().includes(normalizedSearch);
+                    const isSelected = option.value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0;
+                    if (!(isDefault || isMatch || isSelected)) {
+                        return;
+                    }
+
+                    const optionButton = document.createElement('button');
+                    optionButton.type = 'button';
+                    optionButton.className = `list-group-item list-group-item-action py-1 px-2${isSelected ? ' active' : ''}`;
+                    optionButton.textContent = option.text;
+                    optionButton.addEventListener('click', () => {
+                        syncClientCodeUi(option.value);
+                    });
+                    clientCodeOptions.appendChild(optionButton);
+                });
+
+                if (!clientCodeOptions.children.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'text-muted small px-2 py-1';
+                    empty.textContent = 'No matches';
+                    clientCodeOptions.appendChild(empty);
+                }
+            }
+
             scheduleTypeSelect.addEventListener('change', updateScheduleFields);
+
+            if (clientCodeSearchInput) {
+                clientCodeSearchInput.addEventListener('input', event => {
+                    const searchValue = event.target instanceof HTMLInputElement ? event.target.value : '';
+                    renderClientCodeOptions(searchValue);
+                });
+            }
+
+            if (clientCodeClearButton) {
+                clientCodeClearButton.addEventListener('click', () => {
+                    syncClientCodeUi('');
+                });
+            }
+
+            if (reportDefinitionSelect) {
+                reportDefinitionSelect.addEventListener('change', () => {
+                    updateClientCodeSelectOptions();
+                });
+            }
+
             updateScheduleFields();
+            updateClientCodeSelectOptions();
         })();
     </script>
 }

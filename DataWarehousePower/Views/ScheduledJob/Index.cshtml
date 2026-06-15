@@ -37,6 +37,8 @@ else
                     <th>Job Name</th>
                     <th>Report</th>
                     <th>Format</th>
+                    <th>Schema Template</th>
+                    <th>Filter Client Code</th>
                     <th>Schedule</th>
                     <th style="width: 100px;" class="text-center">Active</th>
                     <th style="width: 170px;">Actions</th>
@@ -53,6 +55,8 @@ else
                         </td>
                         <td>@job.ReportName</td>
                         <td class="text-uppercase">@job.Format</td>
+                        <td>@(string.IsNullOrWhiteSpace(job.ClientCode) ? "-" : job.ClientCode)</td>
+                        <td>@(string.IsNullOrWhiteSpace(job.FilterClientCode) ? "-" : job.FilterClientCode)</td>
                         <td>
                             <div>@job.ScheduleDisplay</div>
                             <div class="small text-muted"><code>@job.CronExpression</code></div>
