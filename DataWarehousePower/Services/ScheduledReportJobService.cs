@@ -97,9 +97,11 @@ public sealed class ScheduledReportJobService(
     {
         ValidateForm(form);
 
+        string hangfireJobId = form.JobName.Trim();
+
         ScheduledReportJob entity = new()
         {
-            JobName = form.JobName.Trim(),
+            JobName = hangfireJobId,
             ReportDefinitionId = form.ReportDefinitionId,
             Format = form.Format.Trim().ToLowerInvariant(),
             CronExpression = BuildCronExpression(form),
@@ -112,13 +114,10 @@ public sealed class ScheduledReportJobService(
             CreatedByUserId = userId,
             CreatedByUsername = username,
             CreatedUtc = DateTime.UtcNow,
-            HangfireJobId = string.Empty
+            HangfireJobId = hangfireJobId
         };
 
         await scheduledJobRepository.AddAsync(entity);
-
-        entity.HangfireJobId = BuildHangfireJobId(entity.Id);
-        await scheduledJobRepository.UpdateAsync(entity);
 
         SyncRecurringJob(entity);
         return entity.Id;
@@ -131,7 +130,11 @@ public sealed class ScheduledReportJobService(
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUpdateAsync(form.Id)
             ?? throw new InvalidOperationException($"Scheduled job {form.Id} was not found.");
 
-        entity.JobName = form.JobName.Trim();
+        string newJobName = form.JobName.Trim();
+        string oldHangfireJobId = entity.HangfireJobId;
+        string newHangfireJobId = newJobName;
+
+        entity.JobName = newJobName;
         entity.ReportDefinitionId = form.ReportDefinitionId;
         entity.Format = form.Format.Trim().ToLowerInvariant();
         entity.CronExpression = BuildCronExpression(form);
@@ -149,10 +152,13 @@ public sealed class ScheduledReportJobService(
             entity.EncryptedPassword = dataProtectionService.Protect(form.Password);
         }
 
-        if (string.IsNullOrWhiteSpace(entity.HangfireJobId))
+        if (!string.IsNullOrWhiteSpace(oldHangfireJobId) &&
+            !string.Equals(oldHangfireJobId, newHangfireJobId, StringComparison.Ordinal))
         {
-            entity.HangfireJobId = BuildHangfireJobId(entity.Id);
+            recurringJobManager.RemoveIfExists(oldHangfireJobId);
         }
+
+        entity.HangfireJobId = newHangfireJobId;
 
         await scheduledJobRepository.UpdateAsync(entity);
         SyncRecurringJob(entity);
@@ -232,10 +238,6 @@ public sealed class ScheduledReportJobService(
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-    private static string BuildHangfireJobId(int id)
-    {
-        return $"scheduled-export-{id}";
-    }
 
     private static string? NormalizeNullable(string? value)
     {
