@@ -47,12 +47,7 @@ public sealed class ScheduledJobController(
 
         if (!ModelState.IsValid)
         {
-            ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
-            form.AvailableReports = lookupForm.AvailableReports;
-            form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
-            form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
-                ? reportClientCodes
-                : [];
+            await PopulateFormLookupsAsync(form, userId);
             return View("Form", form);
         }
 
@@ -77,24 +72,14 @@ public sealed class ScheduledJobController(
         {
             logger.LogWarning(ex, "Validation failed when saving scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, ex.Message);
-            ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
-            form.AvailableReports = lookupForm.AvailableReports;
-            form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
-            form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
-                ? reportClientCodes
-                : [];
+            await PopulateFormLookupsAsync(form, userId);
             return View("Form", form);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, "An unexpected error occurred while saving the job.");
-            ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
-            form.AvailableReports = lookupForm.AvailableReports;
-            form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
-            form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
-                ? reportClientCodes
-                : [];
+            await PopulateFormLookupsAsync(form, userId);
             return View("Form", form);
         }
     }
@@ -150,5 +135,21 @@ public sealed class ScheduledJobController(
         }
 
         return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Anonymous" : User.Identity!.Name!.Trim();
+    }
+
+    private async Task PopulateFormLookupsAsync(ScheduledJobFormViewModel form, string userId)
+    {
+        ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
+        form.AvailableReports = lookupForm.AvailableReports;
+        form.AvailableClientCodesByReportId = lookupForm.AvailableClientCodesByReportId;
+        form.AvailableClientCodes = lookupForm.AvailableClientCodesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
+            ? reportClientCodes
+            : [];
+
+        if (form.Id > 0 && string.IsNullOrWhiteSpace(form.ExistingPassword))
+        {
+            ScheduledJobFormViewModel editForm = await scheduledReportJobService.GetEditFormAsync(form.Id, userId);
+            form.ExistingPassword = editForm.ExistingPassword;
+        }
     }
 }

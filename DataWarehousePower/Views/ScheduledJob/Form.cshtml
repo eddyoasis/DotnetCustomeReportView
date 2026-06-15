@@ -77,8 +77,28 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label asp-for="Password" class="form-label"></label>
-                    <input asp-for="Password" type="password" class="form-control" placeholder="@(isEdit ? "Leave blank to keep existing password" : "Required")" />
+                    @if (isEdit)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label asp-for="Password" class="form-label mb-0"></label>
+                            <div class="form-check mb-0">
+                                <input asp-for="UpdatePassword" class="form-check-input" id="updatePasswordToggle" />
+                                <label asp-for="UpdatePassword" class="form-check-label"></label>
+                            </div>
+                        </div>
+
+                        <div class="input-group mb-2">
+                            <input id="existingPasswordInput" type="password" class="form-control" value="@Model.ExistingPassword" readonly autocomplete="off" />
+                            <button id="toggleExistingPasswordVisibility" type="button" class="btn btn-outline-secondary">Show</button>
+                        </div>
+                        <div class="form-text mb-2">Current password is shown for reference. Turn on Update Password only when changing it.</div>
+                    }
+                    else
+                    {
+                        <label asp-for="Password" class="form-label"></label>
+                    }
+
+                    <input asp-for="Password" id="passwordInput" type="password" class="form-control" placeholder="@(isEdit ? "Enter a new password only when updating" : "Required")" />
                     <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
 
@@ -164,6 +184,10 @@
             const dailyTimeGroup = document.getElementById('dailyTimeGroup');
             const cronGroup = document.getElementById('cronGroup');
             const reportDefinitionSelect = document.getElementById('ReportDefinitionId');
+            const updatePasswordToggle = document.getElementById('updatePasswordToggle');
+            const passwordInput = document.getElementById('passwordInput');
+            const existingPasswordInput = document.getElementById('existingPasswordInput');
+            const toggleExistingPasswordVisibility = document.getElementById('toggleExistingPasswordVisibility');
             const clientCodeHiddenInput = document.getElementById('ClientCode');
             const clientCodeSelect = document.getElementById('scheduled-client-code-select');
             const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
@@ -181,6 +205,20 @@
                 everyMinutesGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes' ? '' : 'none';
                 dailyTimeGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeDailyTime' ? '' : 'none';
                 cronGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron' ? '' : 'none';
+            }
+
+            function updatePasswordFields() {
+                if (!passwordInput) {
+                    return;
+                }
+
+                const isUpdateEnabled = !updatePasswordToggle || updatePasswordToggle.checked;
+                passwordInput.disabled = !isUpdateEnabled;
+                passwordInput.required = isUpdateEnabled;
+
+                if (!isUpdateEnabled) {
+                    passwordInput.value = '';
+                }
             }
 
             function updateClientCodeSelectOptions() {
@@ -291,8 +329,23 @@
                 });
             }
 
+            if (updatePasswordToggle) {
+                updatePasswordToggle.addEventListener('change', () => {
+                    updatePasswordFields();
+                });
+            }
+
+            if (toggleExistingPasswordVisibility && existingPasswordInput) {
+                toggleExistingPasswordVisibility.addEventListener('click', () => {
+                    const isHidden = existingPasswordInput.type === 'password';
+                    existingPasswordInput.type = isHidden ? 'text' : 'password';
+                    toggleExistingPasswordVisibility.textContent = isHidden ? 'Hide' : 'Show';
+                });
+            }
+
             updateScheduleFields();
             updateClientCodeSelectOptions();
+            updatePasswordFields();
         })();
     </script>
 }

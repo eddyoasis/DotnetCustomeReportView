@@ -80,6 +80,12 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Password")]
     public string Password { get; set; } = string.Empty;
 
+    [Display(Name = "Update Password")]
+    public bool UpdatePassword { get; set; }
+
+    [Display(Name = "Existing Password")]
+    public string ExistingPassword { get; set; } = string.Empty;
+
     [Display(Name = "Enabled")]
     public bool IsActive { get; set; } = true;
 

@@ -79,6 +79,7 @@ public sealed class ScheduledReportJobService(
             FilterClientCode = entity.FilterClientCode,
             DateFrom = entity.DateFrom,
             DateTo = entity.DateTo,
+            ExistingPassword = dataProtectionService.Unprotect(entity.EncryptedPassword),
             IsActive = entity.IsActive,
             AvailableReports = availableReports,
             AvailableClientCodesByReportId = availableClientCodesByReportId,
@@ -147,8 +148,13 @@ public sealed class ScheduledReportJobService(
         entity.UpdatedByUsername = username;
         entity.UpdatedUtc = DateTime.UtcNow;
 
-        if (!string.IsNullOrWhiteSpace(form.Password))
+        if (form.UpdatePassword)
         {
+            if (string.IsNullOrWhiteSpace(form.Password))
+            {
+                throw new InvalidOperationException("Password is required when update password is enabled.");
+            }
+
             entity.EncryptedPassword = dataProtectionService.Protect(form.Password);
         }
 
@@ -277,6 +283,11 @@ public sealed class ScheduledReportJobService(
         if (form.Id == 0 && string.IsNullOrWhiteSpace(form.Password))
         {
             throw new InvalidOperationException("Password is required for a new scheduled job.");
+        }
+
+        if (form.Id > 0 && form.UpdatePassword && string.IsNullOrWhiteSpace(form.Password))
+        {
+            throw new InvalidOperationException("Password is required when update password is enabled.");
         }
 
         if (form.DateFrom.HasValue && form.DateTo.HasValue && form.DateFrom.Value.Date > form.DateTo.Value.Date)
