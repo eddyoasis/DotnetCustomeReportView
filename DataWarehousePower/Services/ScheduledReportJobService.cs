@@ -1,6 +1,8 @@
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
 using Hangfire;
+using Microsoft.Extensions.Options;
+using System.Globalization;
 
 namespace DataWarehousePower.Services;
 
@@ -9,6 +11,7 @@ public sealed class ScheduledReportJobService(
     IReportRepository reportRepository,
     IRecurringJobManager recurringJobManager,
     IHangfireDataProtectionService dataProtectionService,
+    IOptions<HangfireOptions> hangfireOptions,
     ILogger<ScheduledReportJobService> logger) : IScheduledReportJobService
 {
     public async Task<ScheduledJobListViewModel> GetListViewModelAsync()
@@ -26,6 +29,7 @@ public sealed class ScheduledReportJobService(
                 ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
                 Format = entity.Format,
                 CronExpression = entity.CronExpression,
+                ScheduleDisplay = BuildScheduleDisplay(entity.CronExpression),
                 IsActive = entity.IsActive,
                 CreatedUtc = entity.CreatedUtc
             }).ToList()
@@ -40,6 +44,9 @@ public sealed class ScheduledReportJobService(
         {
             IsActive = true,
             Format = "csv",
+            ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime,
+            DailyTime = "08:30",
+            EveryMinutes = 5,
             CronExpression = "0 8 * * *",
             AvailableReports = await GetReportLookupAsync()
         };
@@ -50,7 +57,7 @@ public sealed class ScheduledReportJobService(
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdAsync(id)
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
-        return new ScheduledJobFormViewModel
+        ScheduledJobFormViewModel form = new()
         {
             Id = entity.Id,
             JobName = entity.JobName,
@@ -64,6 +71,9 @@ public sealed class ScheduledReportJobService(
             IsActive = entity.IsActive,
             AvailableReports = await GetReportLookupAsync()
         };
+
+        ApplyScheduleFromCron(form, entity.CronExpression);
+        return form;
     }
 
     public async Task<int> CreateAsync(ScheduledJobFormViewModel form, string userId, string username)
@@ -75,7 +85,7 @@ public sealed class ScheduledReportJobService(
             JobName = form.JobName.Trim(),
             ReportDefinitionId = form.ReportDefinitionId,
             Format = form.Format.Trim().ToLowerInvariant(),
-            CronExpression = form.CronExpression.Trim(),
+            CronExpression = BuildCronExpression(form),
             ClientCode = NormalizeNullable(form.ClientCode),
             FilterClientCode = NormalizeNullable(form.FilterClientCode),
             DateFrom = form.DateFrom,
@@ -107,7 +117,7 @@ public sealed class ScheduledReportJobService(
         entity.JobName = form.JobName.Trim();
         entity.ReportDefinitionId = form.ReportDefinitionId;
         entity.Format = form.Format.Trim().ToLowerInvariant();
-        entity.CronExpression = form.CronExpression.Trim();
+        entity.CronExpression = BuildCronExpression(form);
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.FilterClientCode = NormalizeNullable(form.FilterClientCode);
         entity.DateFrom = form.DateFrom;
@@ -167,7 +177,11 @@ public sealed class ScheduledReportJobService(
         recurringJobManager.AddOrUpdate<IScheduledReportExecutionService>(
             entity.HangfireJobId,
             service => service.ExecuteAsync(entity.Id),
-            entity.CronExpression);
+            entity.CronExpression,
+            new RecurringJobOptions
+            {
+                TimeZone = HangfireTimeZoneResolver.Resolve(hangfireOptions.Value.TimeZoneId)
+            });
     }
 
     private async Task<List<ReportDefinitionLookupItem>> GetReportLookupAsync()
@@ -207,10 +221,16 @@ public sealed class ScheduledReportJobService(
             throw new InvalidOperationException("Format must be csv, excel, or pdf.");
         }
 
-        if (string.IsNullOrWhiteSpace(form.CronExpression))
+        string normalizedScheduleType = (form.ScheduleType ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalizedScheduleType is not (
+            ScheduledJobFormViewModel.ScheduleTypeEveryMinutes or
+            ScheduledJobFormViewModel.ScheduleTypeDailyTime or
+            ScheduledJobFormViewModel.ScheduleTypeAdvancedCron))
         {
-            throw new InvalidOperationException("Cron expression is required.");
+            throw new InvalidOperationException("Schedule type is invalid.");
         }
+
+        _ = BuildCronExpression(form);
 
         if (form.Id == 0 && string.IsNullOrWhiteSpace(form.Password))
         {
@@ -221,5 +241,109 @@ public sealed class ScheduledReportJobService(
         {
             throw new InvalidOperationException("Date From cannot be later than Date To.");
         }
+    }
+
+    private static string BuildCronExpression(ScheduledJobFormViewModel form)
+    {
+        string scheduleType = (form.ScheduleType ?? string.Empty).Trim().ToLowerInvariant();
+
+        if (scheduleType == ScheduledJobFormViewModel.ScheduleTypeEveryMinutes)
+        {
+            int interval = form.EveryMinutes ?? 0;
+            if (interval is < 1 or > 1440)
+            {
+                throw new InvalidOperationException("Every minutes must be between 1 and 1440.");
+            }
+
+            return $"*/{interval} * * * *";
+        }
+
+        if (scheduleType == ScheduledJobFormViewModel.ScheduleTypeDailyTime)
+        {
+            string rawTime = form.DailyTime?.Trim() ?? string.Empty;
+            if (!TimeOnly.TryParse(rawTime, CultureInfo.InvariantCulture, DateTimeStyles.None, out TimeOnly time))
+            {
+                throw new InvalidOperationException("Daily time is invalid. Use HH:mm.");
+            }
+
+            return $"{time.Minute} {time.Hour} * * *";
+        }
+
+        string cronExpression = form.CronExpression?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(cronExpression))
+        {
+            throw new InvalidOperationException("Cron expression is required.");
+        }
+
+        string[] segments = cronExpression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 5)
+        {
+            throw new InvalidOperationException("Cron expression must have at least 5 parts.");
+        }
+
+        return cronExpression;
+    }
+
+    private static void ApplyScheduleFromCron(ScheduledJobFormViewModel form, string cronExpression)
+    {
+        string[] segments = (cronExpression ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length >= 5 &&
+            segments[0].StartsWith("*/", StringComparison.Ordinal) &&
+            int.TryParse(segments[0][2..], out int minutes) &&
+            segments[1] == "*" &&
+            segments[2] == "*" &&
+            segments[3] == "*" &&
+            segments[4] == "*")
+        {
+            form.ScheduleType = ScheduledJobFormViewModel.ScheduleTypeEveryMinutes;
+            form.EveryMinutes = minutes;
+            return;
+        }
+
+        if (segments.Length >= 5 &&
+            int.TryParse(segments[0], out int minute) &&
+            int.TryParse(segments[1], out int hour) &&
+            segments[2] == "*" &&
+            segments[3] == "*" &&
+            segments[4] == "*" &&
+            minute is >= 0 and < 60 &&
+            hour is >= 0 and < 24)
+        {
+            form.ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime;
+            form.DailyTime = $"{hour:00}:{minute:00}";
+            return;
+        }
+
+        form.ScheduleType = ScheduledJobFormViewModel.ScheduleTypeAdvancedCron;
+    }
+
+    private static string BuildScheduleDisplay(string? cronExpression)
+    {
+        string[] segments = (cronExpression ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (segments.Length >= 5 &&
+            segments[0].StartsWith("*/", StringComparison.Ordinal) &&
+            int.TryParse(segments[0][2..], out int minutes) &&
+            segments[1] == "*" &&
+            segments[2] == "*" &&
+            segments[3] == "*" &&
+            segments[4] == "*")
+        {
+            return minutes == 1 ? "Every minute" : $"Every {minutes} minutes";
+        }
+
+        if (segments.Length >= 5 &&
+            int.TryParse(segments[0], out int minute) &&
+            int.TryParse(segments[1], out int hour) &&
+            segments[2] == "*" &&
+            segments[3] == "*" &&
+            segments[4] == "*" &&
+            minute is >= 0 and < 60 &&
+            hour is >= 0 and < 24)
+        {
+            return $"Daily at {hour:00}:{minute:00}";
+        }
+
+        return "Advanced schedule";
     }
 }

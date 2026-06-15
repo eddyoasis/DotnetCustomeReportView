@@ -47,9 +47,32 @@
                 </div>
 
                 <div class="col-md-6">
+                    <label asp-for="ScheduleType" class="form-label"></label>
+                    <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
+                        <option value="@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes">Every N minutes</option>
+                        <option value="@ScheduledJobFormViewModel.ScheduleTypeDailyTime">Daily at time</option>
+                        <option value="@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron">Advanced (Cron)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6" id="everyMinutesGroup">
+                    <label asp-for="EveryMinutes" class="form-label"></label>
+                    <input asp-for="EveryMinutes" type="number" min="1" max="1440" class="form-control" placeholder="5" />
+                    <div class="form-text">Example: every 5 minutes.</div>
+                    <span asp-validation-for="EveryMinutes" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6" id="dailyTimeGroup">
+                    <label asp-for="DailyTime" class="form-label"></label>
+                    <input asp-for="DailyTime" type="time" class="form-control" />
+                    <div class="form-text">Example: 08:30 means every day at 8:30 AM.</div>
+                    <span asp-validation-for="DailyTime" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6" id="cronGroup">
                     <label asp-for="CronExpression" class="form-label"></label>
                     <input asp-for="CronExpression" class="form-control" placeholder="0 8 * * *" />
-                    <div class="form-text">Daily at 8 AM: <code>0 8 * * *</code></div>
+                    <div class="form-text">Use only for advanced schedules.</div>
                     <span asp-validation-for="CronExpression" class="text-danger"></span>
                 </div>
 
@@ -101,4 +124,26 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
+            const everyMinutesGroup = document.getElementById('everyMinutesGroup');
+            const dailyTimeGroup = document.getElementById('dailyTimeGroup');
+            const cronGroup = document.getElementById('cronGroup');
+
+            if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !cronGroup) {
+                return;
+            }
+
+            function updateScheduleFields() {
+                const mode = scheduleTypeSelect.value;
+                everyMinutesGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes' ? '' : 'none';
+                dailyTimeGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeDailyTime' ? '' : 'none';
+                cronGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron' ? '' : 'none';
+            }
+
+            scheduleTypeSelect.addEventListener('change', updateScheduleFields);
+            updateScheduleFields();
+        })();
+    </script>
 }

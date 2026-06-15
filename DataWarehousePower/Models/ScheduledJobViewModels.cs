@@ -11,6 +11,7 @@ public sealed class ScheduledJobListItemViewModel
     public string ReportName { get; set; } = string.Empty;
     public string Format { get; set; } = string.Empty;
     public string CronExpression { get; set; } = string.Empty;
+    public string ScheduleDisplay { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public DateTime CreatedUtc { get; set; }
 }
@@ -22,6 +23,10 @@ public sealed class ScheduledJobListViewModel
 
 public sealed class ScheduledJobFormViewModel
 {
+    public const string ScheduleTypeEveryMinutes = "every-minutes";
+    public const string ScheduleTypeDailyTime = "daily-time";
+    public const string ScheduleTypeAdvancedCron = "advanced-cron";
+
     public int Id { get; set; }
 
     [Required]
@@ -39,8 +44,19 @@ public sealed class ScheduledJobFormViewModel
     public string Format { get; set; } = "csv";
 
     [Required]
+    [Display(Name = "Schedule Type")]
+    public string ScheduleType { get; set; } = ScheduleTypeDailyTime;
+
+    [Range(1, 1440)]
+    [Display(Name = "Every (minutes)")]
+    public int? EveryMinutes { get; set; } = 5;
+
+    [MaxLength(5)]
+    [Display(Name = "Daily Time")]
+    public string DailyTime { get; set; } = "08:30";
+
     [MaxLength(128)]
-    [Display(Name = "Cron Expression")]
+    [Display(Name = "Cron Expression (Advanced)")]
     public string CronExpression { get; set; } = "0 8 * * *";
 
     [MaxLength(128)]

@@ -37,7 +37,7 @@ else
                     <th>Job Name</th>
                     <th>Report</th>
                     <th>Format</th>
-                    <th>Cron</th>
+                    <th>Schedule</th>
                     <th style="width: 100px;" class="text-center">Active</th>
                     <th style="width: 170px;">Actions</th>
                 </tr>
@@ -53,7 +53,10 @@ else
                         </td>
                         <td>@job.ReportName</td>
                         <td class="text-uppercase">@job.Format</td>
-                        <td><code>@job.CronExpression</code></td>
+                        <td>
+                            <div>@job.ScheduleDisplay</div>
+                            <div class="small text-muted"><code>@job.CronExpression</code></div>
+                        </td>
                         <td class="text-center">
                             <form asp-action="ToggleActive" asp-route-id="@job.Id" method="post" class="d-inline">
                                 @Html.AntiForgeryToken()
@@ -77,5 +80,5 @@ else
 }
 
 <div class="small text-muted mt-3">
-    Cron example for daily 8 AM: <code>0 8 * * *</code>
+    Schedules are interpreted in UTC+8 timezone.
 </div>

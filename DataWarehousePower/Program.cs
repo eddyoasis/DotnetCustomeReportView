@@ -199,6 +199,7 @@ app.UseMiddleware<UserDisplayNameSessionMiddleware>();
 app.UseAuthorization();
 
 HangfireOptions hangfireOptions = app.Services.GetRequiredService<IOptions<HangfireOptions>>().Value;
+TimeZoneInfo hangfireTimeZone = HangfireTimeZoneResolver.Resolve(hangfireOptions.TimeZoneId);
 string dashboardPath = string.IsNullOrWhiteSpace(hangfireOptions.DashboardPath)
     ? "/hangfire"
     : hangfireOptions.DashboardPath;
@@ -209,7 +210,11 @@ app.MapHangfireDashboard(dashboardPath)
 RecurringJob.AddOrUpdate<IAuditLogCleanupJob>(
     "audit-log-cleanup",
     job => job.DeleteExpiredLogsAsync(),
-    hangfireOptions.AuditLogCleanupCron);
+    hangfireOptions.AuditLogCleanupCron,
+    new RecurringJobOptions
+    {
+        TimeZone = hangfireTimeZone
+    });
 
 using (IServiceScope scope = app.Services.CreateScope())
 {
