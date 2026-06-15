@@ -23,6 +23,169 @@
     </div>
 }
 
+<div class="card mb-3 shadow-sm">
+    <div class="card-body pb-2">
+        <form asp-action="Index" method="get" class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label small mb-1">Job Name</label>
+                <input type="text" name="JobName" value="@Model.Filter.JobName" class="form-control form-control-sm" placeholder="Search job name…" />
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label small mb-1">Report</label>
+                <input type="text" name="ReportName" value="@Model.Filter.ReportName" class="form-control form-control-sm" placeholder="Search report…" />
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label small mb-1">Format</label>
+                <select name="Format" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    @foreach (string fmt in Model.AvailableFormats)
+                    {
+                        <option value="@fmt" selected="@(Model.Filter.Format == fmt ? "selected" : null)">@fmt.ToUpperInvariant()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label small mb-1">Client Code</label>
+                <input type="hidden" name="ClientCode" id="scheduled-job-client-code-value" value="@Model.Filter.ClientCode" />
+                <div class="dropdown w-100">
+                    <button id="scheduled-job-client-code-toggle"
+                            class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            aria-expanded="false">
+                        @(string.IsNullOrWhiteSpace(Model.Filter.ClientCode) ? "All" : Model.Filter.ClientCode)
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
+                        <input id="scheduled-job-client-code-search"
+                               type="text"
+                               class="form-control form-control-sm mb-2"
+                               maxlength="128"
+                               placeholder="Search client code"
+                               autocomplete="off" />
+                        <div id="scheduled-job-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label small mb-1">Filter Client Code</label>
+                <input type="hidden" name="FilterClientCode" id="scheduled-job-filter-client-code-value" value="@Model.Filter.FilterClientCode" />
+                <div class="dropdown w-100">
+                    <button id="scheduled-job-filter-client-code-toggle"
+                            class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            aria-expanded="false">
+                        @(string.IsNullOrWhiteSpace(Model.Filter.FilterClientCode) ? "All" : Model.Filter.FilterClientCode)
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
+                        <input id="scheduled-job-filter-client-code-search"
+                               type="text"
+                               class="form-control form-control-sm mb-2"
+                               maxlength="128"
+                               placeholder="Search client code"
+                               autocomplete="off" />
+                        <div id="scheduled-job-filter-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label small mb-1">Status</label>
+                <select name="IsActive" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="true" selected="@(Model.Filter.IsActive == true ? "selected" : null)">Active</option>
+                    <option value="false" selected="@(Model.Filter.IsActive == false ? "selected" : null)">Inactive</option>
+                </select>
+            </div>
+            <div class="col-auto d-flex gap-1">
+                <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            function createSearchableDropdown(config) {
+                const hiddenInput = document.getElementById(config.hiddenInputId);
+                const toggleButton = document.getElementById(config.toggleButtonId);
+                const searchInput = document.getElementById(config.searchInputId);
+                const optionsContainer = document.getElementById(config.optionsContainerId);
+
+                if (!hiddenInput || !toggleButton || !searchInput || !optionsContainer) {
+                    return;
+                }
+
+                const items = config.items.map(item => (item || '').trim()).filter(item => item.length > 0);
+
+                function setValue(value) {
+                    const normalizedValue = (value || '').trim();
+                    hiddenInput.value = normalizedValue;
+                    toggleButton.textContent = normalizedValue || 'All';
+                    render(searchInput.value);
+                }
+
+                function render(searchValue) {
+                    const normalizedSearch = (searchValue || '').trim().toLowerCase();
+                    const selectedValue = hiddenInput.value.trim();
+
+                    optionsContainer.innerHTML = '';
+
+                    const visibleItems = items.filter(item => !normalizedSearch || item.toLowerCase().includes(normalizedSearch));
+                    const currentSelection = visibleItems.some(item => item.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0);
+
+                    if (!selectedValue || !currentSelection) {
+                        visibleItems.unshift('');
+                    }
+
+                    visibleItems.forEach(item => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = `list-group-item list-group-item-action py-1 px-2${item && item.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0 ? ' active' : ''}`;
+                        button.textContent = item || 'All';
+                        button.addEventListener('click', () => setValue(item));
+                        optionsContainer.appendChild(button);
+                    });
+
+                    if (!optionsContainer.children.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'text-muted small px-2 py-1';
+                        empty.textContent = 'No matches';
+                        optionsContainer.appendChild(empty);
+                    }
+                }
+
+                searchInput.addEventListener('input', event => {
+                    const target = event.target;
+                    render(target instanceof HTMLInputElement ? target.value : '');
+                });
+
+                render('');
+                setValue(hiddenInput.value);
+            }
+
+            createSearchableDropdown({
+                hiddenInputId: 'scheduled-job-client-code-value',
+                toggleButtonId: 'scheduled-job-client-code-toggle',
+                searchInputId: 'scheduled-job-client-code-search',
+                optionsContainerId: 'scheduled-job-client-code-options',
+                items: [@foreach (string cc in Model.AvailableClientCodes) { <text>'@cc',</text> }]
+            });
+
+            createSearchableDropdown({
+                hiddenInputId: 'scheduled-job-filter-client-code-value',
+                toggleButtonId: 'scheduled-job-filter-client-code-toggle',
+                searchInputId: 'scheduled-job-filter-client-code-search',
+                optionsContainerId: 'scheduled-job-filter-client-code-options',
+                items: [@foreach (string fcc in Model.AvailableFilterClientCodes) { <text>'@fcc',</text> }]
+            });
+        })();
+    </script>
+}
+
 @if (!Model.Jobs.Any())
 {
     <div class="alert alert-info">No scheduled jobs found. Click <strong>+ New Scheduled Job</strong> to create one.</div>

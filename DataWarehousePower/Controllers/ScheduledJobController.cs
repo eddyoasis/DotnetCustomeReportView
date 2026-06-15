@@ -12,9 +12,9 @@ public sealed class ScheduledJobController(
     IColumnPreferenceService columnPreferenceService,
     ILogger<ScheduledJobController> logger) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(ScheduledJobFilterViewModel? filter)
     {
-        ScheduledJobListViewModel viewModel = await scheduledReportJobService.GetListViewModelAsync();
+        ScheduledJobListViewModel viewModel = await scheduledReportJobService.GetListViewModelAsync(filter);
         return View(viewModel);
     }
 

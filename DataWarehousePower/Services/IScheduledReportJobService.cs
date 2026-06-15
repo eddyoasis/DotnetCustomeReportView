@@ -4,7 +4,7 @@ namespace DataWarehousePower.Services;
 
 public interface IScheduledReportJobService
 {
-    Task<ScheduledJobListViewModel> GetListViewModelAsync();
+    Task<ScheduledJobListViewModel> GetListViewModelAsync(ScheduledJobFilterViewModel? filter = null);
     Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId);
     Task<ScheduledJobFormViewModel> GetEditFormAsync(int id, string userId);
     Task<int> CreateAsync(ScheduledJobFormViewModel form, string userId, string username);

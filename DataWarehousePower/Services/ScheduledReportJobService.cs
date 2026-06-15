@@ -15,27 +15,73 @@ public sealed class ScheduledReportJobService(
     IOptions<HangfireOptions> hangfireOptions,
     ILogger<ScheduledReportJobService> logger) : IScheduledReportJobService
 {
-    public async Task<ScheduledJobListViewModel> GetListViewModelAsync()
+    public async Task<ScheduledJobListViewModel> GetListViewModelAsync(ScheduledJobFilterViewModel? filter = null)
     {
         List<ScheduledReportJob> entities = await scheduledJobRepository.GetAllAsync();
 
+        List<ScheduledJobListItemViewModel> allJobs = entities.Select(entity => new ScheduledJobListItemViewModel
+        {
+            Id = entity.Id,
+            JobName = entity.JobName,
+            HangfireJobId = entity.HangfireJobId,
+            ReportDefinitionId = entity.ReportDefinitionId,
+            ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
+            Format = entity.Format,
+            ClientCode = entity.ClientCode,
+            FilterClientCode = entity.FilterClientCode,
+            CronExpression = entity.CronExpression,
+            ScheduleDisplay = BuildScheduleDisplay(entity.CronExpression),
+            IsActive = entity.IsActive,
+            CreatedUtc = entity.CreatedUtc
+        }).ToList();
+
+        List<string> availableFormats = allJobs.Select(j => j.Format).Distinct().Order().ToList();
+        List<string> availableClientCodes = allJobs
+            .Select(j => j.ClientCode)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct()
+            .Order()
+            .Select(c => c!)
+            .ToList();
+
+        List<string> availableFilterClientCodes = allJobs
+            .Select(j => j.FilterClientCode)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct()
+            .Order()
+            .Select(c => c!)
+            .ToList();
+
+        IEnumerable<ScheduledJobListItemViewModel> filtered = allJobs;
+
+        if (filter is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(filter.JobName))
+                filtered = filtered.Where(j => j.JobName.Contains(filter.JobName, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(filter.ReportName))
+                filtered = filtered.Where(j => j.ReportName.Contains(filter.ReportName, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(filter.Format))
+                filtered = filtered.Where(j => j.Format.Equals(filter.Format, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(filter.ClientCode))
+                filtered = filtered.Where(j => string.Equals(j.ClientCode, filter.ClientCode, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(filter.FilterClientCode))
+                filtered = filtered.Where(j => string.Equals(j.FilterClientCode, filter.FilterClientCode, StringComparison.OrdinalIgnoreCase));
+
+            if (filter.IsActive.HasValue)
+                filtered = filtered.Where(j => j.IsActive == filter.IsActive.Value);
+        }
+
         ScheduledJobListViewModel viewModel = new()
         {
-            Jobs = entities.Select(entity => new ScheduledJobListItemViewModel
-            {
-                Id = entity.Id,
-                JobName = entity.JobName,
-                HangfireJobId = entity.HangfireJobId,
-                ReportDefinitionId = entity.ReportDefinitionId,
-                ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
-                Format = entity.Format,
-                ClientCode = entity.ClientCode,
-                FilterClientCode = entity.FilterClientCode,
-                CronExpression = entity.CronExpression,
-                ScheduleDisplay = BuildScheduleDisplay(entity.CronExpression),
-                IsActive = entity.IsActive,
-                CreatedUtc = entity.CreatedUtc
-            }).ToList()
+            Jobs = filtered.ToList(),
+            Filter = filter ?? new ScheduledJobFilterViewModel(),
+            AvailableFormats = availableFormats,
+            AvailableClientCodes = availableClientCodes,
+            AvailableFilterClientCodes = availableFilterClientCodes
         };
 
         return viewModel;
