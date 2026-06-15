@@ -23,6 +23,7 @@ namespace DataWarehousePower.Data
         public DbSet<ReportColumn>         ReportColumns         { get; set; }
         public DbSet<UserColumnPreference> UserColumnPreferences { get; set; }
         public DbSet<AuditLog>             AuditLogs             { get; set; }
+        public DbSet<ScheduledReportJob>   ScheduledReportJobs   { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
             => SaveChangesAsync(acceptAllChangesOnSuccess, CancellationToken.None).GetAwaiter().GetResult();
@@ -115,6 +116,27 @@ namespace DataWarehousePower.Data
                 .WithOne(c => c.Report)
                 .HasForeignKey(c => c.ReportDefinitionId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ScheduledReportJob>(e =>
+            {
+                e.HasKey(job => job.Id);
+                e.Property(job => job.JobName).HasMaxLength(128);
+                e.Property(job => job.HangfireJobId).HasMaxLength(128);
+                e.Property(job => job.Format).HasMaxLength(16);
+                e.Property(job => job.CronExpression).HasMaxLength(128);
+                e.Property(job => job.ClientCode).HasMaxLength(128);
+                e.Property(job => job.FilterClientCode).HasMaxLength(128);
+                e.Property(job => job.EncryptedPassword).HasMaxLength(512);
+                e.Property(job => job.CreatedByUserId).HasMaxLength(128);
+                e.Property(job => job.CreatedByUsername).HasMaxLength(128);
+                e.Property(job => job.UpdatedByUserId).HasMaxLength(128);
+                e.Property(job => job.UpdatedByUsername).HasMaxLength(128);
+                e.HasIndex(job => job.HangfireJobId).IsUnique();
+                e.HasOne(job => job.ReportDefinition)
+                    .WithMany()
+                    .HasForeignKey(job => job.ReportDefinitionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             // ── Seed: Staff Report ────────────────────────────────────────────
             modelBuilder.Entity<ReportDefinition>().HasData(

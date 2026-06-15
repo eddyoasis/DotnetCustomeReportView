@@ -1,0 +1,104 @@
+@model DataWarehousePower.Models.ScheduledJobFormViewModel
+@{
+    bool isEdit = Model.Id > 0;
+    ViewData["Title"] = isEdit ? "Edit Scheduled Job" : "Create Scheduled Job";
+}
+
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <h4 class="mb-0">@ViewData["Title"]</h4>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form asp-action="Save" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="Id" type="hidden" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="JobName" class="form-label"></label>
+                    <input asp-for="JobName" class="form-control" />
+                    <span asp-validation-for="JobName" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-3">
+                    <label asp-for="ReportDefinitionId" class="form-label"></label>
+                    <select asp-for="ReportDefinitionId" class="form-select">
+                        <option value="">-- Select report --</option>
+                        @foreach (ReportDefinitionLookupItem report in Model.AvailableReports)
+                        {
+                            <option value="@report.Id">@report.ReportName</option>
+                        }
+                    </select>
+                    <span asp-validation-for="ReportDefinitionId" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-3">
+                    <label asp-for="Format" class="form-label"></label>
+                    <select asp-for="Format" class="form-select text-uppercase">
+                        <option value="csv">CSV</option>
+                        <option value="excel">EXCEL</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                    <span asp-validation-for="Format" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="CronExpression" class="form-label"></label>
+                    <input asp-for="CronExpression" class="form-control" placeholder="0 8 * * *" />
+                    <div class="form-text">Daily at 8 AM: <code>0 8 * * *</code></div>
+                    <span asp-validation-for="CronExpression" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" type="password" class="form-control" placeholder="@(isEdit ? "Leave blank to keep existing password" : "Required")" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="ClientCode" class="form-label"></label>
+                    <input asp-for="ClientCode" class="form-control" />
+                    <span asp-validation-for="ClientCode" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="FilterClientCode" class="form-label"></label>
+                    <input asp-for="FilterClientCode" class="form-control" />
+                    <span asp-validation-for="FilterClientCode" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="DateFrom" class="form-label"></label>
+                    <input asp-for="DateFrom" type="date" class="form-control" />
+                    <span asp-validation-for="DateFrom" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="DateTo" class="form-label"></label>
+                    <input asp-for="DateTo" type="date" class="form-control" />
+                    <span asp-validation-for="DateTo" class="text-danger"></span>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label"></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

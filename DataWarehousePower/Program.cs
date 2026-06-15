@@ -3,10 +3,13 @@ using DataWarehousePower.Data;
 using DataWarehousePower.Middleware;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
+using Hangfire;
+using Hangfire.SqlServer;
 using log4net.Config;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +25,7 @@ builder.Services.AddScoped<IColumnPreferenceRepository, ColumnPreferenceReposito
 builder.Services.AddScoped<IReportRepository,           ReportRepository>();
 builder.Services.AddScoped<IReportManageRepository,     ReportManageRepository>();
 builder.Services.AddScoped<IAuditLogRepository,         AuditLogRepository>();
+builder.Services.AddScoped<IScheduledReportJobRepository, ScheduledReportJobRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
@@ -31,6 +35,9 @@ builder.Services.AddScoped<IReportManageService,     ReportManageService>();
 builder.Services.AddScoped<IActiveDirectoryUserService, ActiveDirectoryUserService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
+builder.Services.AddScoped<IHangfireDataProtectionService, HangfireDataProtectionService>();
+builder.Services.AddScoped<IScheduledReportExecutionService, ScheduledReportExecutionService>();
+builder.Services.AddScoped<IScheduledReportJobService, ScheduledReportJobService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
@@ -43,6 +50,30 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
 });
+
+builder.Services.Configure<HangfireOptions>(
+    builder.Configuration.GetSection(HangfireOptions.SectionName));
+builder.Services.AddScoped<IAuditLogCleanupJob, AuditLogCleanupJob>();
+builder.Services.AddHangfire(configuration =>
+{
+    string connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is missing.");
+
+    configuration
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
+        {
+            SchemaName = "ReportViewer_Hangfire",
+            CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+            SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+            QueuePollInterval = TimeSpan.FromSeconds(15),
+            UseRecommendedIsolationLevel = true,
+            DisableGlobalLocks = true
+        });
+});
+builder.Services.AddHangfireServer();
 
 // ── MVC ───────────────────────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
@@ -167,6 +198,25 @@ app.Use(async (context, next) =>
 app.UseMiddleware<UserDisplayNameSessionMiddleware>();
 app.UseAuthorization();
 
+HangfireOptions hangfireOptions = app.Services.GetRequiredService<IOptions<HangfireOptions>>().Value;
+string dashboardPath = string.IsNullOrWhiteSpace(hangfireOptions.DashboardPath)
+    ? "/hangfire"
+    : hangfireOptions.DashboardPath;
+
+app.MapHangfireDashboard(dashboardPath)
+    .RequireAuthorization(DepartmentAuthorizationPolicies.AuditlogAccess);
+
+RecurringJob.AddOrUpdate<IAuditLogCleanupJob>(
+    "audit-log-cleanup",
+    job => job.DeleteExpiredLogsAsync(),
+    hangfireOptions.AuditLogCleanupCron);
+
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    IScheduledReportJobService scheduledReportJobService = scope.ServiceProvider.GetRequiredService<IScheduledReportJobService>();
+    await scheduledReportJobService.SyncRecurringJobsAsync();
+}
+
 // Root "/" → redirect to /Report/List which picks the first report
 app.MapGet("/", () => Results.Redirect("/Report/List"));
 
@@ -187,6 +237,11 @@ app.MapControllerRoute(
     name: "reportManage",
     pattern: "ReportManage/{action=Index}/{id?}",
     defaults: new { controller = "ReportManage" });
+
+app.MapControllerRoute(
+    name: "scheduledJobs",
+    pattern: "ScheduledJob/{action=Index}/{id?}",
+    defaults: new { controller = "ScheduledJob" });
 
 // /AuditLog
 app.MapControllerRoute(
