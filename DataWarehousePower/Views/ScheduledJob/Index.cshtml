@@ -45,6 +45,16 @@
                 </select>
             </div>
             <div class="col-sm-4 col-md-2">
+                <label class="form-label small mb-1">Action</label>
+                <select name="JobAction" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    @foreach (string action in Model.AvailableJobActions)
+                    {
+                        <option value="@action" selected="@(Model.Filter.JobAction == action ? "selected" : null)">@(action == ScheduledJobActions.ExportFileAndEmailToUser ? "Export + Email" : "Export File")</option>
+                    }
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-2">
                 <label class="form-label small mb-1">Client Code</label>
                 <input type="hidden" name="ClientCode" id="scheduled-job-client-code-value" value="@Model.Filter.ClientCode" />
                 <div class="dropdown w-100">
@@ -200,6 +210,7 @@ else
                     <th>Job Name</th>
                     <th>Report</th>
                     <th>Format</th>
+                    <th>Action</th>
                     <th>Schema Template</th>
                     <th>Filter Client Code</th>
                     <th>Schedule</th>
@@ -218,6 +229,13 @@ else
                         </td>
                         <td>@job.ReportName</td>
                         <td class="text-uppercase">@job.Format</td>
+                        <td>
+                            <div>@(job.JobAction == ScheduledJobActions.ExportFileAndEmailToUser ? "Export + Email" : "Export File")</div>
+                            @if (!string.IsNullOrWhiteSpace(job.RecipientEmail))
+                            {
+                                <div class="small text-muted">@job.RecipientEmail</div>
+                            }
+                        </td>
                         <td>@(string.IsNullOrWhiteSpace(job.ClientCode) ? "-" : job.ClientCode)</td>
                         <td>@(string.IsNullOrWhiteSpace(job.FilterClientCode) ? "-" : job.FilterClientCode)</td>
                         <td>

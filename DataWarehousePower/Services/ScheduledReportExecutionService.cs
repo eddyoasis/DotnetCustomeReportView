@@ -8,6 +8,7 @@ public sealed class ScheduledReportExecutionService(
     IScheduledReportJobRepository scheduledJobRepository,
     IReportService reportService,
     IReportExportService reportExportService,
+    IScheduledReportEmailService scheduledReportEmailService,
     IHangfireDataProtectionService dataProtectionService,
     IOptions<HangfireOptions> options,
     ILogger<ScheduledReportExecutionService> logger) : IScheduledReportExecutionService
@@ -68,5 +69,21 @@ public sealed class ScheduledReportExecutionService(
             "Scheduled export job {ScheduledJobId} produced file {ExportFilePath}.",
             scheduledJobId,
             fullPath);
+
+        string jobAction = (job.JobAction ?? string.Empty).Trim().ToLowerInvariant();
+        if (jobAction == ScheduledJobActions.ExportFileAndEmailToUser)
+        {
+            if (string.IsNullOrWhiteSpace(job.RecipientEmail))
+            {
+                throw new InvalidOperationException($"Scheduled job {scheduledJobId} is configured for email action but recipient email is empty.");
+            }
+
+            await scheduledReportEmailService.SendExportResultAsync(
+                job.RecipientEmail,
+                job.JobName,
+                reportViewModel.ReportName,
+                fileName,
+                zipBytes);
+        }
     }
 }

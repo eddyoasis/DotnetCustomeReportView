@@ -47,6 +47,22 @@
                 </div>
 
                 <div class="col-md-6">
+                    <label asp-for="JobAction" class="form-label"></label>
+                    <select asp-for="JobAction" class="form-select" id="jobActionSelect">
+                        <option value="@ScheduledJobActions.ExportFile">Export file</option>
+                        <option value="@ScheduledJobActions.ExportFileAndEmailToUser">Export file and email to user</option>
+                    </select>
+                    <span asp-validation-for="JobAction" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6" id="recipientEmailGroup">
+                    <label asp-for="RecipientEmail" class="form-label"></label>
+                    <input asp-for="RecipientEmail" type="email" class="form-control" placeholder="user@company.com" />
+                    <div class="form-text">Required only for "Export file and email to user" action.</div>
+                    <span asp-validation-for="RecipientEmail" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
                     <label asp-for="ScheduleType" class="form-label"></label>
                     <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
                         <option value="@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes">Every N minutes</option>
@@ -180,6 +196,9 @@
     <script>
         (function () {
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
+            const jobActionSelect = document.getElementById('jobActionSelect');
+            const recipientEmailGroup = document.getElementById('recipientEmailGroup');
+            const recipientEmailInput = document.getElementById('RecipientEmail');
             const everyMinutesGroup = document.getElementById('everyMinutesGroup');
             const dailyTimeGroup = document.getElementById('dailyTimeGroup');
             const cronGroup = document.getElementById('cronGroup');
@@ -205,6 +224,20 @@
                 everyMinutesGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes' ? '' : 'none';
                 dailyTimeGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeDailyTime' ? '' : 'none';
                 cronGroup.style.display = mode === '@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron' ? '' : 'none';
+            }
+
+            function updateJobActionFields() {
+                if (!jobActionSelect || !recipientEmailGroup || !recipientEmailInput) {
+                    return;
+                }
+
+                const requiresEmail = jobActionSelect.value === '@ScheduledJobActions.ExportFileAndEmailToUser';
+                recipientEmailGroup.style.display = requiresEmail ? '' : 'none';
+                recipientEmailInput.required = requiresEmail;
+
+                if (!requiresEmail) {
+                    recipientEmailInput.value = '';
+                }
             }
 
             function updatePasswordFields() {
@@ -310,6 +343,10 @@
 
             scheduleTypeSelect.addEventListener('change', updateScheduleFields);
 
+            if (jobActionSelect) {
+                jobActionSelect.addEventListener('change', updateJobActionFields);
+            }
+
             if (clientCodeSearchInput) {
                 clientCodeSearchInput.addEventListener('input', event => {
                     const searchValue = event.target instanceof HTMLInputElement ? event.target.value : '';
@@ -344,6 +381,7 @@
             }
 
             updateScheduleFields();
+            updateJobActionFields();
             updateClientCodeSelectOptions();
             updatePasswordFields();
         })();

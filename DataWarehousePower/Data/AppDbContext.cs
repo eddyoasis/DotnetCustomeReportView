@@ -124,6 +124,8 @@ namespace DataWarehousePower.Data
                 e.Property(job => job.HangfireJobId).HasMaxLength(128);
                 e.Property(job => job.Format).HasMaxLength(16);
                 e.Property(job => job.CronExpression).HasMaxLength(128);
+                e.Property(job => job.JobAction).HasMaxLength(64);
+                e.Property(job => job.RecipientEmail).HasMaxLength(256);
                 e.Property(job => job.ClientCode).HasMaxLength(128);
                 e.Property(job => job.FilterClientCode).HasMaxLength(128);
                 e.Property(job => job.EncryptedPassword).HasMaxLength(512);

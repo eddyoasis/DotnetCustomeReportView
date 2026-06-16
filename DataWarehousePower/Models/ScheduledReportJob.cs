@@ -27,6 +27,13 @@ public class ScheduledReportJob
     [MaxLength(128)]
     public string CronExpression { get; set; } = "0 8 * * *";
 
+    [Required]
+    [MaxLength(64)]
+    public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
+
+    [MaxLength(256)]
+    public string? RecipientEmail { get; set; }
+
     [MaxLength(128)]
     public string? ClientCode { get; set; }
 

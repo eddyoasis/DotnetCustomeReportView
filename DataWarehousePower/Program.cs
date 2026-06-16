@@ -39,6 +39,7 @@ builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 builder.Services.AddScoped<IHangfireDataProtectionService, HangfireDataProtectionService>();
 builder.Services.AddScoped<IScheduledReportExecutionService, ScheduledReportExecutionService>();
 builder.Services.AddScoped<IScheduledReportJobService, ScheduledReportJobService>();
+builder.Services.AddScoped<IScheduledReportEmailService, ScheduledReportEmailService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
@@ -67,6 +68,8 @@ builder.Services.AddSession(options =>
 
 builder.Services.Configure<HangfireOptions>(
     builder.Configuration.GetSection(HangfireOptions.SectionName));
+builder.Services.Configure<ScheduledReportEmailOptions>(
+    builder.Configuration.GetSection(ScheduledReportEmailOptions.SectionName));
 builder.Services.AddScoped<IAuditLogCleanupJob, AuditLogCleanupJob>();
 builder.Services.AddHangfire(configuration =>
 {

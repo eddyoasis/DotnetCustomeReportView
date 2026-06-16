@@ -27,6 +27,8 @@ public sealed class ScheduledReportJobService(
             ReportDefinitionId = entity.ReportDefinitionId,
             ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
             Format = entity.Format,
+            JobAction = entity.JobAction,
+            RecipientEmail = entity.RecipientEmail,
             ClientCode = entity.ClientCode,
             FilterClientCode = entity.FilterClientCode,
             CronExpression = entity.CronExpression,
@@ -36,6 +38,7 @@ public sealed class ScheduledReportJobService(
         }).ToList();
 
         List<string> availableFormats = allJobs.Select(j => j.Format).Distinct().Order().ToList();
+        List<string> availableJobActions = ScheduledJobActions.All.ToList();
         List<string> availableClientCodes = allJobs
             .Select(j => j.ClientCode)
             .Where(c => !string.IsNullOrWhiteSpace(c))
@@ -65,6 +68,9 @@ public sealed class ScheduledReportJobService(
             if (!string.IsNullOrWhiteSpace(filter.Format))
                 filtered = filtered.Where(j => j.Format.Equals(filter.Format, StringComparison.OrdinalIgnoreCase));
 
+            if (!string.IsNullOrWhiteSpace(filter.JobAction))
+                filtered = filtered.Where(j => j.JobAction.Equals(filter.JobAction, StringComparison.OrdinalIgnoreCase));
+
             if (!string.IsNullOrWhiteSpace(filter.ClientCode))
                 filtered = filtered.Where(j => string.Equals(j.ClientCode, filter.ClientCode, StringComparison.OrdinalIgnoreCase));
 
@@ -80,6 +86,7 @@ public sealed class ScheduledReportJobService(
             Jobs = filtered.ToList(),
             Filter = filter ?? new ScheduledJobFilterViewModel(),
             AvailableFormats = availableFormats,
+            AvailableJobActions = availableJobActions,
             AvailableClientCodes = availableClientCodes,
             AvailableFilterClientCodes = availableFilterClientCodes
         };
@@ -96,6 +103,7 @@ public sealed class ScheduledReportJobService(
         {
             IsActive = true,
             Format = "csv",
+            JobAction = ScheduledJobActions.ExportFile,
             ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime,
             DailyTime = "08:30",
             EveryMinutes = 5,
@@ -120,6 +128,8 @@ public sealed class ScheduledReportJobService(
             JobName = entity.JobName,
             ReportDefinitionId = entity.ReportDefinitionId,
             Format = entity.Format,
+            JobAction = entity.JobAction,
+            RecipientEmail = entity.RecipientEmail,
             CronExpression = entity.CronExpression,
             ClientCode = entity.ClientCode,
             FilterClientCode = entity.FilterClientCode,
@@ -151,6 +161,8 @@ public sealed class ScheduledReportJobService(
             JobName = hangfireJobId,
             ReportDefinitionId = form.ReportDefinitionId,
             Format = form.Format.Trim().ToLowerInvariant(),
+            JobAction = NormalizeJobAction(form.JobAction),
+            RecipientEmail = NormalizeNullable(form.RecipientEmail),
             CronExpression = BuildCronExpression(form),
             ClientCode = NormalizeNullable(form.ClientCode),
             FilterClientCode = NormalizeNullable(form.FilterClientCode),
@@ -184,6 +196,8 @@ public sealed class ScheduledReportJobService(
         entity.JobName = newJobName;
         entity.ReportDefinitionId = form.ReportDefinitionId;
         entity.Format = form.Format.Trim().ToLowerInvariant();
+        entity.JobAction = NormalizeJobAction(form.JobAction);
+        entity.RecipientEmail = NormalizeNullable(form.RecipientEmail);
         entity.CronExpression = BuildCronExpression(form);
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.FilterClientCode = NormalizeNullable(form.FilterClientCode);
@@ -297,6 +311,12 @@ public sealed class ScheduledReportJobService(
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
+    private static string NormalizeJobAction(string? value)
+    {
+        string normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(normalized) ? ScheduledJobActions.ExportFile : normalized;
+    }
+
     private static void ValidateForm(ScheduledJobFormViewModel form)
     {
         if (form.ReportDefinitionId <= 0)
@@ -313,6 +333,21 @@ public sealed class ScheduledReportJobService(
         if (normalizedFormat is not ("csv" or "excel" or "pdf"))
         {
             throw new InvalidOperationException("Format must be csv, excel, or pdf.");
+        }
+
+        string normalizedJobAction = NormalizeJobAction(form.JobAction);
+        if (!ScheduledJobActions.All.Contains(normalizedJobAction, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException("Job action is invalid.");
+        }
+
+        if (normalizedJobAction == ScheduledJobActions.ExportFileAndEmailToUser)
+        {
+            string? recipientEmail = NormalizeNullable(form.RecipientEmail);
+            if (string.IsNullOrWhiteSpace(recipientEmail) || !IsValidEmail(recipientEmail))
+            {
+                throw new InvalidOperationException("Recipient email is required and must be valid when using export file and email to user action.");
+            }
         }
 
         string normalizedScheduleType = (form.ScheduleType ?? string.Empty).Trim().ToLowerInvariant();
@@ -339,6 +374,19 @@ public sealed class ScheduledReportJobService(
         if (form.DateFrom.HasValue && form.DateTo.HasValue && form.DateFrom.Value.Date > form.DateTo.Value.Date)
         {
             throw new InvalidOperationException("Date From cannot be later than Date To.");
+        }
+    }
+
+    private static bool IsValidEmail(string value)
+    {
+        try
+        {
+            _ = new System.Net.Mail.MailAddress(value);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

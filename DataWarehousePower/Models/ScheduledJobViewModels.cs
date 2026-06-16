@@ -14,6 +14,8 @@ public sealed class ScheduledJobListItemViewModel
     public string? FilterClientCode { get; set; }
     public string CronExpression { get; set; } = string.Empty;
     public string ScheduleDisplay { get; set; } = string.Empty;
+    public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
+    public string? RecipientEmail { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedUtc { get; set; }
 }
@@ -23,6 +25,7 @@ public sealed class ScheduledJobFilterViewModel
     public string? JobName { get; set; }
     public string? ReportName { get; set; }
     public string? Format { get; set; }
+    public string? JobAction { get; set; }
     public string? ClientCode { get; set; }
     public string? FilterClientCode { get; set; }
     public bool? IsActive { get; set; }
@@ -33,6 +36,7 @@ public sealed class ScheduledJobListViewModel
     public List<ScheduledJobListItemViewModel> Jobs { get; set; } = [];
     public ScheduledJobFilterViewModel Filter { get; set; } = new();
     public List<string> AvailableFormats { get; set; } = [];
+    public List<string> AvailableJobActions { get; set; } = [];
     public List<string> AvailableClientCodes { get; set; } = [];
     public List<string> AvailableFilterClientCodes { get; set; } = [];
 }
@@ -58,6 +62,15 @@ public sealed class ScheduledJobFormViewModel
     [RegularExpression("^(csv|excel|pdf)$", ErrorMessage = "Format must be csv, excel, or pdf.")]
     [Display(Name = "Format")]
     public string Format { get; set; } = "csv";
+
+    [Required]
+    [Display(Name = "Job Action")]
+    public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
+
+    [EmailAddress]
+    [MaxLength(256)]
+    [Display(Name = "Recipient Email")]
+    public string? RecipientEmail { get; set; }
 
     [Required]
     [Display(Name = "Schedule Type")]
