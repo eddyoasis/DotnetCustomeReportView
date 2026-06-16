@@ -8,6 +8,7 @@ using Hangfire.SqlServer;
 using log4net.Config;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -42,6 +43,19 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
 builder.Services.AddSingleton<IAuthorizationHandler, DepartmentAccessAuthorizationHandler>();
+
+// ── Data Protection ──────────────────────────────────────────────────────────
+// Persist keys to a stable directory so they survive app pool recycles and
+// redeployments. Configure DataProtection:KeysPath in appsettings.json on
+// each environment to an absolute path outside the deployment folder.
+string? dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+IDataProtectionBuilder dpBuilder = builder.Services
+    .AddDataProtection()
+    .SetApplicationName("DataWarehousePower");
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    dpBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -204,8 +218,14 @@ string dashboardPath = string.IsNullOrWhiteSpace(hangfireOptions.DashboardPath)
     ? "/hangfire"
     : hangfireOptions.DashboardPath;
 
-app.MapHangfireDashboard(dashboardPath)
-    .RequireAuthorization(DepartmentAuthorizationPolicies.AuditlogAccess);
+app.MapHangfireDashboard(dashboardPath, new DashboardOptions
+{
+    // Remove the default LocalRequestsOnlyAuthorizationFilter so that
+    // non-localhost browsers (e.g. UAT users) are not blocked by Hangfire
+    // before ASP.NET Core's RequireAuthorization policy even runs.
+    Authorization = []
+})
+.RequireAuthorization(DepartmentAuthorizationPolicies.AuditlogAccess);
 
 RecurringJob.AddOrUpdate<IAuditLogCleanupJob>(
     "audit-log-cleanup",
