@@ -40,6 +40,9 @@ public class ScheduledReportJob
     [MaxLength(128)]
     public string? FilterClientCode { get; set; }
 
+    [MaxLength(512)]
+    public string? ExportLocation { get; set; }
+
     public DateTime? DateFrom { get; set; }
 
     public DateTime? DateTo { get; set; }

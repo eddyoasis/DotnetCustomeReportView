@@ -63,6 +63,13 @@
                 </div>
 
                 <div class="col-md-6">
+                    <label asp-for="ExportLocation" class="form-label"></label>
+                    <input asp-for="ExportLocation" class="form-control" placeholder="Leave blank to use app root folder" />
+                    <div class="form-text">Use an absolute path or a path relative to the app root folder.</div>
+                    <span asp-validation-for="ExportLocation" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
                     <label asp-for="ScheduleType" class="form-label"></label>
                     <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
                         <option value="@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes">Every N minutes</option>

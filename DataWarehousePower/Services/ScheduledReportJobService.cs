@@ -29,6 +29,7 @@ public sealed class ScheduledReportJobService(
             Format = entity.Format,
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
+            ExportLocation = entity.ExportLocation,
             ClientCode = entity.ClientCode,
             FilterClientCode = entity.FilterClientCode,
             CronExpression = entity.CronExpression,
@@ -108,6 +109,7 @@ public sealed class ScheduledReportJobService(
             DailyTime = "08:30",
             EveryMinutes = 5,
             CronExpression = "0 8 * * *",
+            ExportLocation = null,
             AvailableReports = availableReports,
             AvailableClientCodesByReportId = availableClientCodesByReportId,
             AvailableClientCodes = []
@@ -130,6 +132,7 @@ public sealed class ScheduledReportJobService(
             Format = entity.Format,
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
+            ExportLocation = entity.ExportLocation,
             CronExpression = entity.CronExpression,
             ClientCode = entity.ClientCode,
             FilterClientCode = entity.FilterClientCode,
@@ -166,6 +169,7 @@ public sealed class ScheduledReportJobService(
             CronExpression = BuildCronExpression(form),
             ClientCode = NormalizeNullable(form.ClientCode),
             FilterClientCode = NormalizeNullable(form.FilterClientCode),
+            ExportLocation = NormalizeNullable(form.ExportLocation),
             DateFrom = form.DateFrom,
             DateTo = form.DateTo,
             EncryptedPassword = dataProtectionService.Protect(form.Password),
@@ -201,6 +205,7 @@ public sealed class ScheduledReportJobService(
         entity.CronExpression = BuildCronExpression(form);
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.FilterClientCode = NormalizeNullable(form.FilterClientCode);
+        entity.ExportLocation = NormalizeNullable(form.ExportLocation);
         entity.DateFrom = form.DateFrom;
         entity.DateTo = form.DateTo;
         entity.IsActive = form.IsActive;

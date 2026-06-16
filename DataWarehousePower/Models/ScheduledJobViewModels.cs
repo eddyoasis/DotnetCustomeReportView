@@ -16,6 +16,7 @@ public sealed class ScheduledJobListItemViewModel
     public string ScheduleDisplay { get; set; } = string.Empty;
     public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
     public string? RecipientEmail { get; set; }
+    public string? ExportLocation { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedUtc { get; set; }
 }
@@ -95,6 +96,10 @@ public sealed class ScheduledJobFormViewModel
     [MaxLength(128)]
     [Display(Name = "Filter Client Code")]
     public string? FilterClientCode { get; set; }
+
+    [MaxLength(512)]
+    [Display(Name = "Export Location")]
+    public string? ExportLocation { get; set; }
 
     [DataType(DataType.Date)]
     [Display(Name = "Date From")]

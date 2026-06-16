@@ -207,6 +207,7 @@ else
                     <th>Report</th>
                     <th>Format</th>
                     <th>Action</th>
+                    <th>Export Location</th>
                     <th>Schema Template</th>
                     <th>Filter Client Code</th>
                     <th>Schedule</th>
@@ -230,6 +231,16 @@ else
                             @if (!string.IsNullOrWhiteSpace(job.RecipientEmail))
                             {
                                 <div class="small text-muted">@job.RecipientEmail</div>
+                            }
+                        </td>
+                        <td>
+                            @if (string.IsNullOrWhiteSpace(job.ExportLocation))
+                            {
+                                <span class="text-muted">(App Root)</span>
+                            }
+                            else
+                            {
+                                @job.ExportLocation
                             }
                         </td>
                         <td>@(string.IsNullOrWhiteSpace(job.ClientCode) ? "-" : job.ClientCode)</td>

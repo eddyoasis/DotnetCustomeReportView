@@ -1,7 +1,6 @@
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
-using Microsoft.Extensions.Options;
 
 namespace DataWarehousePower.Services;
 
@@ -11,7 +10,6 @@ public sealed class ScheduledReportExecutionService(
     IReportExportService reportExportService,
     IScheduledReportEmailService scheduledReportEmailService,
     IHangfireDataProtectionService dataProtectionService,
-    IOptions<HangfireOptions> options,
     ILogger<ScheduledReportExecutionService> logger) : IScheduledReportExecutionService
 {
     public async Task ExecuteAsync(int scheduledJobId)
@@ -54,10 +52,7 @@ public sealed class ScheduledReportExecutionService(
             normalizedFormat,
             password);
 
-        string directory = options.Value.ScheduledExportOutputDirectory;
-        string baseDirectory = Path.IsPathRooted(directory)
-            ? directory
-            : Path.Combine(AppContext.BaseDirectory, directory);
+        string baseDirectory = ResolveExportDirectory(job.ExportLocation);
         Directory.CreateDirectory(baseDirectory);
 
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
@@ -86,5 +81,21 @@ public sealed class ScheduledReportExecutionService(
                 fileName,
                 zipBytes);
         }
+    }
+
+    private static string ResolveExportDirectory(string? exportLocation)
+    {
+        string normalizedExportLocation = exportLocation?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedExportLocation))
+        {
+            return AppContext.BaseDirectory;
+        }
+
+        if (Path.IsPathRooted(normalizedExportLocation))
+        {
+            return normalizedExportLocation;
+        }
+
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, normalizedExportLocation));
     }
 }
