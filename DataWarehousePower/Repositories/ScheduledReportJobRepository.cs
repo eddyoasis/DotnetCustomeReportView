@@ -15,6 +15,16 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
             .ToListAsync();
     }
 
+    public async Task<List<ScheduledReportJob>> GetAllByUserIdAsync(string userId)
+    {
+        return await dbContext.ScheduledReportJobs
+            .AsNoTracking()
+            .Where(job => job.CreatedByUserId == userId)
+            .Include(job => job.ReportDefinition)
+            .OrderByDescending(job => job.CreatedUtc)
+            .ToListAsync();
+    }
+
     public async Task<ScheduledReportJob?> GetByIdAsync(int id)
     {
         return await dbContext.ScheduledReportJobs
@@ -28,6 +38,21 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
         return await dbContext.ScheduledReportJobs
             .Include(job => job.ReportDefinition)
             .FirstOrDefaultAsync(job => job.Id == id);
+    }
+
+    public async Task<ScheduledReportJob?> GetByIdForUserAsync(int id, string userId)
+    {
+        return await dbContext.ScheduledReportJobs
+            .AsNoTracking()
+            .Include(job => job.ReportDefinition)
+            .FirstOrDefaultAsync(job => job.Id == id && job.CreatedByUserId == userId);
+    }
+
+    public async Task<ScheduledReportJob?> GetByIdForUserUpdateAsync(int id, string userId)
+    {
+        return await dbContext.ScheduledReportJobs
+            .Include(job => job.ReportDefinition)
+            .FirstOrDefaultAsync(job => job.Id == id && job.CreatedByUserId == userId);
     }
 
     public async Task AddAsync(ScheduledReportJob entity)

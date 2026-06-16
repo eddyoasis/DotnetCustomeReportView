@@ -15,9 +15,9 @@ public sealed class ScheduledReportJobService(
     IOptions<HangfireOptions> hangfireOptions,
     ILogger<ScheduledReportJobService> logger) : IScheduledReportJobService
 {
-    public async Task<ScheduledJobListViewModel> GetListViewModelAsync(ScheduledJobFilterViewModel? filter = null)
+    public async Task<ScheduledJobListViewModel> GetListViewModelAsync(string userId, ScheduledJobFilterViewModel? filter = null)
     {
-        List<ScheduledReportJob> entities = await scheduledJobRepository.GetAllAsync();
+        List<ScheduledReportJob> entities = await scheduledJobRepository.GetAllByUserIdAsync(userId);
 
         List<ScheduledJobListItemViewModel> allJobs = entities.Select(entity => new ScheduledJobListItemViewModel
         {
@@ -116,7 +116,7 @@ public sealed class ScheduledReportJobService(
 
     public async Task<ScheduledJobFormViewModel> GetEditFormAsync(int id, string userId)
     {
-        ScheduledReportJob entity = await scheduledJobRepository.GetByIdAsync(id)
+        ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserAsync(id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
@@ -186,7 +186,7 @@ public sealed class ScheduledReportJobService(
     {
         ValidateForm(form);
 
-        ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUpdateAsync(form.Id)
+        ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserUpdateAsync(form.Id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {form.Id} was not found.");
 
         string newJobName = form.JobName.Trim();
@@ -230,9 +230,9 @@ public sealed class ScheduledReportJobService(
         SyncRecurringJob(entity);
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task DeleteAsync(int id, string userId)
     {
-        ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUpdateAsync(id)
+        ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserUpdateAsync(id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
         recurringJobManager.RemoveIfExists(entity.HangfireJobId);

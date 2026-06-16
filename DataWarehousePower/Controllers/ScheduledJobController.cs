@@ -14,7 +14,8 @@ public sealed class ScheduledJobController(
 {
     public async Task<IActionResult> Index(ScheduledJobFilterViewModel? filter)
     {
-        ScheduledJobListViewModel viewModel = await scheduledReportJobService.GetListViewModelAsync(filter);
+        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        ScheduledJobListViewModel viewModel = await scheduledReportJobService.GetListViewModelAsync(userId, filter);
         return View(viewModel);
     }
 
@@ -90,7 +91,8 @@ public sealed class ScheduledJobController(
     {
         try
         {
-            await scheduledReportJobService.DeleteAsync(id);
+            string userId = columnPreferenceService.ResolveUserId(HttpContext);
+            await scheduledReportJobService.DeleteAsync(id, userId);
             TempData["Success"] = "Scheduled job deleted.";
         }
         catch (Exception ex)

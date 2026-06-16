@@ -145,11 +145,7 @@
                     optionsContainer.innerHTML = '';
 
                     const visibleItems = items.filter(item => !normalizedSearch || item.toLowerCase().includes(normalizedSearch));
-                    const currentSelection = visibleItems.some(item => item.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0);
-
-                    if (!selectedValue || !currentSelection) {
-                        visibleItems.unshift('');
-                    }
+                    visibleItems.unshift('');
 
                     visibleItems.forEach(item => {
                         const button = document.createElement('button');
