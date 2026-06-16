@@ -1,6 +1,7 @@
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Data;
 using DataWarehousePower.Middleware;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
 using Hangfire;
@@ -15,6 +16,8 @@ using Microsoft.Extensions.Options;
 var builder = WebApplication.CreateBuilder(args);
 
 XmlConfigurator.Configure(new FileInfo(Path.Combine(AppContext.BaseDirectory, "log4net.config")));
+
+builder.Services.Configure<SmtpAppSetting>(builder.Configuration.GetSection("SmtpAppSettings"));
 
 // ── EF Core ───────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -68,8 +71,6 @@ builder.Services.AddSession(options =>
 
 builder.Services.Configure<HangfireOptions>(
     builder.Configuration.GetSection(HangfireOptions.SectionName));
-builder.Services.Configure<ScheduledReportEmailOptions>(
-    builder.Configuration.GetSection(ScheduledReportEmailOptions.SectionName));
 builder.Services.AddScoped<IAuditLogCleanupJob, AuditLogCleanupJob>();
 builder.Services.AddHangfire(configuration =>
 {

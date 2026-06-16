@@ -1,11 +1,12 @@
+using DataWarehousePower.Models.AppSettings;
+using FluentEmail.Core;
 using Microsoft.Extensions.Options;
-using System.Net;
 using System.Net.Mail;
 
 namespace DataWarehousePower.Services;
 
 public sealed class ScheduledReportEmailService(
-    IOptions<ScheduledReportEmailOptions> options,
+    IOptionsSnapshot<SmtpAppSetting> _smtpAppSetting,
     ILogger<ScheduledReportEmailService> logger) : IScheduledReportEmailService
 {
     public async Task SendExportResultAsync(
@@ -16,54 +17,82 @@ public sealed class ScheduledReportEmailService(
         byte[] zipBytes,
         CancellationToken cancellationToken = default)
     {
-        ScheduledReportEmailOptions emailOptions = options.Value;
-        if (!emailOptions.Enabled)
+        SmtpAppSetting smtpAppSetting = _smtpAppSetting.Value;
+
+        if (!smtpAppSetting.IsEnabled)
         {
-            throw new InvalidOperationException("Scheduled report email is disabled in configuration.");
+            return;
         }
-
-        if (string.IsNullOrWhiteSpace(emailOptions.SmtpHost))
-        {
-            throw new InvalidOperationException("Scheduled report email SMTP host is not configured.");
-        }
-
-        if (string.IsNullOrWhiteSpace(emailOptions.SenderEmail))
-        {
-            throw new InvalidOperationException("Scheduled report email sender address is not configured.");
-        }
-
-        string normalizedRecipient = recipientEmail.Trim();
-        using MailMessage message = new()
-        {
-            From = new MailAddress(emailOptions.SenderEmail, emailOptions.SenderDisplayName),
-            Subject = $"{emailOptions.SubjectPrefix} Scheduled export completed: {jobName}",
-            Body = $"Report '{reportName}' was exported by job '{jobName}'. The ZIP file is attached.",
-            IsBodyHtml = false
-        };
-
-        message.To.Add(new MailAddress(normalizedRecipient));
 
         MemoryStream stream = new(zipBytes, writable: false);
         Attachment attachment = new(stream, fileName, "application/zip");
-        message.Attachments.Add(attachment);
 
-        using SmtpClient smtpClient = new(emailOptions.SmtpHost, emailOptions.SmtpPort)
-        {
-            EnableSsl = emailOptions.UseSsl,
-            DeliveryMethod = SmtpDeliveryMethod.Network
-        };
+        string normalizedRecipient = recipientEmail.Trim();
+        var subject = $"Scheduled export completed: {jobName}";
+        var body = $"Report '{reportName}' was exported by job '{jobName}'. The ZIP file is attached.";
+        List<string> recipientsTo = new List<string> { normalizedRecipient };
+        List<string> recipientsCC = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(emailOptions.Username))
-        {
-            smtpClient.Credentials = new NetworkCredential(emailOptions.Username, emailOptions.Password ?? string.Empty);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await smtpClient.SendMailAsync(message);
+        await SendEmailAsync(recipientsTo, recipientsCC, subject, body, attachment);
 
         logger.LogInformation(
             "Scheduled export email sent to {RecipientEmail} for job {JobName}.",
             normalizedRecipient,
             jobName);
+    }
+
+    private Task SendEmailAsync(List<string> recipientsTo, List<string> recipientsCC, string subject, string body, Attachment attachment)
+    {
+        var smtpAppSetting = _smtpAppSetting.Value;
+
+        // --- Email Configuration ---
+        string smtpHost = smtpAppSetting.Host;
+        string senderEmail = smtpAppSetting.EmailFrom;
+        string emailSubject = subject;
+        string strMailBody = body;
+
+        try
+        {
+            using MailMessage mailMessage = new();
+
+
+            if (smtpAppSetting.IsTestEmailTo)
+            {
+                recipientsTo = smtpAppSetting.EmailTo;
+            }
+
+            if (recipientsCC.Any())
+            {
+                mailMessage.CC.AddRange(recipientsCC.Select(e => new MailAddress(e)));
+            }
+
+            if (attachment != null)
+            {
+                mailMessage.Attachments.Add(attachment);
+            }
+
+            mailMessage.From = new MailAddress(senderEmail);
+            mailMessage.To.AddRange(recipientsTo.Select(e => new MailAddress(e)));
+            mailMessage.Subject = emailSubject;
+            mailMessage.IsBodyHtml = true;
+            mailMessage.Priority = MailPriority.High;
+
+            string formattedMessage = strMailBody.Replace("    ", Environment.NewLine + Environment.NewLine);
+            mailMessage.Body = formattedMessage;
+
+            using SmtpClient smtpClient = new(smtpHost);
+
+            smtpClient.Send(mailMessage);
+        }
+        catch (SmtpException)
+        {
+            // Log exception if needed
+        }
+        catch (Exception)
+        {
+            // Log exception if needed
+        }
+
+        return Task.CompletedTask;
     }
 }

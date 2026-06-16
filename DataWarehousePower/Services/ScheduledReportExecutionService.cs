@@ -1,3 +1,4 @@
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
 using Microsoft.Extensions.Options;
@@ -60,7 +61,7 @@ public sealed class ScheduledReportExecutionService(
         Directory.CreateDirectory(baseDirectory);
 
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-        string fileName = $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{safeReportName}_{job.Id}.zip";
+        string fileName = $"{DateTimeHelper.GetCurrentLocalTime():yyyyMMdd_HHmmss}_{safeReportName}_{job.Id}.zip";
         string fullPath = Path.Combine(baseDirectory, fileName);
 
         await File.WriteAllBytesAsync(fullPath, zipBytes);
