@@ -56,8 +56,12 @@ public sealed class ScheduledReportExecutionService(
         string baseDirectory = ResolveExportDirectory(job.ExportLocation);
         Directory.CreateDirectory(baseDirectory);
 
+        var reportDate = effectiveDateFrom == effectiveDateTo ?
+                $"{effectiveDateFrom:yyyy-MM-dd}" :
+                $"{effectiveDateFrom:yyyy-MM-dd}_{effectiveDateTo:yyyy-MM-dd}";
+
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-        string fileName = $"{DateTimeHelper.GetCurrentLocalTime():yyyyMMdd_HHmmss}_{safeReportName}_{job.Id}.zip";
+        string fileName = $"{safeReportName}_{job.FilterClientCode}_{reportDate}.zip";
         string fullPath = Path.Combine(baseDirectory, fileName);
 
         await File.WriteAllBytesAsync(fullPath, zipBytes);
@@ -75,12 +79,17 @@ public sealed class ScheduledReportExecutionService(
                 throw new InvalidOperationException($"Scheduled job {scheduledJobId} is configured for email action but recipient email is empty.");
             }
 
+            string emailSubject = $"{safeReportName} {job.FilterClientCode} {reportDate}";
+            string emailBody = $"The {safeReportName} for {reportDate} was automatically exported for {job.FilterClientCode}, and the ZIP file is attached.";
+
             await scheduledReportEmailService.SendExportResultAsync(
                 job.RecipientEmail,
                 job.JobName,
                 reportViewModel.ReportName,
                 fileName,
-                zipBytes);
+                zipBytes,
+                emailSubject,
+                emailBody);
         }
     }
 

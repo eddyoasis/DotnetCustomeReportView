@@ -15,6 +15,8 @@ public sealed class ScheduledReportEmailService(
         string reportName,
         string fileName,
         byte[] zipBytes,
+        string emailSubject,
+        string emailBody,
         CancellationToken cancellationToken = default)
     {
         SmtpAppSetting smtpAppSetting = _smtpAppSetting.Value;
@@ -28,11 +30,9 @@ public sealed class ScheduledReportEmailService(
         Attachment attachment = new(stream, fileName, "application/zip");
 
         List<string> recipientsTo = ParseRecipientEmails(recipientEmail);
-        string subject = $"Scheduled export completed: {jobName}";
-        string body = $"Report '{reportName}' was exported by job '{jobName}'. The ZIP file is attached.";
         List<string> recipientsCC = [];
 
-        await SendEmailAsync(recipientsTo, recipientsCC, subject, body, attachment);
+        await SendEmailAsync(recipientsTo, recipientsCC, emailSubject, emailBody, attachment);
 
         logger.LogInformation(
             "Scheduled export email sent to {RecipientEmail} for job {JobName}.",

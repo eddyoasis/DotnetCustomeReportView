@@ -8,5 +8,7 @@ public interface IScheduledReportEmailService
         string reportName,
         string fileName,
         byte[] zipBytes,
+        string emailSubject,
+        string emailBody,
         CancellationToken cancellationToken = default);
 }
