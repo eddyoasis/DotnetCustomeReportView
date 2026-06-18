@@ -18,15 +18,14 @@
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
             <div class="row g-3">
-                <div class="col-12">
+                @* <div class="col-12">
                     <div class="form-text">Job name is generated automatically from the user ID, report name, client code, and filter client code.</div>
                     @if (isEdit)
                     {
                         <label class="form-label mt-2">Generated Job Name</label>
                         <input type="text" class="form-control" value="@Model.JobName" readonly />
                     }
-                </div>
-
+                </div> *@
                 <div class="col-md-3">
                     <label asp-for="ReportDefinitionId" class="form-label"></label>
                     <select asp-for="ReportDefinitionId" class="form-select">
@@ -78,7 +77,7 @@
                         <option value="@ScheduledJobFormViewModel.ScheduleTypeEveryMinutes">Every N minutes</option>
                         <option value="@ScheduledJobFormViewModel.ScheduleTypeDailyTime">Daily at time</option>
                         <option value="@ScheduledJobFormViewModel.ScheduleTypeCustomDays">Custom dates</option>
-                        <option value="@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron">Advanced (Cron)</option>
+                        @* <option value="@ScheduledJobFormViewModel.ScheduleTypeAdvancedCron">Advanced (Cron)</option> *@
                     </select>
                 </div>
 
