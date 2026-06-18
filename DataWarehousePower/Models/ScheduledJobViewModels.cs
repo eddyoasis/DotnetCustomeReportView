@@ -44,14 +44,14 @@ public sealed class ScheduledJobListViewModel
 
 public sealed class ScheduledJobFormViewModel
 {
+    public const int JobNameMaxLength = 128;
     public const string ScheduleTypeEveryMinutes = "every-minutes";
     public const string ScheduleTypeDailyTime = "daily-time";
     public const string ScheduleTypeAdvancedCron = "advanced-cron";
 
     public int Id { get; set; }
 
-    [Required]
-    [MaxLength(128)]
+    [MaxLength(JobNameMaxLength)]
     [Display(Name = "Job Name")]
     public string JobName { get; set; } = string.Empty;
 

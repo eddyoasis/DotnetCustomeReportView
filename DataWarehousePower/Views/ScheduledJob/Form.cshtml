@@ -18,10 +18,13 @@
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label asp-for="JobName" class="form-label"></label>
-                    <input asp-for="JobName" class="form-control" />
-                    <span asp-validation-for="JobName" class="text-danger"></span>
+                <div class="col-12">
+                    <div class="form-text">Job name is generated automatically from the user ID, report name, client code, and filter client code.</div>
+                    @if (isEdit)
+                    {
+                        <label class="form-label mt-2">Generated Job Name</label>
+                        <input type="text" class="form-control" value="@Model.JobName" readonly />
+                    }
                 </div>
 
                 <div class="col-md-3">

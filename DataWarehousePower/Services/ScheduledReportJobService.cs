@@ -3,6 +3,7 @@ using DataWarehousePower.Repositories;
 using Hangfire;
 using Microsoft.Extensions.Options;
 using System.Globalization;
+using System.Text;
 
 namespace DataWarehousePower.Services;
 
@@ -157,11 +158,11 @@ public sealed class ScheduledReportJobService(
     {
         ValidateForm(form);
 
-        string hangfireJobId = form.JobName.Trim();
+        string generatedJobName = await BuildJobNameAsync(form, userId);
 
         ScheduledReportJob entity = new()
         {
-            JobName = hangfireJobId,
+            JobName = generatedJobName,
             ReportDefinitionId = form.ReportDefinitionId,
             Format = form.Format.Trim().ToLowerInvariant(),
             JobAction = NormalizeJobAction(form.JobAction),
@@ -177,7 +178,7 @@ public sealed class ScheduledReportJobService(
             CreatedByUserId = userId,
             CreatedByUsername = username,
             CreatedUtc = DateTime.UtcNow,
-            HangfireJobId = hangfireJobId
+            HangfireJobId = generatedJobName
         };
 
         await scheduledJobRepository.AddAsync(entity);
@@ -193,7 +194,7 @@ public sealed class ScheduledReportJobService(
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserUpdateAsync(form.Id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {form.Id} was not found.");
 
-        string newJobName = form.JobName.Trim();
+        string newJobName = await BuildJobNameAsync(form, userId, form.Id);
         string oldHangfireJobId = entity.HangfireJobId;
         string newHangfireJobId = newJobName;
 
@@ -309,6 +310,100 @@ public sealed class ScheduledReportJobService(
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    private async Task<string> BuildJobNameAsync(ScheduledJobFormViewModel form, string userId, int? currentJobId = null)
+    {
+        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync();
+        ReportDefinition report = reports.FirstOrDefault(candidate => candidate.Id == form.ReportDefinitionId)
+            ?? throw new InvalidOperationException("Report was not found.");
+
+        string baseJobName = string.Join('-',
+        [
+            NormalizeJobNameSegment(userId, "user"),
+            NormalizeJobNameSegment(report.ReportName, "report"),
+            NormalizeJobNameSegment(form.ClientCode, "default"),
+            NormalizeJobNameSegment(form.FilterClientCode, "all")
+        ]);
+
+        List<ScheduledReportJob> existingJobs = await scheduledJobRepository.GetAllByUserIdAsync(userId);
+        HashSet<string> existingNames = existingJobs
+            .Where(job => currentJobId is null || job.Id != currentJobId.Value)
+            .Select(job => job.JobName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return BuildUniqueJobName(baseJobName, existingNames);
+    }
+
+    private static string NormalizeJobNameSegment(string? value, string fallback)
+    {
+        string normalized = value?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return fallback;
+        }
+
+        StringBuilder builder = new(normalized.Length);
+        bool previousWasSeparator = false;
+
+        foreach (char character in normalized)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(character);
+                previousWasSeparator = false;
+                continue;
+            }
+
+            if (previousWasSeparator)
+            {
+                continue;
+            }
+
+            builder.Append('-');
+            previousWasSeparator = true;
+        }
+
+        string sanitized = builder.ToString().Trim('-');
+        return string.IsNullOrWhiteSpace(sanitized) ? fallback : sanitized;
+    }
+
+    private static string BuildUniqueJobName(string baseJobName, ISet<string> existingNames)
+    {
+        string candidate = TruncateJobName(baseJobName);
+        if (!existingNames.Contains(candidate))
+        {
+            return candidate;
+        }
+
+        for (int suffix = 2; ; suffix++)
+        {
+            string suffixText = $"-{suffix}";
+            candidate = TruncateJobName(baseJobName, suffixText);
+
+            if (!existingNames.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string TruncateJobName(string baseJobName, string suffix = "")
+    {
+        int maxBaseLength = ScheduledJobFormViewModel.JobNameMaxLength - suffix.Length;
+        string truncatedBaseName = baseJobName.Length <= maxBaseLength
+            ? baseJobName
+            : baseJobName[..maxBaseLength].TrimEnd('-');
+
+        if (string.IsNullOrWhiteSpace(truncatedBaseName))
+        {
+            truncatedBaseName = "job";
+        }
+
+        string candidate = $"{truncatedBaseName}{suffix}";
+        return candidate.Length <= ScheduledJobFormViewModel.JobNameMaxLength
+            ? candidate
+            : candidate[..ScheduledJobFormViewModel.JobNameMaxLength];
+    }
+
 
     private static string? NormalizeNullable(string? value)
     {
@@ -327,11 +422,6 @@ public sealed class ScheduledReportJobService(
         if (form.ReportDefinitionId <= 0)
         {
             throw new InvalidOperationException("Report is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(form.JobName))
-        {
-            throw new InvalidOperationException("Job name is required.");
         }
 
         string normalizedFormat = form.Format?.Trim().ToLowerInvariant() ?? string.Empty;
