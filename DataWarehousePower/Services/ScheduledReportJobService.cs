@@ -17,6 +17,18 @@ public sealed class ScheduledReportJobService(
     IOptions<HangfireOptions> hangfireOptions,
     ILogger<ScheduledReportJobService> logger) : IScheduledReportJobService
 {
+    private static readonly int[] OrderedCronWeekdays = [1, 2, 3, 4, 5, 6, 0];
+    private static readonly Dictionary<int, string> WeekdayDisplayNames = new()
+    {
+        [1] = "Monday",
+        [2] = "Tuesday",
+        [3] = "Wednesday",
+        [4] = "Thursday",
+        [5] = "Friday",
+        [6] = "Saturday",
+        [0] = "Sunday"
+    };
+
     public async Task<ScheduledJobListViewModel> GetListViewModelAsync(string userId, ScheduledJobFilterViewModel? filter = null)
     {
         List<ScheduledReportJob> entities = await scheduledJobRepository.GetAllByUserIdAsync(userId);
@@ -110,6 +122,8 @@ public sealed class ScheduledReportJobService(
             JobAction = ScheduledJobActions.ExportFile,
             ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime,
             DailyTime = "08:30",
+            CustomDaysTime = "08:30",
+            SelectedWeekdays = [1],
             EveryMinutes = 5,
             CronExpression = "0 8 * * *",
             ExportLocation = null,
@@ -454,6 +468,7 @@ public sealed class ScheduledReportJobService(
         if (normalizedScheduleType is not (
             ScheduledJobFormViewModel.ScheduleTypeEveryMinutes or
             ScheduledJobFormViewModel.ScheduleTypeDailyTime or
+            ScheduledJobFormViewModel.ScheduleTypeCustomDays or
             ScheduledJobFormViewModel.ScheduleTypeAdvancedCron))
         {
             throw new InvalidOperationException("Schedule type is invalid.");
@@ -543,6 +558,24 @@ public sealed class ScheduledReportJobService(
             return $"{time.Minute} {time.Hour} * * *";
         }
 
+        if (scheduleType == ScheduledJobFormViewModel.ScheduleTypeCustomDays)
+        {
+            string rawTime = form.CustomDaysTime?.Trim() ?? string.Empty;
+            if (!TimeOnly.TryParse(rawTime, CultureInfo.InvariantCulture, DateTimeStyles.None, out TimeOnly time))
+            {
+                throw new InvalidOperationException("Execution time is invalid. Use HH:mm.");
+            }
+
+            List<int> selectedWeekdays = NormalizeWeekdays(form.SelectedWeekdays);
+            if (selectedWeekdays.Count == 0)
+            {
+                throw new InvalidOperationException("At least one execution day is required for custom dates schedule.");
+            }
+
+            string daysSegment = string.Join(',', selectedWeekdays);
+            return $"{time.Minute} {time.Hour} * * {daysSegment}";
+        }
+
         string cronExpression = form.CronExpression?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(cronExpression))
         {
@@ -588,6 +621,21 @@ public sealed class ScheduledReportJobService(
             return;
         }
 
+        if (segments.Length >= 5 &&
+            int.TryParse(segments[0], out minute) &&
+            int.TryParse(segments[1], out hour) &&
+            segments[2] == "*" &&
+            segments[3] == "*" &&
+            minute is >= 0 and < 60 &&
+            hour is >= 0 and < 24 &&
+            TryParseWeekdaysCronSegment(segments[4], out List<int> parsedWeekdays))
+        {
+            form.ScheduleType = ScheduledJobFormViewModel.ScheduleTypeCustomDays;
+            form.CustomDaysTime = $"{hour:00}:{minute:00}";
+            form.SelectedWeekdays = parsedWeekdays;
+            return;
+        }
+
         form.ScheduleType = ScheduledJobFormViewModel.ScheduleTypeAdvancedCron;
     }
 
@@ -618,6 +666,85 @@ public sealed class ScheduledReportJobService(
             return $"Daily at {hour:00}:{minute:00}";
         }
 
+        if (segments.Length >= 5 &&
+            int.TryParse(segments[0], out minute) &&
+            int.TryParse(segments[1], out hour) &&
+            segments[2] == "*" &&
+            segments[3] == "*" &&
+            minute is >= 0 and < 60 &&
+            hour is >= 0 and < 24 &&
+            TryParseWeekdaysCronSegment(segments[4], out List<int> weekdays))
+        {
+            return $"Custom days ({FormatWeekdayDisplay(weekdays)}) at {hour:00}:{minute:00}";
+        }
+
         return "Advanced schedule";
+    }
+
+    private static List<int> NormalizeWeekdays(IEnumerable<int>? weekdays)
+    {
+        if (weekdays is null)
+        {
+            return [];
+        }
+
+        HashSet<int> uniqueWeekdays = [];
+
+        foreach (int weekday in weekdays)
+        {
+            int normalizedWeekday = weekday == 7 ? 0 : weekday;
+            if (normalizedWeekday is < 0 or > 6)
+            {
+                continue;
+            }
+
+            uniqueWeekdays.Add(normalizedWeekday);
+        }
+
+        return OrderedCronWeekdays
+            .Where(uniqueWeekdays.Contains)
+            .ToList();
+    }
+
+    private static bool TryParseWeekdaysCronSegment(string? segment, out List<int> weekdays)
+    {
+        weekdays = [];
+        string value = segment?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(value) || value == "*")
+        {
+            return false;
+        }
+
+        string[] parts = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return false;
+        }
+
+        List<int> parsedWeekdays = [];
+        foreach (string part in parts)
+        {
+            if (!int.TryParse(part, out int parsedDay))
+            {
+                return false;
+            }
+
+            parsedWeekdays.Add(parsedDay);
+        }
+
+        weekdays = NormalizeWeekdays(parsedWeekdays);
+        return weekdays.Count > 0;
+    }
+
+    private static string FormatWeekdayDisplay(IEnumerable<int> weekdays)
+    {
+        List<string> weekdayNames = weekdays
+            .Where(weekday => WeekdayDisplayNames.ContainsKey(weekday))
+            .Select(weekday => WeekdayDisplayNames[weekday])
+            .ToList();
+
+        return weekdayNames.Count == 0
+            ? "No days"
+            : string.Join(", ", weekdayNames);
     }
 }

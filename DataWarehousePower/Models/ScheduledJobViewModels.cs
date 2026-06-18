@@ -48,6 +48,7 @@ public sealed class ScheduledJobFormViewModel
     public const int RecipientEmailMaxLength = 2048;
     public const string ScheduleTypeEveryMinutes = "every-minutes";
     public const string ScheduleTypeDailyTime = "daily-time";
+    public const string ScheduleTypeCustomDays = "custom-days";
     public const string ScheduleTypeAdvancedCron = "advanced-cron";
 
     public int Id { get; set; }
@@ -84,6 +85,13 @@ public sealed class ScheduledJobFormViewModel
     [MaxLength(5)]
     [Display(Name = "Daily Time")]
     public string DailyTime { get; set; } = "08:30";
+
+    [MaxLength(5)]
+    [Display(Name = "Execution Time")]
+    public string CustomDaysTime { get; set; } = "08:30";
+
+    [Display(Name = "Execution Days")]
+    public List<int> SelectedWeekdays { get; set; } = [];
 
     [MaxLength(128)]
     [Display(Name = "Cron Expression (Advanced)")]
