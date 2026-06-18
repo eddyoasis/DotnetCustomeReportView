@@ -129,6 +129,7 @@ namespace DataWarehousePower.Data
                 e.Property(job => job.ClientCode).HasMaxLength(128);
                 e.Property(job => job.FilterClientCode).HasMaxLength(128);
                 e.Property(job => job.ExportLocation).HasMaxLength(512);
+                e.Property(job => job.IsCustom).HasDefaultValue(true);
                 e.Property(job => job.EncryptedPassword).HasMaxLength(512);
                 e.Property(job => job.CreatedByUserId).HasMaxLength(128);
                 e.Property(job => job.CreatedByUsername).HasMaxLength(128);

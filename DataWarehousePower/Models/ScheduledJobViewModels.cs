@@ -109,6 +109,9 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Date To")]
     public DateTime? DateTo { get; set; }
 
+    [Display(Name = "Use Custom Date Range")]
+    public bool IsCustom { get; set; } = true;
+
     [Display(Name = "Password")]
     public string Password { get; set; } = string.Empty;
 

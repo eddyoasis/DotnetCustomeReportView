@@ -105,6 +105,7 @@ public sealed class ScheduledReportJobService(
         return new ScheduledJobFormViewModel
         {
             IsActive = true,
+            IsCustom = false,
             Format = "csv",
             JobAction = ScheduledJobActions.ExportFile,
             ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime,
@@ -140,6 +141,7 @@ public sealed class ScheduledReportJobService(
             FilterClientCode = entity.FilterClientCode,
             DateFrom = entity.DateFrom,
             DateTo = entity.DateTo,
+            IsCustom = entity.IsCustom,
             ExistingPassword = dataProtectionService.Unprotect(entity.EncryptedPassword),
             IsActive = entity.IsActive,
             AvailableReports = availableReports,
@@ -172,8 +174,9 @@ public sealed class ScheduledReportJobService(
             ClientCode = NormalizeNullable(form.ClientCode),
             FilterClientCode = NormalizeNullable(form.FilterClientCode),
             ExportLocation = NormalizeNullable(form.ExportLocation),
-            DateFrom = form.DateFrom,
-            DateTo = form.DateTo,
+            DateFrom = form.IsCustom ? form.DateFrom?.Date : null,
+            DateTo = form.IsCustom ? form.DateTo?.Date : null,
+            IsCustom = form.IsCustom,
             EncryptedPassword = dataProtectionService.Protect(form.Password),
             IsActive = form.IsActive,
             CreatedByUserId = userId,
@@ -208,8 +211,9 @@ public sealed class ScheduledReportJobService(
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.FilterClientCode = NormalizeNullable(form.FilterClientCode);
         entity.ExportLocation = NormalizeNullable(form.ExportLocation);
-        entity.DateFrom = form.DateFrom;
-        entity.DateTo = form.DateTo;
+        entity.DateFrom = form.IsCustom ? form.DateFrom?.Date : null;
+        entity.DateTo = form.IsCustom ? form.DateTo?.Date : null;
+        entity.IsCustom = form.IsCustom;
         entity.IsActive = form.IsActive;
         entity.UpdatedByUserId = userId;
         entity.UpdatedByUsername = username;
@@ -467,7 +471,10 @@ public sealed class ScheduledReportJobService(
             throw new InvalidOperationException("Password is required when update password is enabled.");
         }
 
-        if (form.DateFrom.HasValue && form.DateTo.HasValue && form.DateFrom.Value.Date > form.DateTo.Value.Date)
+        if (form.IsCustom &&
+            form.DateFrom.HasValue &&
+            form.DateTo.HasValue &&
+            form.DateFrom.Value.Date > form.DateTo.Value.Date)
         {
             throw new InvalidOperationException("Date From cannot be later than Date To.");
         }

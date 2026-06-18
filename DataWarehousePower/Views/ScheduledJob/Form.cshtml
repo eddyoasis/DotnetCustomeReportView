@@ -173,13 +173,21 @@
                     <span asp-validation-for="FilterClientCode" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="IsCustom" class="form-check-input" id="isCustomToggle" />
+                        <label asp-for="IsCustom" class="form-check-label"></label>
+                    </div>
+                    <div class="form-text">When disabled, both Date From and Date To are auto-set to the previous business day (Monday/weekend runs use Friday).</div>
+                </div>
+
+                <div class="col-md-6" id="dateFromGroup">
                     <label asp-for="DateFrom" class="form-label"></label>
                     <input asp-for="DateFrom" type="date" class="form-control" />
                     <span asp-validation-for="DateFrom" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-6" id="dateToGroup">
                     <label asp-for="DateTo" class="form-label"></label>
                     <input asp-for="DateTo" type="date" class="form-control" />
                     <span asp-validation-for="DateTo" class="text-danger"></span>
@@ -218,6 +226,11 @@
             const existingPasswordInput = document.getElementById('existingPasswordInput');
             const toggleExistingPasswordVisibility = document.getElementById('toggleExistingPasswordVisibility');
             const clientCodeHiddenInput = document.getElementById('ClientCode');
+            const isCustomToggle = document.getElementById('isCustomToggle');
+            const dateFromGroup = document.getElementById('dateFromGroup');
+            const dateToGroup = document.getElementById('dateToGroup');
+            const dateFromInput = document.getElementById('DateFrom');
+            const dateToInput = document.getElementById('DateTo');
             const clientCodeSelect = document.getElementById('scheduled-client-code-select');
             const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
@@ -261,6 +274,30 @@
 
                 if (!isUpdateEnabled) {
                     passwordInput.value = '';
+                }
+            }
+
+            function updateDateFields() {
+                if (!isCustomToggle) {
+                    return;
+                }
+
+                const isCustom = isCustomToggle.checked;
+
+                if (dateFromGroup) {
+                    dateFromGroup.style.display = isCustom ? '' : 'none';
+                }
+
+                if (dateToGroup) {
+                    dateToGroup.style.display = isCustom ? '' : 'none';
+                }
+
+                if (dateFromInput) {
+                    dateFromInput.disabled = !isCustom;
+                }
+
+                if (dateToInput) {
+                    dateToInput.disabled = !isCustom;
                 }
             }
 
@@ -390,10 +427,15 @@
                 });
             }
 
+            if (isCustomToggle) {
+                isCustomToggle.addEventListener('change', updateDateFields);
+            }
+
             updateScheduleFields();
             updateJobActionFields();
             updateClientCodeSelectOptions();
             updatePasswordFields();
+            updateDateFields();
         })();
     </script>
 }

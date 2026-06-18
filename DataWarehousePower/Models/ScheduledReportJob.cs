@@ -47,6 +47,8 @@ public class ScheduledReportJob
 
     public DateTime? DateTo { get; set; }
 
+    public bool IsCustom { get; set; } = true;
+
     [Required]
     [MaxLength(512)]
     public string EncryptedPassword { get; set; } = string.Empty;

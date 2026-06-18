@@ -29,14 +29,15 @@ public sealed class ScheduledReportExecutionService(
 
         string normalizedFormat = job.Format.Trim().ToLowerInvariant();
         string password = dataProtectionService.Unprotect(job.EncryptedPassword);
+        (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
 
         ReportViewModel? reportViewModel = await reportService.BuildReportViewModelAsync(
             job.ReportDefinitionId,
             job.CreatedByUserId,
             job.ClientCode,
             job.FilterClientCode,
-            job.DateFrom,
-            job.DateTo);
+            effectiveDateFrom,
+            effectiveDateTo);
 
         if (reportViewModel is null)
         {
@@ -97,5 +98,24 @@ public sealed class ScheduledReportExecutionService(
         }
 
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, normalizedExportLocation));
+    }
+
+    private static (DateTime? DateFrom, DateTime? DateTo) ResolveEffectiveDateRange(ScheduledReportJob job)
+    {
+        if (job.IsCustom)
+        {
+            return (job.DateFrom?.Date, job.DateTo?.Date);
+        }
+
+        DateTime today = DateTimeHelper.GetCurrentLocalTime().Date;
+        DateTime effectiveDate = today.DayOfWeek switch
+        {
+            DayOfWeek.Monday => today.AddDays(-3),
+            DayOfWeek.Saturday => today.AddDays(-1),
+            DayOfWeek.Sunday => today.AddDays(-2),
+            _ => today.AddDays(-1)
+        };
+
+        return (effectiveDate, effectiveDate);
     }
 }
