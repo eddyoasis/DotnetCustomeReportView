@@ -3,6 +3,7 @@ using DataWarehousePower.Repositories;
 using Hangfire;
 using Microsoft.Extensions.Options;
 using System.Globalization;
+using System.Net.Mail;
 using System.Text;
 
 namespace DataWarehousePower.Services;
@@ -166,7 +167,7 @@ public sealed class ScheduledReportJobService(
             ReportDefinitionId = form.ReportDefinitionId,
             Format = form.Format.Trim().ToLowerInvariant(),
             JobAction = NormalizeJobAction(form.JobAction),
-            RecipientEmail = NormalizeNullable(form.RecipientEmail),
+            RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail),
             CronExpression = BuildCronExpression(form),
             ClientCode = NormalizeNullable(form.ClientCode),
             FilterClientCode = NormalizeNullable(form.FilterClientCode),
@@ -202,7 +203,7 @@ public sealed class ScheduledReportJobService(
         entity.ReportDefinitionId = form.ReportDefinitionId;
         entity.Format = form.Format.Trim().ToLowerInvariant();
         entity.JobAction = NormalizeJobAction(form.JobAction);
-        entity.RecipientEmail = NormalizeNullable(form.RecipientEmail);
+        entity.RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail);
         entity.CronExpression = BuildCronExpression(form);
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.FilterClientCode = NormalizeNullable(form.FilterClientCode);
@@ -438,10 +439,10 @@ public sealed class ScheduledReportJobService(
 
         if (normalizedJobAction == ScheduledJobActions.ExportFileAndEmailToUser)
         {
-            string? recipientEmail = NormalizeNullable(form.RecipientEmail);
-            if (string.IsNullOrWhiteSpace(recipientEmail) || !IsValidEmail(recipientEmail))
+            List<string> recipientEmails = ParseRecipientEmails(form.RecipientEmail);
+            if (recipientEmails.Count == 0)
             {
-                throw new InvalidOperationException("Recipient email is required and must be valid when using export file and email to user action.");
+                throw new InvalidOperationException("Recipient email is required and must contain at least one valid email address when using export file and email to user action.");
             }
         }
 
@@ -472,17 +473,41 @@ public sealed class ScheduledReportJobService(
         }
     }
 
-    private static bool IsValidEmail(string value)
+    private static List<string> ParseRecipientEmails(string? value)
     {
-        try
+        string normalized = value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
         {
-            _ = new System.Net.Mail.MailAddress(value);
-            return true;
+            return [];
         }
-        catch
+
+        char[] separators = [',', ';', '\r', '\n'];
+        string[] segments = normalized.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        List<string> recipientEmails = segments
+            .Select(email => email.Trim())
+            .Where(email => !string.IsNullOrWhiteSpace(email))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (string recipientEmail in recipientEmails)
         {
-            return false;
+            try
+            {
+                _ = new MailAddress(recipientEmail);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidOperationException($"Recipient email '{recipientEmail}' is not valid.", ex);
+            }
         }
+
+        return recipientEmails;
+    }
+
+    private static string? NormalizeRecipientEmails(string? value)
+    {
+        List<string> recipientEmails = ParseRecipientEmails(value);
+        return recipientEmails.Count == 0 ? null : string.Join("; ", recipientEmails);
     }
 
     private static string BuildCronExpression(ScheduledJobFormViewModel form)

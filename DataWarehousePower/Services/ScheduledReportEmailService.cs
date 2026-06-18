@@ -27,18 +27,46 @@ public sealed class ScheduledReportEmailService(
         MemoryStream stream = new(zipBytes, writable: false);
         Attachment attachment = new(stream, fileName, "application/zip");
 
-        string normalizedRecipient = recipientEmail.Trim();
-        var subject = $"Scheduled export completed: {jobName}";
-        var body = $"Report '{reportName}' was exported by job '{jobName}'. The ZIP file is attached.";
-        List<string> recipientsTo = new List<string> { normalizedRecipient };
-        List<string> recipientsCC = new List<string>();
+        List<string> recipientsTo = ParseRecipientEmails(recipientEmail);
+        string subject = $"Scheduled export completed: {jobName}";
+        string body = $"Report '{reportName}' was exported by job '{jobName}'. The ZIP file is attached.";
+        List<string> recipientsCC = [];
 
         await SendEmailAsync(recipientsTo, recipientsCC, subject, body, attachment);
 
         logger.LogInformation(
             "Scheduled export email sent to {RecipientEmail} for job {JobName}.",
-            normalizedRecipient,
+            string.Join("; ", recipientsTo),
             jobName);
+    }
+
+    private static List<string> ParseRecipientEmails(string recipientEmail)
+    {
+        string normalized = recipientEmail.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new InvalidOperationException("At least one recipient email address is required.");
+        }
+
+        char[] separators = [',', ';', '\r', '\n'];
+        string[] recipients = normalized.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        List<string> parsedRecipients = recipients
+            .Select(email => email.Trim())
+            .Where(email => !string.IsNullOrWhiteSpace(email))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (parsedRecipients.Count == 0)
+        {
+            throw new InvalidOperationException("At least one recipient email address is required.");
+        }
+
+        foreach (string parsedRecipient in parsedRecipients)
+        {
+            _ = new MailAddress(parsedRecipient);
+        }
+
+        return parsedRecipients;
     }
 
     private Task SendEmailAsync(List<string> recipientsTo, List<string> recipientsCC, string subject, string body, Attachment attachment)

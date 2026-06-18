@@ -45,6 +45,7 @@ public sealed class ScheduledJobListViewModel
 public sealed class ScheduledJobFormViewModel
 {
     public const int JobNameMaxLength = 128;
+    public const int RecipientEmailMaxLength = 2048;
     public const string ScheduleTypeEveryMinutes = "every-minutes";
     public const string ScheduleTypeDailyTime = "daily-time";
     public const string ScheduleTypeAdvancedCron = "advanced-cron";
@@ -68,8 +69,7 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Job Action")]
     public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
 
-    [EmailAddress]
-    [MaxLength(256)]
+    [MaxLength(RecipientEmailMaxLength)]
     [Display(Name = "Recipient Email")]
     public string? RecipientEmail { get; set; }
 

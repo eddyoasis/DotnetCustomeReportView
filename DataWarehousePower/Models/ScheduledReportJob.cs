@@ -31,7 +31,7 @@ public class ScheduledReportJob
     [MaxLength(64)]
     public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
 
-    [MaxLength(256)]
+    [MaxLength(2048)]
     public string? RecipientEmail { get; set; }
 
     [MaxLength(128)]

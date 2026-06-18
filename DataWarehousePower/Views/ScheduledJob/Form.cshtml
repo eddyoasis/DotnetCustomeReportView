@@ -60,8 +60,8 @@
 
                 <div class="col-md-6" id="recipientEmailGroup">
                     <label asp-for="RecipientEmail" class="form-label"></label>
-                    <input asp-for="RecipientEmail" type="email" class="form-control" placeholder="user@company.com" />
-                    <div class="form-text">Required only for "Export file and email to user" action.</div>
+                    <textarea asp-for="RecipientEmail" class="form-control" rows="3" placeholder="user@company.com; other@company.com"></textarea>
+                    <div class="form-text">Required only for "Export file and email to user" action. Separate multiple addresses with commas, semicolons, or new lines.</div>
                     <span asp-validation-for="RecipientEmail" class="text-danger"></span>
                 </div>
 
