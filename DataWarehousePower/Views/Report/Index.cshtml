@@ -205,7 +205,7 @@
                     Drag chips to reorder &nbsp;|&nbsp;
                     The <span class="badge bg-light text-secondary border" style="font-size:.7rem;">grey badge</span>
                     shows the original column name &nbsp;→&nbsp; type in the box to rename it &nbsp;|&nbsp;
-                    Use the checkbox to show/hide. Click <strong>Save &amp; Apply</strong> to persist.
+                    Use the checkbox to show/hide. Toggle auto-save on/off as needed, or click <strong>Save &amp; Apply</strong>.
                 </p>
 
                 <ul id="sortable-columns" class="list-unstyled d-flex flex-wrap gap-2 mb-3" style="min-height:48px;">
@@ -253,6 +253,10 @@
                 <div class="d-flex gap-2">
                     <button id="btn-apply" class="btn btn-primary btn-sm">Save &amp; Apply</button>
                     <button id="btn-reset" class="btn btn-outline-secondary btn-sm">Reset to Defaults</button>
+                    <div class="form-check form-switch align-self-center ms-2">
+                        <input id="auto-save-toggle" class="form-check-input" type="checkbox" checked />
+                        <label class="form-check-label small" for="auto-save-toggle">Auto-save</label>
+                    </div>
                     <span   id="save-status" class="small align-self-center ms-1"></span>
                 </div>
             </div>
@@ -316,6 +320,37 @@ const exportPasswordInput = document.getElementById('export-password-input');
 const exportPasswordError = document.getElementById('export-password-error');
 const exportConfirmButton = document.getElementById('btn-export-confirm');
 const exportPasswordModal = new bootstrap.Modal(exportPasswordModalElement);
+const autoSaveToggle = document.getElementById('auto-save-toggle');
+let autoSaveTimer = null;
+const autoSaveStorageKey = `report:${reportId}:columnAutoSave`;
+let isAutoSaveEnabled = true;
+
+try {
+    const persistedAutoSave = localStorage.getItem(autoSaveStorageKey);
+    if (persistedAutoSave !== null) {
+        isAutoSaveEnabled = persistedAutoSave === 'true';
+    }
+} catch {
+    // Ignore storage access issues and keep default setting.
+}
+
+if (autoSaveToggle) {
+    autoSaveToggle.checked = isAutoSaveEnabled;
+    autoSaveToggle.addEventListener('change', () => {
+        isAutoSaveEnabled = autoSaveToggle.checked;
+
+        if (!isAutoSaveEnabled && autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
+
+        try {
+            localStorage.setItem(autoSaveStorageKey, String(isAutoSaveEnabled));
+        } catch {
+            // Ignore storage access issues.
+        }
+    });
+}
 
 // Embed all rows as JSON for client-side re-render
 const allRows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Rows));
@@ -401,17 +436,31 @@ sortable.addEventListener('dragover', e => {
         sortable.insertBefore(dragSrc, e.clientX < mid ? target : target.nextSibling);
     }
 });
-sortable.addEventListener('dragend', () => { dragSrc = null; });
+sortable.addEventListener('dragend', () => {
+    dragSrc = null;
+    scheduleAutoSave();
+});
 
 // ── Visibility toggle ─────────────────────────────────────────────────────────
 sortable.addEventListener('change', e => {
     const chk = e.target.closest('.col-visible-toggle');
     if (!chk) return;
     chk.closest('li.chip').classList.toggle('opacity-50', !chk.checked);
+    scheduleAutoSave();
+});
+
+sortable.addEventListener('input', e => {
+    const labelInput = e.target.closest('.label-input');
+    if (!labelInput) return;
+    scheduleAutoSave();
 });
 
 // ── Save & Apply ─────────────────────────────────────────────────────────────
 document.getElementById('btn-apply').addEventListener('click', async () => {
+    await saveColumnsAsync(false);
+});
+
+async function saveColumnsAsync(isAutoSave) {
     const errorEl  = document.getElementById('label-error');
     const statusEl = document.getElementById('save-status');
     const activeClientCode = getActiveClientCode();
@@ -436,7 +485,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
 
     const columns = buildColumnsFromChips(chips);
 
-    statusEl.textContent = 'Saving…';
+    statusEl.textContent = isAutoSave ? 'Auto-saving…' : 'Saving…';
     statusEl.className   = 'small align-self-center ms-1 text-muted';
 
     try {
@@ -452,7 +501,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
                 upsertClientCodeOption(activeClientCode, json.preferenceId);
             }
             syncClientCodeUi(activeClientCode);
-            statusEl.textContent = '✓ Saved';
+            statusEl.textContent = isAutoSave ? '✓ Auto-saved' : '✓ Saved';
             statusEl.className   = 'small align-self-center ms-1 text-success';
             renderTable(columns);
             setTimeout(() => { statusEl.textContent = ''; }, 3000);
@@ -464,7 +513,22 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
         statusEl.textContent = '✗ Network error';
         statusEl.className   = 'small align-self-center ms-1 text-danger';
     }
-});
+}
+
+function scheduleAutoSave() {
+    if (!isAutoSaveEnabled) {
+        return;
+    }
+
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+    }
+
+    autoSaveTimer = setTimeout(async () => {
+        autoSaveTimer = null;
+        await saveColumnsAsync(true);
+    }, 500);
+}
 
 // ── Reset to defaults ─────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', async () => {
