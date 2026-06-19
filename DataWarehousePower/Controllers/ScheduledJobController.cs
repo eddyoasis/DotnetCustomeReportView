@@ -19,7 +19,7 @@ public sealed class ScheduledJobController(
         return View(viewModel);
     }
 
-    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null)
+    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId);
@@ -37,6 +37,21 @@ public sealed class ScheduledJobController(
         if (!string.IsNullOrWhiteSpace(clientCode))
         {
             viewModel.ClientCode = clientCode.Trim();
+        }
+
+        if (formats is not null && formats.Count > 0)
+        {
+            List<string> normalizedFormats = formats
+                .Where(format => !string.IsNullOrWhiteSpace(format))
+                .Select(format => format.Trim().ToLowerInvariant())
+                .Where(format => format is "csv" or "excel" or "pdf")
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (normalizedFormats.Count > 0)
+            {
+                viewModel.Formats = normalizedFormats;
+            }
         }
 
         if (viewModel.ReportDefinitionId > 0 &&

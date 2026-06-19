@@ -418,6 +418,7 @@
                 const scheduleUrl = new URL(`/Report/ScheduleReport/${reportId}`, window.location.origin);
                 const schemaTemplate = getActiveSchemaTemplate();
                 const clientCode = filterClientCodeInput.value.trim();
+                const selectedFormats = getSelectedExportFormats();
 
                 if (schemaTemplate) {
                     scheduleUrl.searchParams.set('schemaTemplate', schemaTemplate);
@@ -426,6 +427,8 @@
                 if (clientCode) {
                     scheduleUrl.searchParams.set('clientCode', clientCode);
                 }
+
+                selectedFormats.forEach(format => scheduleUrl.searchParams.append('formats', format));
 
                 window.location.href = scheduleUrl.toString();
             });
