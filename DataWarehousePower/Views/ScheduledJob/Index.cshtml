@@ -56,7 +56,7 @@
             </div>
             <div class="col-sm-4 col-md-2">
                 <label class="form-label small mb-1">Schema Template</label>
-                <input type="hidden" name="ClientCode" id="scheduled-job-client-code-value" value="@Model.Filter.ClientCode" />
+                <input type="hidden" name="SchemaTemplate" id="scheduled-job-client-code-value" value="@Model.Filter.SchemaTemplate" />
                 <div class="dropdown w-100">
                     <button id="scheduled-job-client-code-toggle"
                             class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
@@ -64,7 +64,7 @@
                             data-bs-toggle="dropdown"
                             data-bs-auto-close="outside"
                             aria-expanded="false">
-                        @(string.IsNullOrWhiteSpace(Model.Filter.ClientCode) ? "All" : Model.Filter.ClientCode)
+                        @(string.IsNullOrWhiteSpace(Model.Filter.SchemaTemplate) ? "All" : Model.Filter.SchemaTemplate)
                     </button>
                     <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
                         <input id="scheduled-job-client-code-search"
@@ -178,7 +178,7 @@
                 toggleButtonId: 'scheduled-job-client-code-toggle',
                 searchInputId: 'scheduled-job-client-code-search',
                 optionsContainerId: 'scheduled-job-client-code-options',
-                items: [@foreach (string cc in Model.AvailableClientCodes) { <text>'@cc',</text> }]
+                items: [@foreach (string cc in Model.AvailableSchemaTemplates) { <text>'@cc',</text> }]
             });
 
             createSearchableDropdown({
@@ -243,7 +243,7 @@ else
                                 @job.ExportLocation
                             }
                         </td>
-                        <td>@(string.IsNullOrWhiteSpace(job.ClientCode) ? "-" : job.ClientCode)</td>
+                        <td>@(string.IsNullOrWhiteSpace(job.SchemaTemplate) ? "-" : job.SchemaTemplate)</td>
                         <td>@(string.IsNullOrWhiteSpace(job.FilterClientCode) ? "-" : job.FilterClientCode)</td>
                         <td>
                             <div>@job.ScheduleDisplay</div>

@@ -34,7 +34,7 @@ public sealed class ScheduledReportExecutionService(
         ReportViewModel? reportViewModel = await reportService.BuildReportViewModelAsync(
             job.ReportDefinitionId,
             job.CreatedByUserId,
-            job.ClientCode,
+            job.SchemaTemplate,
             job.FilterClientCode,
             effectiveDateFrom,
             effectiveDateTo);

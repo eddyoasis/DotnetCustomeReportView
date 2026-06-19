@@ -126,7 +126,7 @@ namespace DataWarehousePower.Data
                 e.Property(job => job.CronExpression).HasMaxLength(128);
                 e.Property(job => job.JobAction).HasMaxLength(64);
                 e.Property(job => job.RecipientEmail).HasMaxLength(2048);
-                e.Property(job => job.ClientCode).HasMaxLength(128);
+                e.Property(job => job.SchemaTemplate).HasMaxLength(128);
                 e.Property(job => job.FilterClientCode).HasMaxLength(128);
                 e.Property(job => job.ExportLocation).HasMaxLength(512);
                 e.Property(job => job.IsCustom).HasDefaultValue(true);

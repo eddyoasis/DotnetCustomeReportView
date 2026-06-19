@@ -190,15 +190,15 @@
                 </div>
 
                 <div class="col-md-6">
-                    @* <label asp-for="ClientCode" class="form-label"></label> *@
+                    @* <label asp-for="SchemaTemplate" class="form-label"></label> *@
                     <label class="form-label">Schema Template</label>
-                    <input asp-for="ClientCode" type="hidden" />
+                    <input asp-for="SchemaTemplate" type="hidden" />
 
                     <select id="scheduled-client-code-select" class="d-none" aria-hidden="true">
                         <option value="">Default</option>
-                        @foreach (string availableClientCode in Model.AvailableClientCodes)
+                        @foreach (string availableClientCode in Model.AvailableSchemaTemplates)
                         {
-                            <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                            <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.SchemaTemplate ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
                         }
                     </select>
 
@@ -225,7 +225,7 @@
 
                         <button id="scheduled-client-code-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
                     </div>
-                    <span asp-validation-for="ClientCode" class="text-danger"></span>
+                    <span asp-validation-for="SchemaTemplate" class="text-danger"></span>
                 </div>
 
                 <div class="col-md-6">
@@ -289,7 +289,7 @@
             const passwordInput = document.getElementById('passwordInput');
             const existingPasswordInput = document.getElementById('existingPasswordInput');
             const toggleExistingPasswordVisibility = document.getElementById('toggleExistingPasswordVisibility');
-            const clientCodeHiddenInput = document.getElementById('ClientCode');
+            const clientCodeHiddenInput = document.getElementById('SchemaTemplate');
             const isCustomToggle = document.getElementById('isCustomToggle');
             const dateFromGroup = document.getElementById('dateFromGroup');
             const dateToGroup = document.getElementById('dateToGroup');
@@ -300,7 +300,7 @@
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
             const clientCodeOptions = document.getElementById('scheduled-client-code-options');
             const clientCodeClearButton = document.getElementById('scheduled-client-code-clear');
-            const availableClientCodesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodesByReportId));
+            const availableClientCodesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableSchemaTemplatesByReportId));
 
             if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !customDaysGroup || !cronGroup) {
                 return;

@@ -44,7 +44,7 @@ public sealed class ScheduledReportJobService(
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
             ExportLocation = entity.ExportLocation,
-            ClientCode = entity.ClientCode,
+            SchemaTemplate = entity.SchemaTemplate,
             FilterClientCode = entity.FilterClientCode,
             CronExpression = entity.CronExpression,
             ScheduleDisplay = BuildScheduleDisplay(entity.CronExpression),
@@ -54,8 +54,8 @@ public sealed class ScheduledReportJobService(
 
         List<string> availableFormats = allJobs.Select(j => j.Format).Distinct().Order().ToList();
         List<string> availableJobActions = ScheduledJobActions.All.ToList();
-        List<string> availableClientCodes = allJobs
-            .Select(j => j.ClientCode)
+        List<string> availableSchemaTemplates = allJobs
+            .Select(j => j.SchemaTemplate)
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct()
             .Order()
@@ -86,8 +86,8 @@ public sealed class ScheduledReportJobService(
             if (!string.IsNullOrWhiteSpace(filter.JobAction))
                 filtered = filtered.Where(j => j.JobAction.Equals(filter.JobAction, StringComparison.OrdinalIgnoreCase));
 
-            if (!string.IsNullOrWhiteSpace(filter.ClientCode))
-                filtered = filtered.Where(j => string.Equals(j.ClientCode, filter.ClientCode, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(filter.SchemaTemplate))
+                filtered = filtered.Where(j => string.Equals(j.SchemaTemplate, filter.SchemaTemplate, StringComparison.OrdinalIgnoreCase));
 
             if (!string.IsNullOrWhiteSpace(filter.FilterClientCode))
                 filtered = filtered.Where(j => string.Equals(j.FilterClientCode, filter.FilterClientCode, StringComparison.OrdinalIgnoreCase));
@@ -102,7 +102,7 @@ public sealed class ScheduledReportJobService(
             Filter = filter ?? new ScheduledJobFilterViewModel(),
             AvailableFormats = availableFormats,
             AvailableJobActions = availableJobActions,
-            AvailableClientCodes = availableClientCodes,
+            AvailableSchemaTemplates = availableSchemaTemplates,
             AvailableFilterClientCodes = availableFilterClientCodes
         };
 
@@ -112,7 +112,7 @@ public sealed class ScheduledReportJobService(
     public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId)
     {
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
-        Dictionary<int, List<string>> availableClientCodesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
+        Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
 
         return new ScheduledJobFormViewModel
         {
@@ -128,8 +128,8 @@ public sealed class ScheduledReportJobService(
             CronExpression = "0 8 * * *",
             ExportLocation = null,
             AvailableReports = availableReports,
-            AvailableClientCodesByReportId = availableClientCodesByReportId,
-            AvailableClientCodes = []
+            AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
+            AvailableSchemaTemplates = []
         };
     }
 
@@ -139,7 +139,7 @@ public sealed class ScheduledReportJobService(
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
-        Dictionary<int, List<string>> availableClientCodesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
+        Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
 
         ScheduledJobFormViewModel form = new()
         {
@@ -151,7 +151,7 @@ public sealed class ScheduledReportJobService(
             RecipientEmail = entity.RecipientEmail,
             ExportLocation = entity.ExportLocation,
             CronExpression = entity.CronExpression,
-            ClientCode = entity.ClientCode,
+            SchemaTemplate = entity.SchemaTemplate,
             FilterClientCode = entity.FilterClientCode,
             DateFrom = entity.DateFrom,
             DateTo = entity.DateTo,
@@ -159,10 +159,10 @@ public sealed class ScheduledReportJobService(
             ExistingPassword = dataProtectionService.Unprotect(entity.EncryptedPassword),
             IsActive = entity.IsActive,
             AvailableReports = availableReports,
-            AvailableClientCodesByReportId = availableClientCodesByReportId,
-            AvailableClientCodes = BuildAvailableClientCodes(
-                entity.ClientCode,
-                availableClientCodesByReportId.TryGetValue(entity.ReportDefinitionId, out List<string>? reportClientCodes)
+            AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
+            AvailableSchemaTemplates = BuildAvailableSchemaTemplates(
+                entity.SchemaTemplate,
+                availableSchemaTemplatesByReportId.TryGetValue(entity.ReportDefinitionId, out List<string>? reportClientCodes)
                     ? reportClientCodes
                     : [])
         };
@@ -185,7 +185,7 @@ public sealed class ScheduledReportJobService(
             JobAction = NormalizeJobAction(form.JobAction),
             RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail),
             CronExpression = BuildCronExpression(form),
-            ClientCode = NormalizeNullable(form.ClientCode),
+            SchemaTemplate = NormalizeNullable(form.SchemaTemplate),
             FilterClientCode = NormalizeNullable(form.FilterClientCode),
             ExportLocation = NormalizeNullable(form.ExportLocation),
             DateFrom = form.IsCustom ? form.DateFrom?.Date : null,
@@ -222,7 +222,7 @@ public sealed class ScheduledReportJobService(
         entity.JobAction = NormalizeJobAction(form.JobAction);
         entity.RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail);
         entity.CronExpression = BuildCronExpression(form);
-        entity.ClientCode = NormalizeNullable(form.ClientCode);
+        entity.SchemaTemplate = NormalizeNullable(form.SchemaTemplate);
         entity.FilterClientCode = NormalizeNullable(form.FilterClientCode);
         entity.ExportLocation = NormalizeNullable(form.ExportLocation);
         entity.DateFrom = form.IsCustom ? form.DateFrom?.Date : null;
@@ -320,9 +320,9 @@ public sealed class ScheduledReportJobService(
         return clientCodesByReportId;
     }
 
-    private static List<string> BuildAvailableClientCodes(string? currentClientCode, IEnumerable<string> savedClientCodes)
-        => savedClientCodes
-            .Append(currentClientCode ?? string.Empty)
+    private static List<string> BuildAvailableSchemaTemplates(string? currentSchemaTemplate, IEnumerable<string> savedSchemaTemplates)
+        => savedSchemaTemplates
+            .Append(currentSchemaTemplate ?? string.Empty)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -339,7 +339,7 @@ public sealed class ScheduledReportJobService(
         [
             NormalizeJobNameSegment(userId, "user"),
             NormalizeJobNameSegment(report.ReportName, "report"),
-            NormalizeJobNameSegment(form.ClientCode, "default"),
+            NormalizeJobNameSegment(form.SchemaTemplate, "default"),
             NormalizeJobNameSegment(form.FilterClientCode, "all")
         ]);
 

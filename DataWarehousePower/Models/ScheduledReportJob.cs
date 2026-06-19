@@ -35,7 +35,7 @@ public class ScheduledReportJob
     public string? RecipientEmail { get; set; }
 
     [MaxLength(128)]
-    public string? ClientCode { get; set; }
+    public string? SchemaTemplate { get; set; }
 
     [MaxLength(128)]
     public string? FilterClientCode { get; set; }
