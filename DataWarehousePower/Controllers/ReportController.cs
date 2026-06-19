@@ -36,12 +36,12 @@ namespace DataWarehousePower.Controllers
         public async Task<IActionResult> Index(
             int id,
             string? schemaTemplate = null,
-            string? filterSchemaTemplate = null,
+            string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, schemaTemplate, filterSchemaTemplate, dateFrom, dateTo);
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, schemaTemplate, clientCode, dateFrom, dateTo);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -52,7 +52,7 @@ namespace DataWarehousePower.Controllers
         // GET /Report/List → redirect to first available report
         public async Task<IActionResult> List(
             string? schemaTemplate = null,
-            string? filterSchemaTemplate = null,
+            string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
@@ -60,7 +60,7 @@ namespace DataWarehousePower.Controllers
             if (reports.Count == 0)
                 return View("NoReports");
 
-            return RedirectToAction(nameof(Index), new { id = reports[0].Id, schemaTemplate, filterSchemaTemplate, dateFrom, dateTo });
+            return RedirectToAction(nameof(Index), new { id = reports[0].Id, schemaTemplate, clientCode, dateFrom, dateTo });
         }
 
         // POST /Report/{id}/SavePreferences  (AJAX)
@@ -176,7 +176,7 @@ namespace DataWarehousePower.Controllers
 
             if (normalizedFormats.Count == 0)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "At least one format must be selected.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "At least one format must be selected.", cancellationToken);
                 return BadRequest(new { success = false, error = "At least one format is required. Use CSV, Excel, or PDF." });
             }
 
@@ -184,14 +184,14 @@ namespace DataWarehousePower.Controllers
             string normalizedFormatsAuditValue = string.Join(",", normalizedFormats);
             if (hasInvalidFormat)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
                 return BadRequest(new { success = false, error = "Invalid format selection. Use CSV, Excel, or PDF." });
             }
 
             string? passwordValidationError = ValidatePasswordStrength(request.Password);
             if (passwordValidationError is not null)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
                 return BadRequest(new { success = false, error = passwordValidationError });
             }
 
@@ -199,13 +199,13 @@ namespace DataWarehousePower.Controllers
                 id,
                 userId,
                 request.SchemaTemplate,
-                request.FilterSchemaTemplate,
+                request.ClientCode,
                 request.DateFrom,
                 request.DateTo);
 
             if (vm is null)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
                 return NotFound(new { success = false, error = "Report not found." });
             }
 
@@ -220,26 +220,26 @@ namespace DataWarehousePower.Controllers
                 string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
                 string zipFileName = $"{reportName}_export.zip";
 
-                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
 
                 return File(zipBytes, "application/zip", zipFileName);
             }
             catch (ArgumentException argumentException)
             {
                 _logger.LogWarning(argumentException, "Invalid export request for report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = argumentException.Message });
             }
             catch (InvalidOperationException invalidOperationException)
             {
                 _logger.LogWarning(invalidOperationException, "Export validation failed for report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = invalidOperationException.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to export report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
                 return StatusCode(500, new { success = false, error = "Failed to export report." });
             }
         }

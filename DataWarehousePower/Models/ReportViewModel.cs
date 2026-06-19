@@ -7,7 +7,7 @@ namespace DataWarehousePower.Models
     {
         public int    ReportId   { get; set; }
         public string ReportName { get; set; } = string.Empty;
-        public string ClientCode { get; set; } = string.Empty;
+        public string SchemaTemplate { get; set; } = string.Empty;
         public int? ActivePreferenceId { get; set; }
         public string FilterClientCode { get; set; } = string.Empty;
         public DateTime? FilterDateFrom { get; set; }

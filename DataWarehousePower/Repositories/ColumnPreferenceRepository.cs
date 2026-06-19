@@ -13,17 +13,17 @@ namespace DataWarehousePower.Repositories
             _context = context;
         }
 
-        public async Task<UserColumnPreference?> GetAsync(string userId, int reportDefinitionId, string? clientCode)
+        public async Task<UserColumnPreference?> GetAsync(string userId, int reportDefinitionId, string? schemaTemplate)
         {
-            string normalizedClientCode = NormalizeClientCode(clientCode);
+            string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
 
             UserColumnPreference? scopedPreference = await _context.UserColumnPreferences
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.UserId == userId
                                        && p.ReportDefinitionId == reportDefinitionId
-                                       && p.SchemaTemplate == normalizedClientCode);
+                                       && p.SchemaTemplate == normalizedSchemaTemplate);
 
-            if (scopedPreference is not null || normalizedClientCode.Length == 0)
+            if (scopedPreference is not null || normalizedSchemaTemplate.Length == 0)
             {
                 return scopedPreference;
             }
@@ -63,7 +63,7 @@ namespace DataWarehousePower.Repositories
 
         public async Task<int> UpsertAsync(UserColumnPreference preference, int? preferenceId = null)
         {
-            preference.SchemaTemplate = NormalizeClientCode(preference.SchemaTemplate);
+            preference.SchemaTemplate = NormalizeSchemaTemplate(preference.SchemaTemplate);
 
             UserColumnPreference? existing;
             if (preferenceId.HasValue)
@@ -109,7 +109,7 @@ namespace DataWarehousePower.Repositories
 
         public async Task UpdateSchemaTemplateAsync(string userId, int reportDefinitionId, int preferenceId, string newSchemaTemplate)
         {
-            string normalizedSchemaTemplate = NormalizeClientCode(newSchemaTemplate);
+            string normalizedSchemaTemplate = NormalizeSchemaTemplate(newSchemaTemplate);
             if (normalizedSchemaTemplate.Length == 0)
                 throw new InvalidOperationException("Client code cannot be blank.");
 
@@ -169,7 +169,7 @@ namespace DataWarehousePower.Repositories
             await _context.SaveChangesAsync();
         }
 
-        private static string NormalizeClientCode(string? clientCode)
-            => clientCode?.Trim() ?? string.Empty;
+        private static string NormalizeSchemaTemplate(string? schemaTemplate)
+            => schemaTemplate?.Trim() ?? string.Empty;
     }
 }

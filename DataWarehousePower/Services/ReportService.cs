@@ -33,12 +33,12 @@ namespace DataWarehousePower.Services
         public async Task<ReportViewModel?> BuildReportViewModelAsync(
             int reportId,
             string userId,
-            string? clientCode = null,
+            string? schemaTemplate = null,
             string? filterClientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
-            string normalizedClientCode = NormalizeClientCode(clientCode);
+            string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
             string? normalizedFilterClientCode = NormalizeNullableClientCode(filterClientCode);
             var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
             if (report is null) return null;
@@ -58,7 +58,7 @@ namespace DataWarehousePower.Services
 
             // Apply user preferences
             (List<ColumnDefinition> displayColumns, int? activePreferenceId) =
-                await LoadPreferencesAsync(userId, reportId, normalizedClientCode, systemColumns);
+                await LoadPreferencesAsync(userId, reportId, normalizedSchemaTemplate, systemColumns);
 
             // Fetch data — SP mode takes priority over table mode
             List<Dictionary<string, object?>> rows;
@@ -88,7 +88,7 @@ namespace DataWarehousePower.Services
             Dictionary<string, int> schemaTemplatePreferenceIds = await _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
             Dictionary<int, List<string>> reportSchemaTemplatesByReportId = await BuildReportSchemaTemplatesByReportIdAsync(userId, allReports);
             List<string> availableSchemaTemplates = BuildAvailableSchemaTemplates(
-                normalizedClientCode,
+                normalizedSchemaTemplate,
                 ExtractClientCodes(rows),
                 savedSchemaTemplates);
 
@@ -96,7 +96,7 @@ namespace DataWarehousePower.Services
             {
                 ReportId         = report.Id,
                 ReportName       = report.ReportName,
-                ClientCode       = normalizedClientCode,
+                SchemaTemplate       = normalizedSchemaTemplate,
                 ActivePreferenceId = activePreferenceId,
                 FilterClientCode = normalizedFilterClientCode ?? string.Empty,
                 FilterDateFrom   = dateFrom,
@@ -119,7 +119,7 @@ namespace DataWarehousePower.Services
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns)
         {
-            string normalizedClientCode = NormalizeClientCode(clientCode);
+            string normalizedClientCode = NormalizeSchemaTemplate(clientCode);
             var validKeys = systemColumns.Select(c => c.Key)
                                          .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -164,12 +164,12 @@ namespace DataWarehousePower.Services
         private async Task<(List<ColumnDefinition> Columns, int? PreferenceId)> LoadPreferencesAsync(
             string userId,
             int reportId,
-            string clientCode,
+            string schemaTemplate,
             List<ColumnDefinition> systemColumns)
         {
             try
             {
-                var row = await _prefRepo.GetAsync(userId, reportId, clientCode);
+                var row = await _prefRepo.GetAsync(userId, reportId, schemaTemplate);
                 if (row is null) return (BuildDefaults(systemColumns), null);
 
                 var entries = JsonSerializer.Deserialize<List<ColumnJsonEntry>>(row.ColumnJson, _jsonOpts)
@@ -207,13 +207,13 @@ namespace DataWarehousePower.Services
             {
                 _logger.LogError(ex,
                     "Failed to load preferences for user {UserId} report {ReportId} client code {ClientCode}. Using defaults.",
-                    userId, reportId, clientCode);
+                    userId, reportId, schemaTemplate);
                 return (BuildDefaults(systemColumns), null);
             }
         }
 
-        private static string NormalizeClientCode(string? clientCode)
-            => clientCode?.Trim() ?? string.Empty;
+        private static string NormalizeSchemaTemplate(string? schemaTemplate)
+            => schemaTemplate?.Trim() ?? string.Empty;
 
         private static string? NormalizeNullableClientCode(string? clientCode)
         {
