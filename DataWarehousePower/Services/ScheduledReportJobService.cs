@@ -17,6 +17,7 @@ public sealed class ScheduledReportJobService(
     IOptions<HangfireOptions> hangfireOptions,
     ILogger<ScheduledReportJobService> logger) : IScheduledReportJobService
 {
+    private static readonly string[] SupportedExportFormats = ["csv", "excel", "pdf"];
     private static readonly int[] OrderedCronWeekdays = [1, 2, 3, 4, 5, 6, 0];
     private static readonly Dictionary<int, string> WeekdayDisplayNames = new()
     {
@@ -40,7 +41,7 @@ public sealed class ScheduledReportJobService(
             HangfireJobId = entity.HangfireJobId,
             ReportDefinitionId = entity.ReportDefinitionId,
             ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
-            Format = entity.Format,
+            Format = string.Join(", ", ParseFormats(entity.Format).Select(format => format.ToUpperInvariant())),
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
             ExportLocation = entity.ExportLocation,
@@ -52,7 +53,11 @@ public sealed class ScheduledReportJobService(
             CreatedUtc = entity.CreatedUtc
         }).ToList();
 
-        List<string> availableFormats = allJobs.Select(j => j.Format).Distinct().Order().ToList();
+        List<string> availableFormats = entities
+            .SelectMany(entity => ParseFormats(entity.Format))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(format => format)
+            .ToList();
         List<string> availableJobActions = ScheduledJobActions.All.ToList();
         List<string> availableSchemaTemplates = allJobs
             .Select(j => j.SchemaTemplate)
@@ -81,7 +86,7 @@ public sealed class ScheduledReportJobService(
                 filtered = filtered.Where(j => j.ReportName.Contains(filter.ReportName, StringComparison.OrdinalIgnoreCase));
 
             if (!string.IsNullOrWhiteSpace(filter.Format))
-                filtered = filtered.Where(j => j.Format.Equals(filter.Format, StringComparison.OrdinalIgnoreCase));
+                filtered = filtered.Where(j => ParseFormats(j.Format).Contains(filter.Format.Trim(), StringComparer.OrdinalIgnoreCase));
 
             if (!string.IsNullOrWhiteSpace(filter.JobAction))
                 filtered = filtered.Where(j => j.JobAction.Equals(filter.JobAction, StringComparison.OrdinalIgnoreCase));
@@ -118,7 +123,7 @@ public sealed class ScheduledReportJobService(
         {
             IsActive = true,
             IsCustom = false,
-            Format = "csv",
+            Formats = ["csv"],
             JobAction = ScheduledJobActions.ExportFile,
             ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime,
             DailyTime = "08:30",
@@ -146,7 +151,7 @@ public sealed class ScheduledReportJobService(
             Id = entity.Id,
             JobName = entity.JobName,
             ReportDefinitionId = entity.ReportDefinitionId,
-            Format = entity.Format,
+            Formats = ParseFormats(entity.Format),
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
             ExportLocation = entity.ExportLocation,
@@ -181,7 +186,7 @@ public sealed class ScheduledReportJobService(
         {
             JobName = generatedJobName,
             ReportDefinitionId = form.ReportDefinitionId,
-            Format = form.Format.Trim().ToLowerInvariant(),
+            Format = BuildFormatsStorageValue(form.Formats),
             JobAction = NormalizeJobAction(form.JobAction),
             RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail),
             CronExpression = BuildCronExpression(form),
@@ -218,7 +223,7 @@ public sealed class ScheduledReportJobService(
 
         entity.JobName = newJobName;
         entity.ReportDefinitionId = form.ReportDefinitionId;
-        entity.Format = form.Format.Trim().ToLowerInvariant();
+        entity.Format = BuildFormatsStorageValue(form.Formats);
         entity.JobAction = NormalizeJobAction(form.JobAction);
         entity.RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail);
         entity.CronExpression = BuildCronExpression(form);
@@ -443,10 +448,10 @@ public sealed class ScheduledReportJobService(
             throw new InvalidOperationException("Report is required.");
         }
 
-        string normalizedFormat = form.Format?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (normalizedFormat is not ("csv" or "excel" or "pdf"))
+        List<string> normalizedFormats = NormalizeFormats(form.Formats);
+        if (normalizedFormats.Count == 0)
         {
-            throw new InvalidOperationException("Format must be csv, excel, or pdf.");
+            throw new InvalidOperationException("At least one format must be selected.");
         }
 
         string normalizedJobAction = NormalizeJobAction(form.JobAction);
@@ -531,6 +536,43 @@ public sealed class ScheduledReportJobService(
         List<string> recipientEmails = ParseRecipientEmails(value);
         return recipientEmails.Count == 0 ? null : string.Join("; ", recipientEmails);
     }
+
+    private static List<string> ParseFormats(string? value)
+    {
+        string normalized = value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return ["csv"];
+        }
+
+        string[] segments = normalized.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return NormalizeFormats(segments);
+    }
+
+    private static List<string> NormalizeFormats(IEnumerable<string>? values)
+    {
+        List<string> normalizedValues = (values ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim().ToLowerInvariant())
+            .Distinct()
+            .ToList();
+
+        List<string> invalidFormats = normalizedValues
+            .Where(value => !SupportedExportFormats.Contains(value, StringComparer.Ordinal))
+            .ToList();
+
+        if (invalidFormats.Count > 0)
+        {
+            throw new InvalidOperationException("Format must be csv, excel, or pdf.");
+        }
+
+        return SupportedExportFormats
+            .Where(value => normalizedValues.Contains(value, StringComparer.Ordinal))
+            .ToList();
+    }
+
+    private static string BuildFormatsStorageValue(IEnumerable<string>? values)
+        => string.Join(',', NormalizeFormats(values));
 
     private static string BuildCronExpression(ScheduledJobFormViewModel form)
     {

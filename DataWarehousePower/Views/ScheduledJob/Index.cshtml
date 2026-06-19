@@ -40,7 +40,7 @@
                     <option value="">All</option>
                     @foreach (string fmt in Model.AvailableFormats)
                     {
-                        <option value="@fmt" selected="@(Model.Filter.Format == fmt ? "selected" : null)">@fmt.ToUpperInvariant()</option>
+                        <option value="@fmt" selected="@(string.Equals(Model.Filter.Format, fmt, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@fmt.ToUpperInvariant()</option>
                     }
                 </select>
             </div>

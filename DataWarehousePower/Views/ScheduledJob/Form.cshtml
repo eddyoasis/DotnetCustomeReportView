@@ -39,13 +39,14 @@
                 </div>
 
                 <div class="col-md-3">
-                    <label asp-for="Format" class="form-label"></label>
-                    <select asp-for="Format" class="form-select text-uppercase">
+                    <label asp-for="Formats" class="form-label"></label>
+                    <select asp-for="Formats" class="form-select text-uppercase" multiple size="3">
                         <option value="csv">CSV</option>
                         <option value="excel">EXCEL</option>
                         <option value="pdf">PDF</option>
                     </select>
-                    <span asp-validation-for="Format" class="text-danger"></span>
+                    <div class="form-text">Hold Ctrl (or Cmd on Mac) to select multiple formats.</div>
+                    <span asp-validation-for="Formats" class="text-danger"></span>
                 </div>
 
                 <div class="col-md-6">

@@ -27,7 +27,7 @@ public sealed class ScheduledReportExecutionService(
             return;
         }
 
-        string normalizedFormat = job.Format.Trim().ToLowerInvariant();
+        List<string> normalizedFormats = ParseJobFormats(job.Format);
         string password = dataProtectionService.Unprotect(job.EncryptedPassword);
         (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
 
@@ -50,7 +50,7 @@ public sealed class ScheduledReportExecutionService(
 
         byte[] zipBytes = await reportExportService.BuildPasswordProtectedZipAsync(
             reportViewModel,
-            [normalizedFormat],
+            normalizedFormats,
             password);
 
         string baseDirectory = ResolveExportDirectory(job.ExportLocation);
@@ -126,5 +126,23 @@ public sealed class ScheduledReportExecutionService(
         };
 
         return (effectiveDate, effectiveDate);
+    }
+
+    private static List<string> ParseJobFormats(string? value)
+    {
+        string normalized = value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return ["csv"];
+        }
+
+        List<string> parsedFormats = normalized
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(format => format.Trim().ToLowerInvariant())
+            .Where(format => format is "csv" or "excel" or "pdf")
+            .Distinct()
+            .ToList();
+
+        return parsedFormats.Count > 0 ? parsedFormats : ["csv"];
     }
 }

@@ -61,10 +61,8 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Report")]
     public int ReportDefinitionId { get; set; }
 
-    [Required]
-    [RegularExpression("^(csv|excel|pdf)$", ErrorMessage = "Format must be csv, excel, or pdf.")]
-    [Display(Name = "Format")]
-    public string Format { get; set; } = "csv";
+    [Display(Name = "Formats")]
+    public List<string> Formats { get; set; } = ["csv"];
 
     [Required]
     [Display(Name = "Job Action")]
