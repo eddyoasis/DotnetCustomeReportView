@@ -67,7 +67,7 @@ namespace DataWarehousePower.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> ScheduleReport(int id, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null)
+        public async Task<IActionResult> ScheduleReport(int id, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             int? existingJobId = await _scheduledReportJobService.FindExistingJobIdAsync(userId, id, schemaTemplate, clientCode);
@@ -82,7 +82,8 @@ namespace DataWarehousePower.Controllers
                 reportDefinitionId = id,
                 schemaTemplate,
                 clientCode,
-                formats
+                formats,
+                returnUrl
             });
         }
 

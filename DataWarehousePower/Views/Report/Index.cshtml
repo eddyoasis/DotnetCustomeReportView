@@ -419,16 +419,36 @@
                 const schemaTemplate = getActiveSchemaTemplate();
                 const clientCode = filterClientCodeInput.value.trim();
                 const selectedFormats = getSelectedExportFormats();
+                const returnUrl = new URL(window.location.href);
 
                 if (schemaTemplate) {
                     scheduleUrl.searchParams.set('schemaTemplate', schemaTemplate);
+                    returnUrl.searchParams.set('schemaTemplate', schemaTemplate);
+                } else {
+                    returnUrl.searchParams.delete('schemaTemplate');
                 }
 
                 if (clientCode) {
                     scheduleUrl.searchParams.set('clientCode', clientCode);
+                    returnUrl.searchParams.set('clientCode', clientCode);
+                } else {
+                    returnUrl.searchParams.delete('clientCode');
+                }
+
+                if (filterDateFromInput.value) {
+                    returnUrl.searchParams.set('dateFrom', filterDateFromInput.value);
+                } else {
+                    returnUrl.searchParams.delete('dateFrom');
+                }
+
+                if (filterDateToInput.value) {
+                    returnUrl.searchParams.set('dateTo', filterDateToInput.value);
+                } else {
+                    returnUrl.searchParams.delete('dateTo');
                 }
 
                 selectedFormats.forEach(format => scheduleUrl.searchParams.append('formats', format));
+                scheduleUrl.searchParams.set('returnUrl', `${returnUrl.pathname}${returnUrl.search}`);
 
                 window.location.href = scheduleUrl.toString();
             });

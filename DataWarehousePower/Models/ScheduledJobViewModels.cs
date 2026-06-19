@@ -130,6 +130,8 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Enabled")]
     public bool IsActive { get; set; } = true;
 
+    public string? ReturnUrl { get; set; }
+
     public List<ReportDefinitionLookupItem> AvailableReports { get; set; } = [];
     public List<string> AvailableSchemaTemplates { get; set; } = [];
 

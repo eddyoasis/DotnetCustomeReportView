@@ -19,10 +19,11 @@ public sealed class ScheduledJobController(
         return View(viewModel);
     }
 
-    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null)
+    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId);
+        viewModel.ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
         if (reportDefinitionId.HasValue && reportDefinitionId.Value > 0)
         {
@@ -97,6 +98,11 @@ public sealed class ScheduledJobController(
             {
                 int id = await scheduledReportJobService.CreateAsync(form, userId, username);
                 TempData["Success"] = $"Scheduled job created (ID: {id}).";
+
+                if (Url.IsLocalUrl(form.ReturnUrl))
+                {
+                    return Redirect(form.ReturnUrl!);
+                }
             }
             else
             {
