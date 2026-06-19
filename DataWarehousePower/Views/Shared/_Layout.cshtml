@@ -46,31 +46,54 @@
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        @if (canViewReports)
+                        @if (canViewReports || canManageReports)
                         {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Report" asp-action="List">Reports</a>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle text-dark" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Reports
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
+                                    @if (canManageReports)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage</a>
+                                        </li>
+                                    }
+                                    @if (canViewReports)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item" asp-area="" asp-controller="Report" asp-action="List">View</a>
+                                        </li>
+                                    }
+                                </ul>
                             </li>
                         }
-                        @if (canManageReports)
+                        @if (canManageReports || canViewAudilog)
                         {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage Reports</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="ScheduledJob" asp-action="Index">Scheduled Jobs</a>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle text-dark" href="#" id="scheduledDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Scheduled
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="scheduledDropdown">
+                                    @if (canViewAudilog)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item" href="~/hangfire" target="_blank" rel="noopener noreferrer">Dashboard</a>
+                                        </li>
+                                    }
+                                    @if (canManageReports)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index">Jobs</a>
+                                        </li>
+                                    }
+                                </ul>
                             </li>
                         }
                         @if (canViewAudilog)
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="AuditLog" asp-action="Index">Audit Logs</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="~/hangfire" target="_blank" rel="noopener noreferrer">Scheduler Dashboard</a>
                             </li>
                         }
                     </ul>
