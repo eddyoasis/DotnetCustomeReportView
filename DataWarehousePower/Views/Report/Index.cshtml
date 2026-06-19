@@ -102,8 +102,8 @@
         <div class="card mb-3 shadow-sm">
             <div class="card-header fw-semibold">Data Filters</div>
             <div class="card-body">
-                <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
-                    <input type="hidden" name="clientCode" value="@Model.ClientCode" />
+                <form id="report-filter-form" method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
+                    <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
 
                     <div class="col-md-4">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
@@ -315,6 +315,8 @@
         const exportButton = document.getElementById('btn-export');
         const exportFormatSelect = document.getElementById('export-format');
         const exportStatus = document.getElementById('export-status');
+        const filterForm = document.getElementById('report-filter-form');
+        const filterSchemaTemplateInput = document.getElementById('filter-schema-template');
         const filterClientCodeInput = document.getElementById('filter-client-code');
         const filterDateFromInput = document.getElementById('filter-date-from');
         const filterDateToInput = document.getElementById('filter-date-to');
@@ -1005,6 +1007,12 @@
 
         function getSelectedExportFormats() {
             return [...exportFormatSelect.selectedOptions].map(option => option.value);
+        }
+
+        if (filterForm && filterSchemaTemplateInput) {
+            filterForm.addEventListener('submit', () => {
+                filterSchemaTemplateInput.value = getActiveSchemaTemplate();
+            });
         }
 
         syncSchemaTemplateUi(initialSchemaTemplate);
