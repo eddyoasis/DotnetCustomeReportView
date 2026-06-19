@@ -6,10 +6,10 @@ namespace DataWarehousePower.Repositories
     {
         Task<UserColumnPreference?> GetAsync(string userId, int reportDefinitionId, string? clientCode);
         Task<UserColumnPreference?> GetByIdAsync(string userId, int reportDefinitionId, int preferenceId);
-        Task<List<string>> GetClientCodesAsync(string userId, int reportDefinitionId);
-        Task<Dictionary<string, int>> GetClientCodePreferenceIdsAsync(string userId, int reportDefinitionId);
+        Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportDefinitionId);
+        Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportDefinitionId);
         Task<int> UpsertAsync(UserColumnPreference preference, int? preferenceId = null);
-        Task UpdateClientCodeAsync(string userId, int reportDefinitionId, int preferenceId, string newClientCode);
+        Task UpdateSchemaTemplateAsync(string userId, int reportDefinitionId, int preferenceId, string newSchemaTemplate);
         Task DeleteAsync(string userId, int reportDefinitionId, int preferenceId);
     }
 }

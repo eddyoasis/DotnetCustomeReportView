@@ -13,8 +13,8 @@
                 @foreach (var r in Model.AllReports)
                 {
                     var targetClientCode = !string.IsNullOrWhiteSpace(Model.ClientCode)
-                        && Model.ReportClientCodesByReportId.TryGetValue(r.Id, out var reportClientCodes)
-                        && reportClientCodes.Any(code => code.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase))
+                        && Model.ReportSchemaTemplatesByReportId.TryGetValue(r.Id, out var reportSchemaTemplates)
+                        && reportSchemaTemplates.Any(code => code.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase))
                             ? Model.ClientCode
                             : null;
 
@@ -22,8 +22,8 @@
                                 <a href="@Url.Action("Index", "Report", new
                                          {
                                              id = r.Id,
-                                             clientCode = targetClientCode,
-                                             filterClientCode = Model.FilterClientCode,
+                                             schemaTemplate = targetClientCode,
+                                             filterSchemaTemplate = Model.FilterClientCode,
                                              dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
                                              dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")
                                          })"
@@ -42,18 +42,18 @@
 
         <div class="mb-2">
             <h4 class="mb-1">@Model.ReportName</h4>
-            <div class="text-muted small">Choose a client code to load and save a separate column layout.</div>
+            <div class="text-muted small">Choose a schema template to load and save a separate column layout.</div>
         </div>
 
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body py-2 px-3">
-                <label for="client-code-select" class="form-label small fw-semibold mb-1">Client Code</label>
+                <label for="client-code-select" class="form-label small fw-semibold mb-1">Schema Template</label>
                 <div class="d-flex gap-2 align-items-center flex-nowrap">
                     <select id="client-code-select" class="d-none" aria-hidden="true">
                         <option value="">Default</option>
-                        @foreach (var availableClientCode in Model.AvailableClientCodes)
+                        @foreach (var availableSchemaTemplate in Model.AvailableSchemaTemplates)
                         {
-                            <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                            <option value="@availableSchemaTemplate" selected="@(availableSchemaTemplate.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableSchemaTemplate</option>
                         }
                     </select>
 
@@ -103,17 +103,17 @@
             <div class="card-header fw-semibold">Data Filters</div>
             <div class="card-body">
                 <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
-                    <input type="hidden" name="clientCode" value="@Model.ClientCode" />
+                    <input type="hidden" name="schemaTemplate" value="@Model.ClientCode" />
 
                     <div class="col-md-4">
-                        <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
+                           <label for="filter-client-code" class="form-label small fw-semibold">FilterSchemaTemplate</label>
                         <input id="filter-client-code"
-                               name="filterClientCode"
+                               name="filterSchemaTemplate"
                                type="text"
                                class="form-control form-control-sm"
                                maxlength="128"
                                value="@Model.FilterClientCode"
-                               placeholder="Enter client code" />
+                               placeholder="Enter schema template" />
                     </div>
 
                     <div class="col-md-3">
@@ -137,7 +137,7 @@
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                         <a class="btn btn-sm btn-outline-secondary w-100"
-                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, clientCode = Model.ClientCode })">Clear</a>
+                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, schemaTemplate = Model.ClientCode })">Clear</a>
                     </div>
                 </form>
             </div>
@@ -294,9 +294,9 @@
 @section Scripts {
 <script>
 const reportId = @Model.ReportId;
-const initialClientCode = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCode));
+const initialSchemaTemplate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCode));
 const initialPreferenceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ActivePreferenceId));
-const clientCodePreferenceIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ClientCodePreferenceIds));
+const schemaTemplatePreferenceIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SchemaTemplatePreferenceIds));
 let activePreferenceId = initialPreferenceId;
 const clientCodeSearchInput = document.getElementById('client-code-search');
 const clientCodeDropdownToggle = document.getElementById('client-code-dropdown-toggle');
@@ -500,7 +500,7 @@ async function saveColumnsAsync(isAutoSave) {
         const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ clientCode: activeClientCode, preferenceId: activePreferenceId, columns })
+            body:    JSON.stringify({ schemaTemplate: activeClientCode, preferenceId: activePreferenceId, columns })
         });
         const json = await resp.json();
         if (resp.ok && json.success) {
@@ -567,7 +567,7 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
         const resp = await fetch(`/Report/${reportId}/SavePreferences`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ clientCode: activeClientCode, preferenceId: activePreferenceId, columns: defaultColumns })
+            body:    JSON.stringify({ schemaTemplate: activeClientCode, preferenceId: activePreferenceId, columns: defaultColumns })
         });
         const json = await resp.json();
         if (resp.ok && json.success) {
@@ -611,9 +611,9 @@ function navigateToClientCode(value) {
     const url = new URL(window.location.href);
 
     if (trimmed) {
-        url.searchParams.set('clientCode', trimmed);
+        url.searchParams.set('schemaTemplate', trimmed);
     } else {
-        url.searchParams.delete('clientCode');
+        url.searchParams.delete('schemaTemplate');
     }
 
     window.location.href = url.toString();
@@ -652,7 +652,7 @@ async function applyNewClientCodeAsync() {
         const response = await fetch(`/Report/${reportId}/SavePreferences`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientCode: newClientCode, preferenceId: null, columns })
+            body: JSON.stringify({ schemaTemplate: newClientCode, preferenceId: null, columns })
         });
 
         const json = await response.json();
@@ -703,10 +703,10 @@ function upsertClientCodeOption(value, preferenceId) {
     }
 
     if (typeof preferenceId === 'number') {
-        Object.keys(clientCodePreferenceIds)
+        Object.keys(schemaTemplatePreferenceIds)
             .filter(key => key.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0 && key !== normalizedValue)
-            .forEach(key => delete clientCodePreferenceIds[key]);
-        clientCodePreferenceIds[normalizedValue] = preferenceId;
+            .forEach(key => delete schemaTemplatePreferenceIds[key]);
+        schemaTemplatePreferenceIds[normalizedValue] = preferenceId;
     }
 
     const existingOption = [...clientCodeSelect.options].find(option =>
@@ -743,10 +743,10 @@ function getPreferenceIdForClientCode(clientCode) {
         return null;
     }
 
-    const exactKey = Object.keys(clientCodePreferenceIds).find(key =>
+    const exactKey = Object.keys(schemaTemplatePreferenceIds).find(key =>
         key.localeCompare(normalized, undefined, { sensitivity: 'accent' }) === 0);
 
-    return typeof exactKey === 'string' ? clientCodePreferenceIds[exactKey] : null;
+    return typeof exactKey === 'string' ? schemaTemplatePreferenceIds[exactKey] : null;
 }
 
 async function renameClientCodeAsync() {
@@ -775,10 +775,10 @@ async function renameClientCodeAsync() {
     statusEl.className   = 'small align-self-center ms-1 text-muted';
 
     try {
-        const response = await fetch(`/Report/${reportId}/UpdateClientCode`, {
+        const response = await fetch(`/Report/${reportId}/UpdateSchemaTemplate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ preferenceId: activePreferenceId, newClientCode })
+            body: JSON.stringify({ preferenceId: activePreferenceId, newSchemaTemplate: newClientCode })
         });
 
         const json = await response.json();
@@ -790,16 +790,16 @@ async function renameClientCodeAsync() {
         }
 
         if (currentClientCode) {
-            delete clientCodePreferenceIds[currentClientCode];
+            delete schemaTemplatePreferenceIds[currentClientCode];
             removeClientCodeOption(currentClientCode);
         }
 
         activePreferenceId = json.preferenceId;
-        upsertClientCodeOption(json.clientCode, activePreferenceId);
-        syncClientCodeUi(json.clientCode);
+        upsertClientCodeOption(json.schemaTemplate, activePreferenceId);
+        syncClientCodeUi(json.schemaTemplate);
         statusEl.textContent = '✓ Renamed';
         statusEl.className   = 'small align-self-center ms-1 text-success';
-        navigateToClientCode(json.clientCode);
+        navigateToClientCode(json.schemaTemplate);
     } catch {
         showClientCodeError('Network error while renaming client code.');
         statusEl.textContent = '✗ Network error';
@@ -830,7 +830,7 @@ async function deleteClientCodeAsync() {
     statusEl.className   = 'small align-self-center ms-1 text-muted';
 
     try {
-        const response = await fetch(`/Report/${reportId}/DeleteClientCode`, {
+        const response = await fetch(`/Report/${reportId}/DeleteSchemaTemplate`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ preferenceId: activePreferenceId })
@@ -844,7 +844,7 @@ async function deleteClientCodeAsync() {
             return;
         }
 
-        delete clientCodePreferenceIds[selectedClientCode];
+        delete schemaTemplatePreferenceIds[selectedClientCode];
         removeClientCodeOption(selectedClientCode);
         activePreferenceId = null;
         statusEl.textContent = '✓ Deleted';
@@ -957,8 +957,8 @@ async function exportReportAsync(format, password) {
         format: formats[0] || null,
         formats,
         password,
-        clientCode: getActiveClientCode(),
-        filterClientCode: filterClientCodeInput.value.trim() || null,
+        schemaTemplate: getActiveClientCode(),
+        filterSchemaTemplate: filterClientCodeInput.value.trim() || null,
         dateFrom: filterDateFromInput.value || null,
         dateTo: filterDateToInput.value || null
     };
@@ -1005,6 +1005,6 @@ function getSelectedExportFormats() {
     return [...exportFormatSelect.selectedOptions].map(option => option.value);
 }
 
-syncClientCodeUi(initialClientCode);
+syncClientCodeUi(initialSchemaTemplate);
 </script>
 }

@@ -319,7 +319,7 @@ public sealed class ScheduledReportJobService(
 
         foreach (ReportDefinitionLookupItem report in reports)
         {
-            clientCodesByReportId[report.Id] = await columnPreferenceRepository.GetClientCodesAsync(userId, report.Id);
+            clientCodesByReportId[report.Id] = await columnPreferenceRepository.GetSchemaTemplatesAsync(userId, report.Id);
         }
 
         return clientCodesByReportId;

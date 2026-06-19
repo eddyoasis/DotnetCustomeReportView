@@ -12,9 +12,9 @@ namespace DataWarehousePower.Models
         public string FilterClientCode { get; set; } = string.Empty;
         public DateTime? FilterDateFrom { get; set; }
         public DateTime? FilterDateTo { get; set; }
-        public List<string> AvailableClientCodes { get; set; } = new();
-        public Dictionary<string, int> ClientCodePreferenceIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<int, List<string>> ReportClientCodesByReportId { get; set; } = new();
+        public List<string> AvailableSchemaTemplates { get; set; } = new();
+        public Dictionary<string, int> SchemaTemplatePreferenceIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<int, List<string>> ReportSchemaTemplatesByReportId { get; set; } = new();
 
         /// <summary>All columns defined for this report (from ReportColumns table).</summary>
         public List<ColumnDefinition> AvailableColumns { get; set; } = new();

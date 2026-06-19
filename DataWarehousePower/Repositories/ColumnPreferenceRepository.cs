@@ -42,7 +42,7 @@ namespace DataWarehousePower.Repositories
                                        && p.UserId == userId
                                        && p.ReportDefinitionId == reportDefinitionId);
 
-        public async Task<List<string>> GetClientCodesAsync(string userId, int reportDefinitionId)
+        public async Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportDefinitionId)
             => await _context.UserColumnPreferences
                 .AsNoTracking()
                 .Where(p => p.UserId == userId
@@ -50,10 +50,10 @@ namespace DataWarehousePower.Repositories
                          && p.SchemaTemplate != string.Empty)
                 .Select(p => p.SchemaTemplate)
                 .Distinct()
-                .OrderBy(clientCode => clientCode)
+                .OrderBy(schemaTemplate => schemaTemplate)
                 .ToListAsync();
 
-        public async Task<Dictionary<string, int>> GetClientCodePreferenceIdsAsync(string userId, int reportDefinitionId)
+            public async Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportDefinitionId)
             => await _context.UserColumnPreferences
                 .AsNoTracking()
                 .Where(p => p.UserId == userId
@@ -107,10 +107,10 @@ namespace DataWarehousePower.Repositories
             }
         }
 
-        public async Task UpdateClientCodeAsync(string userId, int reportDefinitionId, int preferenceId, string newClientCode)
+        public async Task UpdateSchemaTemplateAsync(string userId, int reportDefinitionId, int preferenceId, string newSchemaTemplate)
         {
-            string normalizedClientCode = NormalizeClientCode(newClientCode);
-            if (normalizedClientCode.Length == 0)
+            string normalizedSchemaTemplate = NormalizeClientCode(newSchemaTemplate);
+            if (normalizedSchemaTemplate.Length == 0)
                 throw new InvalidOperationException("Client code cannot be blank.");
 
             UserColumnPreference? existing = await _context.UserColumnPreferences
@@ -121,10 +121,10 @@ namespace DataWarehousePower.Repositories
             if (existing is null)
                 throw new InvalidOperationException("Preference scope not found.");
 
-            string currentClientCode = existing.SchemaTemplate;
+            string currentSchemaTemplate = existing.SchemaTemplate;
             List<UserColumnPreference> matchingPreferences = await _context.UserColumnPreferences
                 .Where(p => p.UserId == userId
-                         && p.SchemaTemplate == currentClientCode)
+                         && p.SchemaTemplate == currentSchemaTemplate)
                 .ToListAsync();
 
             if (matchingPreferences.Count == 0)
@@ -141,14 +141,14 @@ namespace DataWarehousePower.Repositories
             bool duplicateScopeExists = await _context.UserColumnPreferences
                 .AnyAsync(p => p.UserId == userId
                             && matchingReportIds.Contains(p.ReportDefinitionId)
-                            && p.SchemaTemplate == normalizedClientCode
+                            && p.SchemaTemplate == normalizedSchemaTemplate
                             && !matchingPreferenceIds.Contains(p.Id));
             if (duplicateScopeExists)
                 throw new InvalidOperationException("Client code scope already exists for one or more reports.");
 
             foreach (UserColumnPreference preference in matchingPreferences)
             {
-                preference.SchemaTemplate = normalizedClientCode;
+                preference.SchemaTemplate = normalizedSchemaTemplate;
             }
 
             await _context.SaveChangesAsync();

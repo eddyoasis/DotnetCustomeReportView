@@ -39,7 +39,7 @@ namespace DataWarehousePower.Services
             DateTime? dateTo = null)
         {
             string normalizedClientCode = NormalizeClientCode(clientCode);
-            string normalizedFilterClientCode = NormalizeNullableClientCode(filterClientCode);
+            string? normalizedFilterClientCode = NormalizeNullableClientCode(filterClientCode);
             var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
             if (report is null) return null;
 
@@ -84,13 +84,13 @@ namespace DataWarehousePower.Services
 
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync();
-            List<string> savedClientCodes = await _prefRepo.GetClientCodesAsync(userId, reportId);
-            Dictionary<string, int> clientCodePreferenceIds = await _prefRepo.GetClientCodePreferenceIdsAsync(userId, reportId);
-            Dictionary<int, List<string>> reportClientCodesByReportId = await BuildReportClientCodesByReportIdAsync(userId, allReports);
-            List<string> availableClientCodes = BuildAvailableClientCodes(
+            List<string> savedSchemaTemplates = await _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
+            Dictionary<string, int> schemaTemplatePreferenceIds = await _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
+            Dictionary<int, List<string>> reportSchemaTemplatesByReportId = await BuildReportSchemaTemplatesByReportIdAsync(userId, allReports);
+            List<string> availableSchemaTemplates = BuildAvailableSchemaTemplates(
                 normalizedClientCode,
                 ExtractClientCodes(rows),
-                savedClientCodes);
+                savedSchemaTemplates);
 
             return new ReportViewModel
             {
@@ -101,9 +101,9 @@ namespace DataWarehousePower.Services
                 FilterClientCode = normalizedFilterClientCode ?? string.Empty,
                 FilterDateFrom   = dateFrom,
                 FilterDateTo     = dateTo,
-                AvailableClientCodes = availableClientCodes,
-                ClientCodePreferenceIds = clientCodePreferenceIds,
-                ReportClientCodesByReportId = reportClientCodesByReportId,
+                AvailableSchemaTemplates = availableSchemaTemplates,
+                SchemaTemplatePreferenceIds = schemaTemplatePreferenceIds,
+                ReportSchemaTemplatesByReportId = reportSchemaTemplatesByReportId,
                 AvailableColumns = systemColumns,
                 DisplayColumns   = displayColumns,
                 Rows             = rows,
@@ -153,8 +153,8 @@ namespace DataWarehousePower.Services
             }, preferenceId);
         }
 
-        public Task UpdateClientCodeAsync(int reportId, string userId, int preferenceId, string newClientCode)
-            => _prefRepo.UpdateClientCodeAsync(userId, reportId, preferenceId, newClientCode);
+        public Task UpdateSchemaTemplateAsync(int reportId, string userId, int preferenceId, string newSchemaTemplate)
+            => _prefRepo.UpdateSchemaTemplateAsync(userId, reportId, preferenceId, newSchemaTemplate);
 
         public Task DeletePreferenceAsync(int reportId, string userId, int preferenceId)
             => _prefRepo.DeleteAsync(userId, reportId, preferenceId);
@@ -221,7 +221,7 @@ namespace DataWarehousePower.Services
             return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
-        private static List<string> BuildAvailableClientCodes(
+        private static List<string> BuildAvailableSchemaTemplates(
             string currentClientCode,
             IEnumerable<string> rowClientCodes,
             IEnumerable<string> savedClientCodes)
@@ -242,18 +242,18 @@ namespace DataWarehousePower.Services
                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                    .ToList();
 
-        private async Task<Dictionary<int, List<string>>> BuildReportClientCodesByReportIdAsync(
+        private async Task<Dictionary<int, List<string>>> BuildReportSchemaTemplatesByReportIdAsync(
             string userId,
             IEnumerable<ReportDefinition> reports)
         {
-            Dictionary<int, List<string>> clientCodesByReportId = new();
+            Dictionary<int, List<string>> schemaTemplatesByReportId = new();
 
             foreach (ReportDefinition report in reports)
             {
-                clientCodesByReportId[report.Id] = await _prefRepo.GetClientCodesAsync(userId, report.Id);
+                schemaTemplatesByReportId[report.Id] = await _prefRepo.GetSchemaTemplatesAsync(userId, report.Id);
             }
 
-            return clientCodesByReportId;
+            return schemaTemplatesByReportId;
         }
 
         private static string? FindClientCodeValue(Dictionary<string, object?> row)

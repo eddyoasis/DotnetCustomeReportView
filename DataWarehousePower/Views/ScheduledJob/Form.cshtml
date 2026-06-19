@@ -301,7 +301,7 @@
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
             const clientCodeOptions = document.getElementById('scheduled-client-code-options');
             const clientCodeClearButton = document.getElementById('scheduled-client-code-clear');
-            const availableClientCodesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableSchemaTemplatesByReportId));
+            const availableSchemaTemplatesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableSchemaTemplatesByReportId));
 
             if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !customDaysGroup || !cronGroup) {
                 return;
@@ -384,11 +384,11 @@
                 }
 
                 const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
-                const reportClientCodes = Number.isFinite(selectedReportId)
-                    ? (availableClientCodesByReportId[selectedReportId] || [])
+                const reportSchemaTemplates = Number.isFinite(selectedReportId)
+                    ? (availableSchemaTemplatesByReportId[selectedReportId] || [])
                     : [];
 
-                const distinctClientCodes = [...new Set(reportClientCodes
+                const distinctClientCodes = [...new Set(reportSchemaTemplates
                     .map(clientCode => (clientCode || '').trim())
                     .filter(clientCode => clientCode.length > 0)
                     .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' })))];

@@ -27,7 +27,7 @@ namespace DataWarehousePower.Services
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns);
 
-        Task UpdateClientCodeAsync(int reportId, string userId, int preferenceId, string newClientCode);
+        Task UpdateSchemaTemplateAsync(int reportId, string userId, int preferenceId, string newSchemaTemplate);
         Task DeletePreferenceAsync(int reportId, string userId, int preferenceId);
     }
 }

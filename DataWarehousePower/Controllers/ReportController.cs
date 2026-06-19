@@ -35,13 +35,13 @@ namespace DataWarehousePower.Controllers
         // GET /Report/{id}
         public async Task<IActionResult> Index(
             int id,
-            string? clientCode = null,
-            string? filterClientCode = null,
+            string? schemaTemplate = null,
+            string? filterSchemaTemplate = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, clientCode, filterClientCode, dateFrom, dateTo);
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, schemaTemplate, filterSchemaTemplate, dateFrom, dateTo);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -51,8 +51,8 @@ namespace DataWarehousePower.Controllers
 
         // GET /Report/List → redirect to first available report
         public async Task<IActionResult> List(
-            string? clientCode = null,
-            string? filterClientCode = null,
+            string? schemaTemplate = null,
+            string? filterSchemaTemplate = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
@@ -60,7 +60,7 @@ namespace DataWarehousePower.Controllers
             if (reports.Count == 0)
                 return View("NoReports");
 
-            return RedirectToAction(nameof(Index), new { id = reports[0].Id, clientCode, filterClientCode, dateFrom, dateTo });
+            return RedirectToAction(nameof(Index), new { id = reports[0].Id, schemaTemplate, filterSchemaTemplate, dateFrom, dateTo });
         }
 
         // POST /Report/{id}/SavePreferences  (AJAX)
@@ -68,19 +68,21 @@ namespace DataWarehousePower.Controllers
         public async Task<IActionResult> SavePreferences(int id,
             [FromBody] SavePreferencesRequest? request)
         {
-            if (request?.Columns == null || request.Columns.Count == 0)
+            if (request is null || request.Columns == null || request.Columns.Count == 0)
                 return BadRequest(new { success = false, error = "No columns supplied." });
+
+            SavePreferencesRequest requestModel = request;
 
             var userId = _prefService.ResolveUserId(HttpContext);
 
             // Load the system columns for this report to validate against
-            var vm = await _reportService.BuildReportViewModelAsync(id, userId, request?.ClientCode);
+            var vm = await _reportService.BuildReportViewModelAsync(id, userId, requestModel.SchemaTemplate);
             if (vm is null)
                 return NotFound(new { success = false, error = "Report not found." });
 
             try
             {
-                int preferenceId = await _prefService.SavePreferencesAsync(userId, id, request.ClientCode, request.PreferenceId, request.Columns, vm.AvailableColumns);
+                int preferenceId = await _prefService.SavePreferencesAsync(userId, id, requestModel.SchemaTemplate, requestModel.PreferenceId, requestModel.Columns, vm.AvailableColumns);
                 return Ok(new { success = true, preferenceId });
             }
             catch (InvalidOperationException ex)
@@ -89,27 +91,27 @@ namespace DataWarehousePower.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to save preferences for user {UserId} report {ReportId} client code {ClientCode}", userId, id, request?.ClientCode);
+                _logger.LogError(ex, "Failed to save preferences for user {UserId} report {ReportId} schema template {SchemaTemplate}", userId, id, requestModel.SchemaTemplate);
                 return StatusCode(500, new { success = false, error = "Failed to save preferences." });
             }
         }
 
-        // POST /Report/{id}/UpdateClientCode  (AJAX)
+        // POST /Report/{id}/UpdateSchemaTemplate  (AJAX)
         [HttpPost]
-        public async Task<IActionResult> UpdateClientCode(int id, [FromBody] UpdateClientCodeRequest? request)
+        public async Task<IActionResult> UpdateSchemaTemplate(int id, [FromBody] UpdateSchemaTemplateRequest? request)
         {
             if (request is null || request.PreferenceId <= 0)
                 return BadRequest(new { success = false, error = "Valid preference id is required." });
 
-            if (string.IsNullOrWhiteSpace(request.NewClientCode))
-                return BadRequest(new { success = false, error = "New client code cannot be blank." });
+            if (string.IsNullOrWhiteSpace(request.NewSchemaTemplate))
+                return BadRequest(new { success = false, error = "New schema template cannot be blank." });
 
             string userId = _prefService.ResolveUserId(HttpContext);
 
             try
             {
-                await _prefService.UpdateClientCodeAsync(userId, id, request.PreferenceId, request.NewClientCode);
-                return Ok(new { success = true, preferenceId = request.PreferenceId, clientCode = request.NewClientCode.Trim() });
+                await _prefService.UpdateSchemaTemplateAsync(userId, id, request.PreferenceId, request.NewSchemaTemplate);
+                return Ok(new { success = true, preferenceId = request.PreferenceId, schemaTemplate = request.NewSchemaTemplate.Trim() });
             }
             catch (InvalidOperationException ex)
             {
@@ -118,13 +120,13 @@ namespace DataWarehousePower.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update preference scope for user {UserId} report {ReportId} preference {PreferenceId}", userId, id, request.PreferenceId);
-                return StatusCode(500, new { success = false, error = "Failed to update client code scope." });
+                return StatusCode(500, new { success = false, error = "Failed to update schema template scope." });
             }
         }
 
-        // DELETE /Report/{id}/DeleteClientCode  (AJAX)
+        // DELETE /Report/{id}/DeleteSchemaTemplate  (AJAX)
         [HttpDelete]
-        public async Task<IActionResult> DeleteClientCode(int id, [FromBody] DeleteClientCodeRequest? request)
+        public async Task<IActionResult> DeleteSchemaTemplate(int id, [FromBody] DeleteSchemaTemplateRequest? request)
         {
             if (request is null || request.PreferenceId <= 0)
                 return BadRequest(new { success = false, error = "Valid preference id is required." });
@@ -143,7 +145,7 @@ namespace DataWarehousePower.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to delete preference scope for user {UserId} report {ReportId} preference {PreferenceId}", userId, id, request.PreferenceId);
-                return StatusCode(500, new { success = false, error = "Failed to delete client code scope." });
+                return StatusCode(500, new { success = false, error = "Failed to delete schema template scope." });
             }
         }
 
@@ -174,7 +176,7 @@ namespace DataWarehousePower.Controllers
 
             if (normalizedFormats.Count == 0)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "At least one format must be selected.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "At least one format must be selected.", cancellationToken);
                 return BadRequest(new { success = false, error = "At least one format is required. Use CSV, Excel, or PDF." });
             }
 
@@ -182,28 +184,28 @@ namespace DataWarehousePower.Controllers
             string normalizedFormatsAuditValue = string.Join(",", normalizedFormats);
             if (hasInvalidFormat)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
                 return BadRequest(new { success = false, error = "Invalid format selection. Use CSV, Excel, or PDF." });
             }
 
             string? passwordValidationError = ValidatePasswordStrength(request.Password);
             if (passwordValidationError is not null)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
                 return BadRequest(new { success = false, error = passwordValidationError });
             }
 
             ReportViewModel? vm = await _reportService.BuildReportViewModelAsync(
                 id,
                 userId,
-                request.ClientCode,
-                request.FilterClientCode,
+                request.SchemaTemplate,
+                request.FilterSchemaTemplate,
                 request.DateFrom,
                 request.DateTo);
 
             if (vm is null)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
                 return NotFound(new { success = false, error = "Report not found." });
             }
 
@@ -218,26 +220,26 @@ namespace DataWarehousePower.Controllers
                 string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
                 string zipFileName = $"{reportName}_export.zip";
 
-                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
 
                 return File(zipBytes, "application/zip", zipFileName);
             }
             catch (ArgumentException argumentException)
             {
                 _logger.LogWarning(argumentException, "Invalid export request for report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = argumentException.Message });
             }
             catch (InvalidOperationException invalidOperationException)
             {
                 _logger.LogWarning(invalidOperationException, "Export validation failed for report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = invalidOperationException.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to export report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.FilterSchemaTemplate, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
                 return StatusCode(500, new { success = false, error = "Failed to export report." });
             }
         }
@@ -282,18 +284,18 @@ namespace DataWarehousePower.Controllers
 
     public class SavePreferencesRequest
     {
-        public string? ClientCode { get; set; }
+        public string? SchemaTemplate { get; set; }
         public int? PreferenceId { get; set; }
         public List<SaveColumnRequest> Columns { get; set; } = new();
     }
 
-    public class UpdateClientCodeRequest
+    public class UpdateSchemaTemplateRequest
     {
         public int PreferenceId { get; set; }
-        public string NewClientCode { get; set; } = string.Empty;
+        public string NewSchemaTemplate { get; set; } = string.Empty;
     }
 
-    public class DeleteClientCodeRequest
+    public class DeleteSchemaTemplateRequest
     {
         public int PreferenceId { get; set; }
     }

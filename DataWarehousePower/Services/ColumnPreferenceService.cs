@@ -50,8 +50,8 @@ namespace DataWarehousePower.Services
             IReadOnlyList<ColumnDefinition> systemColumns)
             => _reportService.SavePreferencesAsync(reportId, userId, clientCode, preferenceId, columns, systemColumns);
 
-        public Task UpdateClientCodeAsync(string userId, int reportId, int preferenceId, string newClientCode)
-            => _reportService.UpdateClientCodeAsync(reportId, userId, preferenceId, newClientCode);
+        public Task UpdateSchemaTemplateAsync(string userId, int reportId, int preferenceId, string newSchemaTemplate)
+            => _reportService.UpdateSchemaTemplateAsync(reportId, userId, preferenceId, newSchemaTemplate);
 
         public Task DeletePreferenceAsync(string userId, int reportId, int preferenceId)
             => _reportService.DeletePreferenceAsync(reportId, userId, preferenceId);
