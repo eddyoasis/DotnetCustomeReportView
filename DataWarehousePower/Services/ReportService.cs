@@ -148,7 +148,7 @@ namespace DataWarehousePower.Services
             {
                 UserId             = userId,
                 ReportDefinitionId = reportId,
-                ClientCode         = normalizedClientCode,
+                SchemaTemplate         = normalizedClientCode,
                 ColumnJson         = JsonSerializer.Serialize(entries)
             }, preferenceId);
         }

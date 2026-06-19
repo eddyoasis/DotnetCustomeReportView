@@ -20,7 +20,7 @@ namespace DataWarehousePower.Models
         public int ReportDefinitionId { get; set; }
 
         [MaxLength(128)]
-        public string ClientCode { get; set; } = string.Empty;
+        public string SchemaTemplate { get; set; } = string.Empty;
 
         [Required]
         public string ColumnJson { get; set; } = "[]";

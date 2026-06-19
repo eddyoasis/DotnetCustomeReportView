@@ -21,7 +21,7 @@ namespace DataWarehousePower.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.UserId == userId
                                        && p.ReportDefinitionId == reportDefinitionId
-                                       && p.ClientCode == normalizedClientCode);
+                                       && p.SchemaTemplate == normalizedClientCode);
 
             if (scopedPreference is not null || normalizedClientCode.Length == 0)
             {
@@ -32,7 +32,7 @@ namespace DataWarehousePower.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.UserId == userId
                                        && p.ReportDefinitionId == reportDefinitionId
-                                       && p.ClientCode == string.Empty);
+                                       && p.SchemaTemplate == string.Empty);
         }
 
         public Task<UserColumnPreference?> GetByIdAsync(string userId, int reportDefinitionId, int preferenceId)
@@ -47,8 +47,8 @@ namespace DataWarehousePower.Repositories
                 .AsNoTracking()
                 .Where(p => p.UserId == userId
                          && p.ReportDefinitionId == reportDefinitionId
-                         && p.ClientCode != string.Empty)
-                .Select(p => p.ClientCode)
+                         && p.SchemaTemplate != string.Empty)
+                .Select(p => p.SchemaTemplate)
                 .Distinct()
                 .OrderBy(clientCode => clientCode)
                 .ToListAsync();
@@ -58,12 +58,12 @@ namespace DataWarehousePower.Repositories
                 .AsNoTracking()
                 .Where(p => p.UserId == userId
                          && p.ReportDefinitionId == reportDefinitionId
-                         && p.ClientCode != string.Empty)
-                .ToDictionaryAsync(p => p.ClientCode, p => p.Id, StringComparer.OrdinalIgnoreCase);
+                         && p.SchemaTemplate != string.Empty)
+                .ToDictionaryAsync(p => p.SchemaTemplate, p => p.Id, StringComparer.OrdinalIgnoreCase);
 
         public async Task<int> UpsertAsync(UserColumnPreference preference, int? preferenceId = null)
         {
-            preference.ClientCode = NormalizeClientCode(preference.ClientCode);
+            preference.SchemaTemplate = NormalizeClientCode(preference.SchemaTemplate);
 
             UserColumnPreference? existing;
             if (preferenceId.HasValue)
@@ -81,7 +81,7 @@ namespace DataWarehousePower.Repositories
                 existing = await _context.UserColumnPreferences
                     .FirstOrDefaultAsync(p => p.UserId == preference.UserId
                                            && p.ReportDefinitionId == preference.ReportDefinitionId
-                                           && p.ClientCode == preference.ClientCode);
+                                           && p.SchemaTemplate == preference.SchemaTemplate);
             }
 
             if (existing is null)
@@ -96,11 +96,11 @@ namespace DataWarehousePower.Repositories
                     .AnyAsync(p => p.Id != existing.Id
                                 && p.UserId == preference.UserId
                                 && p.ReportDefinitionId == preference.ReportDefinitionId
-                                && p.ClientCode == preference.ClientCode);
+                                && p.SchemaTemplate == preference.SchemaTemplate);
                 if (duplicateScopeExists)
                     throw new InvalidOperationException("Client code scope already exists.");
 
-                existing.ClientCode = preference.ClientCode;
+                existing.SchemaTemplate = preference.SchemaTemplate;
                 existing.ColumnJson = preference.ColumnJson;
                 await _context.SaveChangesAsync();
                 return existing.Id;
@@ -121,10 +121,10 @@ namespace DataWarehousePower.Repositories
             if (existing is null)
                 throw new InvalidOperationException("Preference scope not found.");
 
-            string currentClientCode = existing.ClientCode;
+            string currentClientCode = existing.SchemaTemplate;
             List<UserColumnPreference> matchingPreferences = await _context.UserColumnPreferences
                 .Where(p => p.UserId == userId
-                         && p.ClientCode == currentClientCode)
+                         && p.SchemaTemplate == currentClientCode)
                 .ToListAsync();
 
             if (matchingPreferences.Count == 0)
@@ -141,14 +141,14 @@ namespace DataWarehousePower.Repositories
             bool duplicateScopeExists = await _context.UserColumnPreferences
                 .AnyAsync(p => p.UserId == userId
                             && matchingReportIds.Contains(p.ReportDefinitionId)
-                            && p.ClientCode == normalizedClientCode
+                            && p.SchemaTemplate == normalizedClientCode
                             && !matchingPreferenceIds.Contains(p.Id));
             if (duplicateScopeExists)
                 throw new InvalidOperationException("Client code scope already exists for one or more reports.");
 
             foreach (UserColumnPreference preference in matchingPreferences)
             {
-                preference.ClientCode = normalizedClientCode;
+                preference.SchemaTemplate = normalizedClientCode;
             }
 
             await _context.SaveChangesAsync();
