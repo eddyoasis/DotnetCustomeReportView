@@ -148,12 +148,13 @@
             <div class="card-body">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
-                        <label for="export-format" class="form-label small fw-semibold">Format</label>
-                        <select id="export-format" class="form-select form-select-sm">
+                        <label for="export-format" class="form-label small fw-semibold">Formats</label>
+                        <select id="export-format" class="form-select form-select-sm" multiple size="3">
                             <option value="csv">CSV</option>
                             <option value="excel">Excel (.xlsx)</option>
                             <option value="pdf">PDF</option>
                         </select>
+                        <div class="form-text">Hold Ctrl (or Cmd on Mac) to select multiple formats.</div>
                     </div>
                     <div class="col-md-8 d-flex gap-2">
                         <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
@@ -161,7 +162,7 @@
                     </div>
                 </div>
                 <div class="text-muted small mt-2">
-                    Choose a format, set a strong password, and download the report as a protected ZIP.
+                    Choose one or more formats, set a strong password, and download the report as a protected ZIP.
                 </div>
             </div>
         </div>
@@ -393,6 +394,13 @@ clientCodeNewInput.addEventListener('keydown', async e => {
 });
 
 exportButton.addEventListener('click', async () => {
+    const selectedFormats = getSelectedExportFormats();
+    if (!selectedFormats.length) {
+        exportStatus.textContent = 'Select at least one format.';
+        exportStatus.className = 'small align-self-center text-danger';
+        return;
+    }
+
     hideExportPasswordError();
     exportPasswordInput.value = '';
     exportPasswordModal.show();
@@ -410,7 +418,7 @@ exportConfirmButton.addEventListener('click', async () => {
 
     hideExportPasswordError();
     exportPasswordModal.hide();
-    await exportReportAsync(exportFormatSelect.value, password);
+    await exportReportAsync(getSelectedExportFormats(), password);
 });
 
 exportPasswordInput.addEventListener('keydown', async e => {
@@ -943,8 +951,11 @@ async function exportReportAsync(format, password) {
     exportStatus.className = 'small align-self-center text-muted';
     exportButton.disabled = true;
 
+    const formats = Array.isArray(format) ? format : [format];
+
     const payload = {
-        format,
+        format: formats[0] || null,
+        formats,
         password,
         clientCode: getActiveClientCode(),
         filterClientCode: filterClientCodeInput.value.trim() || null,
@@ -980,7 +991,7 @@ async function exportReportAsync(format, password) {
         anchor.remove();
         URL.revokeObjectURL(downloadUrl);
 
-        exportStatus.textContent = 'ZIP download started.';
+        exportStatus.textContent = `ZIP download started (${formats.length} format${formats.length === 1 ? '' : 's'}).`;
         exportStatus.className = 'small align-self-center text-success';
     } catch {
         exportStatus.textContent = 'Network error during export.';
@@ -988,6 +999,10 @@ async function exportReportAsync(format, password) {
     } finally {
         exportButton.disabled = false;
     }
+}
+
+function getSelectedExportFormats() {
+    return [...exportFormatSelect.selectedOptions].map(option => option.value);
 }
 
 syncClientCodeUi(initialClientCode);

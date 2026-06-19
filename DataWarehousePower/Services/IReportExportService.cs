@@ -6,7 +6,7 @@ namespace DataWarehousePower.Services
     {
         Task<byte[]> BuildPasswordProtectedZipAsync(
             ReportViewModel report,
-            string format,
+            IReadOnlyCollection<string> formats,
             string password,
             CancellationToken cancellationToken = default);
     }

@@ -161,17 +161,35 @@ namespace DataWarehousePower.Controllers
                 return BadRequest(new { success = false, error = "Export request is required." });
             }
 
-            string normalizedFormat = request.Format?.Trim().ToLowerInvariant() ?? string.Empty;
-            if (normalizedFormat is not ("csv" or "excel" or "pdf"))
+            List<string> normalizedFormats = (request.Formats ?? [])
+                .Where(format => !string.IsNullOrWhiteSpace(format))
+                .Select(format => format.Trim().ToLowerInvariant())
+                .Distinct()
+                .ToList();
+
+            if (normalizedFormats.Count == 0 && !string.IsNullOrWhiteSpace(request.Format))
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
-                return BadRequest(new { success = false, error = "Invalid format. Use CSV, Excel, or PDF." });
+                normalizedFormats.Add(request.Format.Trim().ToLowerInvariant());
+            }
+
+            if (normalizedFormats.Count == 0)
+            {
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "At least one format must be selected.", cancellationToken);
+                return BadRequest(new { success = false, error = "At least one format is required. Use CSV, Excel, or PDF." });
+            }
+
+            bool hasInvalidFormat = normalizedFormats.Any(format => format is not ("csv" or "excel" or "pdf"));
+            string normalizedFormatsAuditValue = string.Join(",", normalizedFormats);
+            if (hasInvalidFormat)
+            {
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Invalid format.", cancellationToken);
+                return BadRequest(new { success = false, error = "Invalid format selection. Use CSV, Excel, or PDF." });
             }
 
             string? passwordValidationError = ValidatePasswordStrength(request.Password);
             if (passwordValidationError is not null)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, passwordValidationError, cancellationToken);
                 return BadRequest(new { success = false, error = passwordValidationError });
             }
 
@@ -185,7 +203,7 @@ namespace DataWarehousePower.Controllers
 
             if (vm is null)
             {
-                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Report not found.", cancellationToken);
                 return NotFound(new { success = false, error = "Report not found." });
             }
 
@@ -193,33 +211,33 @@ namespace DataWarehousePower.Controllers
             {
                 byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
                     vm,
-                    normalizedFormat,
+                    normalizedFormats,
                     request.Password,
                     cancellationToken);
 
                 string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
                 string zipFileName = $"{reportName}_export.zip";
 
-                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
 
                 return File(zipBytes, "application/zip", zipFileName);
             }
             catch (ArgumentException argumentException)
             {
                 _logger.LogWarning(argumentException, "Invalid export request for report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, argumentException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = argumentException.Message });
             }
             catch (InvalidOperationException invalidOperationException)
             {
                 _logger.LogWarning(invalidOperationException, "Export validation failed for report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, invalidOperationException.Message, cancellationToken);
                 return BadRequest(new { success = false, error = invalidOperationException.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to export report {ReportId}", id);
-                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormat, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
+                await _auditLogService.LogExportAsync("ExportFailed", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.ClientCode, request.FilterClientCode, request.DateFrom, request.DateTo, "Unexpected export error.", cancellationToken);
                 return StatusCode(500, new { success = false, error = "Failed to export report." });
             }
         }

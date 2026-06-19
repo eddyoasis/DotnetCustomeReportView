@@ -13,16 +13,41 @@ namespace DataWarehousePower.Services
     {
         private readonly ILogger<ReportExportService> _logger = logger;
 
-        public async Task<byte[]> BuildPasswordProtectedZipAsync(
+        public Task<byte[]> BuildPasswordProtectedZipAsync(
             ReportViewModel report,
-            string format,
+            IReadOnlyCollection<string> formats,
             string password,
             CancellationToken cancellationToken = default)
         {
-            string normalizedFormat = format.Trim().ToLowerInvariant();
             if (string.IsNullOrWhiteSpace(password))
             {
                 throw new ArgumentException("Password is required.", nameof(password));
+            }
+
+            if (formats is null || formats.Count == 0)
+            {
+                throw new ArgumentException("At least one export format must be provided.", nameof(formats));
+            }
+
+            List<string> normalizedFormats = formats
+                .Where(format => !string.IsNullOrWhiteSpace(format))
+                .Select(format => format.Trim().ToLowerInvariant())
+                .Distinct()
+                .ToList();
+
+            if (normalizedFormats.Count == 0)
+            {
+                throw new ArgumentException("At least one export format must be provided.", nameof(formats));
+            }
+
+            List<string> invalidFormats = normalizedFormats
+                .Where(format => format is not ("csv" or "excel" or "pdf"))
+                .Distinct()
+                .ToList();
+
+            if (invalidFormats.Count > 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(formats), $"Unsupported format(s): {string.Join(", ", invalidFormats)}. Supported formats are CSV, Excel, and PDF.");
             }
 
             IReadOnlyList<ColumnDefinition> visibleColumns = report.DisplayColumns
@@ -35,19 +60,26 @@ namespace DataWarehousePower.Services
                 throw new InvalidOperationException("There are no visible columns to export.");
             }
 
-            (byte[] fileBytes, string extension) exportPayload = normalizedFormat switch
+            List<(string FileName, byte[] FileBytes)> exportFiles = [];
+            foreach (string normalizedFormat in normalizedFormats)
             {
-                "csv" => (BuildCsv(report.Rows, visibleColumns), "csv"),
-                "excel" => (BuildExcel(report.Rows, visibleColumns), "xlsx"),
-                "pdf" => (BuildPdf(report, visibleColumns), "pdf"),
-                _ => throw new ArgumentOutOfRangeException(nameof(format), "Supported formats are CSV, Excel, and PDF.")
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            string baseFileName = BuildSafeFileName(report.ReportName, normalizedFormat);
-            byte[] zipBytes = BuildPasswordProtectedZip(baseFileName, exportPayload.extension, exportPayload.fileBytes, password);
+                (byte[] fileBytes, string extension) exportPayload = normalizedFormat switch
+                {
+                    "csv" => (BuildCsv(report.Rows, visibleColumns), "csv"),
+                    "excel" => (BuildExcel(report.Rows, visibleColumns), "xlsx"),
+                    "pdf" => (BuildPdf(report, visibleColumns), "pdf"),
+                    _ => throw new ArgumentOutOfRangeException(nameof(formats), "Supported formats are CSV, Excel, and PDF.")
+                };
 
-            await Task.CompletedTask;
-            return zipBytes;
+                string baseFileName = BuildSafeFileName(report.ReportName, normalizedFormat);
+                exportFiles.Add(($"{baseFileName}.{exportPayload.extension}", exportPayload.fileBytes));
+            }
+
+            byte[] zipBytes = BuildPasswordProtectedZip(exportFiles, password);
+
+            return Task.FromResult(zipBytes);
         }
 
         private static byte[] BuildCsv(
@@ -202,7 +234,7 @@ namespace DataWarehousePower.Services
             return $"{sanitizedName}_{format}_{timestamp}";
         }
 
-        private byte[] BuildPasswordProtectedZip(string baseFileName, string extension, byte[] fileBytes, string password)
+        private byte[] BuildPasswordProtectedZip(IReadOnlyCollection<(string FileName, byte[] FileBytes)> files, string password)
         {
             try
             {
@@ -212,15 +244,19 @@ namespace DataWarehousePower.Services
                 zipOutputStream.SetLevel(9);
                 zipOutputStream.Password = password;
 
-                ZipEntry zipEntry = new($"{baseFileName}.{extension}")
+                foreach ((string fileName, byte[] fileBytes) in files)
                 {
-                    DateTime = DateTime.Now,
-                    Size = fileBytes.LongLength
-                };
+                    ZipEntry zipEntry = new(fileName)
+                    {
+                        DateTime = DateTime.Now,
+                        Size = fileBytes.LongLength
+                    };
 
-                zipOutputStream.PutNextEntry(zipEntry);
-                zipOutputStream.Write(fileBytes, 0, fileBytes.Length);
-                zipOutputStream.CloseEntry();
+                    zipOutputStream.PutNextEntry(zipEntry);
+                    zipOutputStream.Write(fileBytes, 0, fileBytes.Length);
+                    zipOutputStream.CloseEntry();
+                }
+
                 zipOutputStream.IsStreamOwner = false;
                 zipOutputStream.Close();
 
@@ -228,7 +264,7 @@ namespace DataWarehousePower.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to build password-protected ZIP for export file {BaseFileName}", baseFileName);
+                _logger.LogError(ex, "Failed to build password-protected ZIP for report export files.");
                 throw;
             }
         }

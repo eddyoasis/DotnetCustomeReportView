@@ -50,7 +50,7 @@ public sealed class ScheduledReportExecutionService(
 
         byte[] zipBytes = await reportExportService.BuildPasswordProtectedZipAsync(
             reportViewModel,
-            normalizedFormat,
+            [normalizedFormat],
             password);
 
         string baseDirectory = ResolveExportDirectory(job.ExportLocation);
