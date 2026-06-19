@@ -158,6 +158,7 @@
                     </div>
                     <div class="col-md-8 d-flex gap-2">
                         <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
+                        <button id="btn-schedule-report" type="button" class="btn btn-sm btn-outline-primary">Schedule Report</button>
                         <span id="export-status" class="small align-self-center"></span>
                     </div>
                 </div>
@@ -313,6 +314,7 @@
         const schemaTemplateError = document.getElementById('client-code-error');
         const schemaTemplateStatus = document.getElementById('client-code-status');
         const exportButton = document.getElementById('btn-export');
+        const scheduleReportButton = document.getElementById('btn-schedule-report');
         const exportFormatSelect = document.getElementById('export-format');
         const exportStatus = document.getElementById('export-status');
         const filterForm = document.getElementById('report-filter-form');
@@ -410,6 +412,24 @@
             exportPasswordModal.show();
             exportPasswordInput.focus();
         });
+
+        if (scheduleReportButton) {
+            scheduleReportButton.addEventListener('click', () => {
+                const scheduleUrl = new URL(`/Report/ScheduleReport/${reportId}`, window.location.origin);
+                const schemaTemplate = getActiveSchemaTemplate();
+                const clientCode = filterClientCodeInput.value.trim();
+
+                if (schemaTemplate) {
+                    scheduleUrl.searchParams.set('schemaTemplate', schemaTemplate);
+                }
+
+                if (clientCode) {
+                    scheduleUrl.searchParams.set('clientCode', clientCode);
+                }
+
+                window.location.href = scheduleUrl.toString();
+            });
+        }
 
         exportConfirmButton.addEventListener('click', async () => {
             const password = exportPasswordInput.value.trim();

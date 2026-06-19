@@ -114,6 +114,20 @@ public sealed class ScheduledReportJobService(
         return viewModel;
     }
 
+    public async Task<int?> FindExistingJobIdAsync(string userId, int reportDefinitionId, string? schemaTemplate, string? clientCode)
+    {
+        List<ScheduledReportJob> entities = await scheduledJobRepository.GetAllByUserIdAsync(userId);
+        string? normalizedSchemaTemplate = NormalizeNullable(schemaTemplate);
+        string? normalizedClientCode = NormalizeNullable(clientCode);
+
+        ScheduledReportJob? existingJob = entities.FirstOrDefault(entity =>
+            entity.ReportDefinitionId == reportDefinitionId
+            && string.Equals(NormalizeNullable(entity.SchemaTemplate), normalizedSchemaTemplate, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeNullable(entity.ClientCode), normalizedClientCode, StringComparison.OrdinalIgnoreCase));
+
+        return existingJob?.Id;
+    }
+
     public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId)
     {
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();

@@ -15,6 +15,7 @@ namespace DataWarehousePower.Controllers
         private readonly IReportService          _reportService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IReportExportService _exportService;
+        private readonly IScheduledReportJobService _scheduledReportJobService;
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<ReportController> _logger;
 
@@ -22,12 +23,14 @@ namespace DataWarehousePower.Controllers
             IReportService reportService,
             IColumnPreferenceService prefService,
             IReportExportService exportService,
+            IScheduledReportJobService scheduledReportJobService,
             IAuditLogService auditLogService,
             ILogger<ReportController> logger)
         {
             _reportService = reportService;
             _prefService   = prefService;
             _exportService = exportService;
+            _scheduledReportJobService = scheduledReportJobService;
             _auditLogService = auditLogService;
             _logger        = logger;
         }
@@ -61,6 +64,25 @@ namespace DataWarehousePower.Controllers
                 return View("NoReports");
 
             return RedirectToAction(nameof(Index), new { id = reports[0].Id, schemaTemplate, clientCode, dateFrom, dateTo });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ScheduleReport(int id, string? schemaTemplate = null, string? clientCode = null)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            int? existingJobId = await _scheduledReportJobService.FindExistingJobIdAsync(userId, id, schemaTemplate, clientCode);
+
+            if (existingJobId.HasValue)
+            {
+                return RedirectToAction("Edit", "ScheduledJob", new { id = existingJobId.Value });
+            }
+
+            return RedirectToAction("Create", "ScheduledJob", new
+            {
+                reportDefinitionId = id,
+                schemaTemplate,
+                clientCode
+            });
         }
 
         // POST /Report/{id}/SavePreferences  (AJAX)

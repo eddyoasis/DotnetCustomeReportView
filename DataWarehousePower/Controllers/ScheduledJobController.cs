@@ -19,10 +19,32 @@ public sealed class ScheduledJobController(
         return View(viewModel);
     }
 
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId);
+
+        if (reportDefinitionId.HasValue && reportDefinitionId.Value > 0)
+        {
+            viewModel.ReportDefinitionId = reportDefinitionId.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(schemaTemplate))
+        {
+            viewModel.SchemaTemplate = schemaTemplate.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(clientCode))
+        {
+            viewModel.ClientCode = clientCode.Trim();
+        }
+
+        if (viewModel.ReportDefinitionId > 0 &&
+            viewModel.AvailableSchemaTemplatesByReportId.TryGetValue(viewModel.ReportDefinitionId, out List<string>? reportSchemaTemplates))
+        {
+            viewModel.AvailableSchemaTemplates = reportSchemaTemplates;
+        }
+
         return View("Form", viewModel);
     }
 
