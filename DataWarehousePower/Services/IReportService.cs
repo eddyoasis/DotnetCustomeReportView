@@ -14,15 +14,15 @@ namespace DataWarehousePower.Services
         Task<ReportViewModel?> BuildReportViewModelAsync(
             int reportId,
             string userId,
+            string? schemaTemplate = null,
             string? clientCode = null,
-            string? filterClientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null);
 
         /// <summary>
         /// Persists the user's column preferences for a specific report.
         /// </summary>
-        Task<int> SavePreferencesAsync(int reportId, string userId, string? clientCode,
+        Task<int> SavePreferencesAsync(int reportId, string userId, string? schemaTemplate,
             int? preferenceId,
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns);

@@ -34,12 +34,12 @@ namespace DataWarehousePower.Services
             int reportId,
             string userId,
             string? schemaTemplate = null,
-            string? filterClientCode = null,
+            string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
             string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
-            string? normalizedFilterClientCode = NormalizeNullableClientCode(filterClientCode);
+            string? normalizedClientCode = NormalizeNullableClientCode(clientCode);
             var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
             if (report is null) return null;
 
@@ -68,7 +68,7 @@ namespace DataWarehousePower.Services
                 // only for labelling/ordering in the UI — not for filtering SELECT columns
                 rows = await _reportRepo.GetReportDataFromSpAsync(
                     report.SourceSP,
-                    normalizedFilterClientCode,
+                    normalizedClientCode,
                     dateFrom,
                     dateTo);
             }
@@ -98,7 +98,7 @@ namespace DataWarehousePower.Services
                 ReportName       = report.ReportName,
                 SchemaTemplate       = normalizedSchemaTemplate,
                 ActivePreferenceId = activePreferenceId,
-                FilterClientCode = normalizedFilterClientCode ?? string.Empty,
+                ClientCode = normalizedClientCode ?? string.Empty,
                 FilterDateFrom   = dateFrom,
                 FilterDateTo     = dateTo,
                 AvailableSchemaTemplates = availableSchemaTemplates,

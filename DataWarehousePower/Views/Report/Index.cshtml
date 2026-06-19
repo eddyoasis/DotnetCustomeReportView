@@ -23,7 +23,7 @@
                                          {
                                              id = r.Id,
                                              schemaTemplate = targetSchemaTemplate,
-                                             clientCode = Model.FilterClientCode,
+                                             clientCode = Model.ClientCode,
                                              dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
                                              dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")
                                          })"
@@ -103,7 +103,7 @@
             <div class="card-header fw-semibold">Data Filters</div>
             <div class="card-body">
                 <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
-                    <input type="hidden" name="clientCode" value="@Model.FilterClientCode" />
+                    <input type="hidden" name="clientCode" value="@Model.ClientCode" />
 
                     <div class="col-md-4">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
@@ -112,7 +112,7 @@
                                type="text"
                                class="form-control form-control-sm"
                                maxlength="128"
-                               value="@Model.FilterClientCode"
+                               value="@Model.ClientCode"
                                placeholder="Enter client code" />
                     </div>
 
@@ -137,7 +137,7 @@
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                         <a class="btn btn-sm btn-outline-secondary w-100"
-                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, schemaTemplate = Model.SchemaTemplate, clientCode = Model.FilterClientCode })">Clear</a>
+                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, schemaTemplate = Model.SchemaTemplate, clientCode = Model.ClientCode })">Clear</a>
                     </div>
                 </form>
             </div>

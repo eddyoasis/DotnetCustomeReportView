@@ -20,7 +20,7 @@ namespace DataWarehousePower.Repositories
         /// </summary>
         Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(
             string sourceSp,
-            string? filterClientCode = null,
+            string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null);
     }

@@ -38,7 +38,7 @@ public class ScheduledReportJob
     public string? SchemaTemplate { get; set; }
 
     [MaxLength(128)]
-    public string? FilterClientCode { get; set; }
+    public string? ClientCode { get; set; }
 
     [MaxLength(512)]
     public string? ExportLocation { get; set; }

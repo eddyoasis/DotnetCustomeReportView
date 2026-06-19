@@ -11,7 +11,7 @@ public sealed class ScheduledJobListItemViewModel
     public string ReportName { get; set; } = string.Empty;
     public string Format { get; set; } = string.Empty;
     public string? SchemaTemplate { get; set; }
-    public string? FilterClientCode { get; set; }
+    public string? ClientCode { get; set; }
     public string CronExpression { get; set; } = string.Empty;
     public string ScheduleDisplay { get; set; } = string.Empty;
     public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
@@ -28,7 +28,7 @@ public sealed class ScheduledJobFilterViewModel
     public string? Format { get; set; }
     public string? JobAction { get; set; }
     public string? SchemaTemplate { get; set; }
-    public string? FilterClientCode { get; set; }
+    public string? ClientCode { get; set; }
     public bool? IsActive { get; set; }
 }
 
@@ -39,7 +39,7 @@ public sealed class ScheduledJobListViewModel
     public List<string> AvailableFormats { get; set; } = [];
     public List<string> AvailableJobActions { get; set; } = [];
     public List<string> AvailableSchemaTemplates { get; set; } = [];
-    public List<string> AvailableFilterClientCodes { get; set; } = [];
+    public List<string> AvailableClientCodes { get; set; } = [];
 }
 
 public sealed class ScheduledJobFormViewModel
@@ -100,8 +100,8 @@ public sealed class ScheduledJobFormViewModel
     public string? SchemaTemplate { get; set; }
 
     [MaxLength(128)]
-    [Display(Name = "Filter Client Code")]
-    public string? FilterClientCode { get; set; }
+    [Display(Name = "Client Code")]
+    public string? ClientCode { get; set; }
 
     [MaxLength(512)]
     [Display(Name = "Export Location")]

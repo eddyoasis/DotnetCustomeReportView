@@ -56,7 +56,7 @@ namespace DataWarehousePower.Repositories
 
         public async Task<List<Dictionary<string, object?>>> GetReportDataFromSpAsync(
             string sourceSp,
-            string? filterClientCode = null,
+            string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
@@ -73,7 +73,7 @@ namespace DataWarehousePower.Repositories
             var parameters = new Dictionary<string, object?>();
 
             if (spParameterNames.Contains("@ClientCode"))
-                parameters["@ClientCode"] = string.IsNullOrWhiteSpace(filterClientCode) ? DBNull.Value : filterClientCode;
+                parameters["@ClientCode"] = string.IsNullOrWhiteSpace(clientCode) ? DBNull.Value : clientCode;
 
             if (spParameterNames.Contains("@DateFrom"))
                 parameters["@DateFrom"] = dateFrom.HasValue ? dateFrom.Value.Date : DBNull.Value;
