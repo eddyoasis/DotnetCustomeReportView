@@ -237,6 +237,16 @@
                 </div>
 
                 <div class="col-12">
+                    <input asp-for="Parameters" type="hidden" id="scheduled-job-parameters" />
+                    <label class="form-label">Parameters</label>
+                    <div id="scheduled-parameters-container" class="border rounded p-3">
+                        <div id="scheduled-parameters-empty" class="text-muted small">No required parameters for the selected report.</div>
+                    </div>
+                    <div class="form-text">These values are used when this scheduled job runs report export.</div>
+                    <span asp-validation-for="Parameters" class="text-danger"></span>
+                </div>
+
+                <div class="col-12">
                     <div class="form-check">
                         <input asp-for="IsCustom" class="form-check-input" id="isCustomToggle" />
                         <label asp-for="IsCustom" class="form-check-label"></label>
@@ -303,6 +313,10 @@
             const clientCodeOptions = document.getElementById('scheduled-client-code-options');
             const clientCodeClearButton = document.getElementById('scheduled-client-code-clear');
             const availableSchemaTemplatesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableSchemaTemplatesByReportId));
+            const parametersHiddenInput = document.getElementById('scheduled-job-parameters');
+            const scheduledParametersContainer = document.getElementById('scheduled-parameters-container');
+            const scheduledParametersEmpty = document.getElementById('scheduled-parameters-empty');
+            const availableParametersByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableParametersByReportId));
 
             if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !customDaysGroup || !cronGroup) {
                 return;
@@ -419,6 +433,117 @@
                 syncClientCodeUi(currentValue);
             }
 
+            function normalizeParameterName(name) {
+                return (name || '').trim().replace(/^@@+/, '');
+            }
+
+            function escapeHtmlAttribute(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function parseScheduledJobParameters() {
+                const raw = (parametersHiddenInput?.value || '').trim();
+                if (!raw) {
+                    return [];
+                }
+
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (!Array.isArray(parsed)) {
+                        return [];
+                    }
+
+                    return parsed
+                        .map(item => ({
+                            name: normalizeParameterName(item?.name || item?.Name || ''),
+                            value: (item?.value || item?.Value || '').toString().trim()
+                        }))
+                        .filter(item => item.name);
+                } catch {
+                    return [];
+                }
+            }
+
+            function serializeScheduledJobParameters() {
+                if (!parametersHiddenInput || !scheduledParametersContainer) {
+                    return;
+                }
+
+                const rows = [...scheduledParametersContainer.querySelectorAll('[data-scheduled-param-row]')];
+                const payload = rows
+                    .map(row => {
+                        const queryKey = normalizeParameterName(row.getAttribute('data-param-query-key') || '');
+                        const input = row.querySelector('input[data-scheduled-param-value]');
+                        const value = (input?.value || '').trim();
+
+                        if (!queryKey) {
+                            return null;
+                        }
+
+                        return {
+                            Name: `@@${queryKey}`,
+                            Value: value || null
+                        };
+                    })
+                    .filter(Boolean);
+
+                parametersHiddenInput.value = payload.length ? JSON.stringify(payload) : '';
+            }
+
+            function renderScheduledParameterInputs() {
+                if (!reportDefinitionSelect || !scheduledParametersContainer || !scheduledParametersEmpty) {
+                    return;
+                }
+
+                const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
+                const reportParameters = Number.isFinite(selectedReportId)
+                    ? (availableParametersByReportId[selectedReportId] || [])
+                    : [];
+
+                const existingValues = new Map(
+                    parseScheduledJobParameters().map(item => [normalizeParameterName(item.name), item.value || ''])
+                );
+
+                scheduledParametersContainer.querySelectorAll('[data-scheduled-param-row]').forEach(row => row.remove());
+
+                if (!Array.isArray(reportParameters) || reportParameters.length === 0) {
+                    scheduledParametersEmpty.style.display = 'block';
+                    if (parametersHiddenInput) {
+                        parametersHiddenInput.value = '';
+                    }
+                    return;
+                }
+
+                scheduledParametersEmpty.style.display = 'none';
+
+                reportParameters.forEach(parameter => {
+                    const queryKey = normalizeParameterName(parameter.queryKey || parameter.QueryKey || '');
+                    const name = (parameter.name || parameter.Name || '').toString().trim() || `@@${queryKey}`;
+                    const value = existingValues.get(queryKey) || '';
+
+                    const row = document.createElement('div');
+                    row.className = 'row g-2 align-items-center mb-2';
+                    row.setAttribute('data-scheduled-param-row', 'true');
+                    row.setAttribute('data-param-query-key', queryKey);
+                    row.innerHTML = `
+                        <div class="col-md-4">
+                            <span class="bg-secondary-subtle text-secondary-emphasis border">${name}</span>
+                        </div>
+                        <div class="col-md-8">
+                            <input type="text" class="form-control form-control-sm" data-scheduled-param-value="true" placeholder="Required" value="${escapeHtmlAttribute(value)}" />
+                        </div>`;
+
+                    scheduledParametersContainer.appendChild(row);
+                });
+
+                serializeScheduledJobParameters();
+            }
+
             function syncClientCodeUi(value) {
                 if (!clientCodeHiddenInput || !clientCodeSelect || !clientCodeDropdownToggle) {
                     return;
@@ -488,6 +613,15 @@
             if (reportDefinitionSelect) {
                 reportDefinitionSelect.addEventListener('change', () => {
                     updateClientCodeSelectOptions();
+                    renderScheduledParameterInputs();
+                });
+            }
+
+            if (scheduledParametersContainer) {
+                scheduledParametersContainer.addEventListener('input', event => {
+                    if (event.target instanceof HTMLInputElement && event.target.matches('[data-scheduled-param-value]')) {
+                        serializeScheduledJobParameters();
+                    }
                 });
             }
 
@@ -512,6 +646,7 @@
             updateScheduleFields();
             updateJobActionFields();
             updateClientCodeSelectOptions();
+            renderScheduledParameterInputs();
             updatePasswordFields();
             updateDateFields();
         })();

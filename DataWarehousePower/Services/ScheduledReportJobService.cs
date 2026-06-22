@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Net.Mail;
 using System.Text;
+using System.Text.Json;
 
 namespace DataWarehousePower.Services;
 
@@ -28,6 +29,12 @@ public sealed class ScheduledReportJobService(
         [5] = "Friday",
         [6] = "Saturday",
         [0] = "Sunday"
+    };
+    private static readonly HashSet<string> ReservedParameterNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ClientCode",
+        "DateFrom",
+        "DateTo"
     };
 
     public async Task<ScheduledJobListViewModel> GetListViewModelAsync(string userId, ScheduledJobFilterViewModel? filter = null)
@@ -132,6 +139,8 @@ public sealed class ScheduledReportJobService(
     {
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
+        Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
+            await BuildParameterLookupByReportIdAsync(availableReports);
 
         return new ScheduledJobFormViewModel
         {
@@ -148,7 +157,8 @@ public sealed class ScheduledReportJobService(
             ExportLocation = null,
             AvailableReports = availableReports,
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
-            AvailableSchemaTemplates = []
+            AvailableSchemaTemplates = [],
+            AvailableParametersByReportId = availableParametersByReportId
         };
     }
 
@@ -159,6 +169,8 @@ public sealed class ScheduledReportJobService(
 
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
+        Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
+            await BuildParameterLookupByReportIdAsync(availableReports);
 
         ScheduledJobFormViewModel form = new()
         {
@@ -172,6 +184,7 @@ public sealed class ScheduledReportJobService(
             CronExpression = entity.CronExpression,
             SchemaTemplate = entity.SchemaTemplate,
             ClientCode = entity.ClientCode,
+            Parameters = entity.Parameters,
             DateFrom = entity.DateFrom,
             DateTo = entity.DateTo,
             IsCustom = entity.IsCustom,
@@ -179,6 +192,7 @@ public sealed class ScheduledReportJobService(
             IsActive = entity.IsActive,
             AvailableReports = availableReports,
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
+            AvailableParametersByReportId = availableParametersByReportId,
             AvailableSchemaTemplates = BuildAvailableSchemaTemplates(
                 entity.SchemaTemplate,
                 availableSchemaTemplatesByReportId.TryGetValue(entity.ReportDefinitionId, out List<string>? reportClientCodes)
@@ -193,6 +207,8 @@ public sealed class ScheduledReportJobService(
     public async Task<int> CreateAsync(ScheduledJobFormViewModel form, string userId, string username)
     {
         ValidateForm(form);
+        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId);
+        string? normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
 
         string generatedJobName = await BuildJobNameAsync(form, userId);
 
@@ -206,6 +222,7 @@ public sealed class ScheduledReportJobService(
             CronExpression = BuildCronExpression(form),
             SchemaTemplate = NormalizeNullable(form.SchemaTemplate),
             ClientCode = NormalizeNullable(form.ClientCode),
+            Parameters = normalizedParameters,
             ExportLocation = NormalizeNullable(form.ExportLocation),
             DateFrom = form.IsCustom ? form.DateFrom?.Date : null,
             DateTo = form.IsCustom ? form.DateTo?.Date : null,
@@ -227,6 +244,8 @@ public sealed class ScheduledReportJobService(
     public async Task UpdateAsync(ScheduledJobFormViewModel form, string userId, string username)
     {
         ValidateForm(form);
+        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId);
+        string? normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
 
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserUpdateAsync(form.Id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {form.Id} was not found.");
@@ -243,6 +262,7 @@ public sealed class ScheduledReportJobService(
         entity.CronExpression = BuildCronExpression(form);
         entity.SchemaTemplate = NormalizeNullable(form.SchemaTemplate);
         entity.ClientCode = NormalizeNullable(form.ClientCode);
+        entity.Parameters = normalizedParameters;
         entity.ExportLocation = NormalizeNullable(form.ExportLocation);
         entity.DateFrom = form.IsCustom ? form.DateFrom?.Date : null;
         entity.DateTo = form.IsCustom ? form.DateTo?.Date : null;
@@ -325,6 +345,13 @@ public sealed class ScheduledReportJobService(
             .ToList();
     }
 
+    private async Task<ReportDefinition> GetReportDefinitionAsync(int reportDefinitionId)
+    {
+        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync();
+        return reports.FirstOrDefault(candidate => candidate.Id == reportDefinitionId)
+            ?? throw new InvalidOperationException("Report was not found.");
+    }
+
     private async Task<Dictionary<int, List<string>>> GetClientCodesLookupAsync(
         string userId,
         IEnumerable<ReportDefinitionLookupItem> reports)
@@ -347,6 +374,157 @@ public sealed class ScheduledReportJobService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private async Task<Dictionary<int, List<ScheduledJobParameterInputViewModel>>> BuildParameterLookupByReportIdAsync(
+        IEnumerable<ReportDefinitionLookupItem> reports)
+    {
+        List<ReportDefinition> reportDefinitions = await reportRepository.GetAllReportsAsync();
+        Dictionary<int, ReportDefinition> reportById = reportDefinitions
+            .GroupBy(report => report.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        Dictionary<int, List<ScheduledJobParameterInputViewModel>> parametersByReportId = [];
+        foreach (ReportDefinitionLookupItem report in reports)
+        {
+            if (!reportById.TryGetValue(report.Id, out ReportDefinition? reportDefinition))
+            {
+                parametersByReportId[report.Id] = [];
+                continue;
+            }
+
+            parametersByReportId[report.Id] = await GetRequiredScheduledParametersAsync(reportDefinition);
+        }
+
+        return parametersByReportId;
+    }
+
+    private async Task<List<ScheduledJobParameterInputViewModel>> GetRequiredScheduledParametersAsync(ReportDefinition report)
+    {
+        if (string.IsNullOrWhiteSpace(report.SourceSP))
+        {
+            return [];
+        }
+
+        List<string> sourceParameterNames = await reportRepository.GetStoredProcedureParameterNamesAsync(report.SourceSP);
+        Dictionary<string, string?> configuredDefaults = ParseReportParameterDefaults(report.Parameters);
+
+        List<ScheduledJobParameterInputViewModel> items = [];
+        foreach (string sourceParameterName in sourceParameterNames)
+        {
+            string queryKey = NormalizeParameterName(sourceParameterName);
+            if (ReservedParameterNames.Contains(queryKey))
+            {
+                continue;
+            }
+
+            string? defaultValue = configuredDefaults.TryGetValue(queryKey, out string? configuredDefault)
+                ? configuredDefault
+                : null;
+
+            if (!string.IsNullOrWhiteSpace(defaultValue))
+            {
+                continue;
+            }
+
+            items.Add(new ScheduledJobParameterInputViewModel
+            {
+                Name = "@" + queryKey,
+                QueryKey = queryKey,
+                DefaultValue = defaultValue
+            });
+        }
+
+        return items;
+    }
+
+    private async Task<string?> NormalizeScheduledParametersJsonAsync(string? inputJson, ReportDefinition report)
+    {
+        List<ScheduledJobParameterInputViewModel> requiredParameters = await GetRequiredScheduledParametersAsync(report);
+        if (requiredParameters.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string?> inputValues = ParseScheduledParameterValues(inputJson);
+        List<ScheduledJobParameterValue> result = [];
+
+        foreach (ScheduledJobParameterInputViewModel requiredParameter in requiredParameters)
+        {
+            if (!inputValues.TryGetValue(requiredParameter.QueryKey, out string? value) || string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException($"Parameter {requiredParameter.Name} is required for this report.");
+            }
+
+            result.Add(new ScheduledJobParameterValue
+            {
+                Name = requiredParameter.Name,
+                Value = value.Trim()
+            });
+        }
+
+        return JsonSerializer.Serialize(result);
+    }
+
+    private static Dictionary<string, string?> ParseReportParameterDefaults(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            List<ReportParameterFormModel> parameters = JsonSerializer.Deserialize<List<ReportParameterFormModel>>(json)
+                ?? [];
+
+            return parameters
+                .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Name))
+                .GroupBy(parameter => NormalizeParameterName(parameter.Name), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().DefaultValue,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static Dictionary<string, string?> ParseScheduledParameterValues(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            List<ScheduledJobParameterValue> parameters = JsonSerializer.Deserialize<List<ScheduledJobParameterValue>>(json)
+                ?? [];
+
+            return parameters
+                .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Name))
+                .GroupBy(parameter => NormalizeParameterName(parameter.Name), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Value,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string NormalizeParameterName(string? name)
+        => (name ?? string.Empty).Trim().TrimStart('@');
+
+    private sealed class ScheduledJobParameterValue
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Value { get; set; }
+    }
 
     private async Task<string> BuildJobNameAsync(ScheduledJobFormViewModel form, string userId, int? currentJobId = null)
     {

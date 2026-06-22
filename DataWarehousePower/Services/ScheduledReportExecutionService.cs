@@ -1,6 +1,7 @@
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
+using System.Text.Json;
 
 namespace DataWarehousePower.Services;
 
@@ -30,6 +31,7 @@ public sealed class ScheduledReportExecutionService(
         List<string> normalizedFormats = ParseJobFormats(job.Format);
         string password = dataProtectionService.Unprotect(job.EncryptedPassword);
         (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
+        Dictionary<string, string?> jobParameters = ParseJobParameters(job.Parameters);
 
         ReportViewModel? reportViewModel = await reportService.BuildReportViewModelAsync(
             reportId: job.ReportDefinitionId,
@@ -37,7 +39,8 @@ public sealed class ScheduledReportExecutionService(
             schemaTemplate: job.SchemaTemplate,
             clientCode: job.ClientCode,
             dateFrom: effectiveDateFrom,
-            dateTo: effectiveDateTo);
+            dateTo: effectiveDateTo,
+            parameterValues: jobParameters);
 
         if (reportViewModel is null)
         {
@@ -144,5 +147,40 @@ public sealed class ScheduledReportExecutionService(
             .ToList();
 
         return parsedFormats.Count > 0 ? parsedFormats : ["csv"];
+    }
+
+    private static Dictionary<string, string?> ParseJobParameters(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            List<ScheduledJobParameterValue> parameters = JsonSerializer.Deserialize<List<ScheduledJobParameterValue>>(json)
+                ?? [];
+
+            return parameters
+                .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Name))
+                .GroupBy(parameter => NormalizeParameterName(parameter.Name), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Value,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string NormalizeParameterName(string? name)
+        => (name ?? string.Empty).Trim().TrimStart('@');
+
+    private sealed class ScheduledJobParameterValue
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Value { get; set; }
     }
 }

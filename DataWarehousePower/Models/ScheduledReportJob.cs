@@ -40,6 +40,8 @@ public class ScheduledReportJob
     [MaxLength(128)]
     public string? ClientCode { get; set; }
 
+    public string? Parameters { get; set; }
+
     [MaxLength(512)]
     public string? ExportLocation { get; set; }
 

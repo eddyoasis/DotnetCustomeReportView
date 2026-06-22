@@ -128,6 +128,7 @@ namespace DataWarehousePower.Data
                 e.Property(job => job.RecipientEmail).HasMaxLength(2048);
                 e.Property(job => job.SchemaTemplate).HasMaxLength(128);
                 e.Property(job => job.ClientCode).HasMaxLength(128);
+                e.Property(job => job.Parameters).HasColumnType("nvarchar(max)");
                 e.Property(job => job.ExportLocation).HasMaxLength(512);
                 e.Property(job => job.IsCustom).HasDefaultValue(true);
                 e.Property(job => job.EncryptedPassword).HasMaxLength(512);

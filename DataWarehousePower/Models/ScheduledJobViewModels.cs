@@ -103,6 +103,9 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Client Code")]
     public string? ClientCode { get; set; }
 
+    [Display(Name = "Parameters")]
+    public string? Parameters { get; set; }
+
     [MaxLength(512)]
     [Display(Name = "Export Location")]
     public string? ExportLocation { get; set; }
@@ -136,6 +139,15 @@ public sealed class ScheduledJobFormViewModel
     public List<string> AvailableSchemaTemplates { get; set; } = [];
 
     public Dictionary<int, List<string>> AvailableSchemaTemplatesByReportId { get; set; } = [];
+
+    public Dictionary<int, List<ScheduledJobParameterInputViewModel>> AvailableParametersByReportId { get; set; } = [];
+}
+
+public sealed class ScheduledJobParameterInputViewModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string QueryKey { get; set; } = string.Empty;
+    public string? DefaultValue { get; set; }
 }
 
 public sealed class ReportDefinitionLookupItem
