@@ -48,11 +48,7 @@ namespace DataWarehousePower.Repositories
             if (conn.State != ConnectionState.Open)
                 await conn.OpenAsync();
 
-            var safeDatabase = await ValidateDatabaseNameAsync(conn, sourceDatabase.Trim());
-            if (string.IsNullOrWhiteSpace(safeDatabase))
-                return new();
-
-            var escapedDatabase = EscapeSqlIdentifier(safeDatabase);
+            var escapedDatabase = EscapeSqlIdentifier(sourceDatabase.Trim());
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
@@ -71,9 +67,9 @@ namespace DataWarehousePower.Repositories
                         items.Add(reader.GetString(0));
                 }
             }
-            catch (SqlException ex) when (ex.Number == 916)
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911)
             {
-                // Database exists but current login has no access.
+                // Database is invalid or current login cannot access metadata.
                 return new();
             }
 
@@ -89,11 +85,7 @@ namespace DataWarehousePower.Repositories
             if (conn.State != ConnectionState.Open)
                 await conn.OpenAsync();
 
-            var safeDatabase = await ValidateDatabaseNameAsync(conn, sourceDatabase.Trim());
-            if (string.IsNullOrWhiteSpace(safeDatabase))
-                return new();
-
-            var escapedDatabase = EscapeSqlIdentifier(safeDatabase);
+            var escapedDatabase = EscapeSqlIdentifier(sourceDatabase.Trim());
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
@@ -112,7 +104,7 @@ namespace DataWarehousePower.Repositories
                         items.Add(reader.GetString(0));
                 }
             }
-            catch (SqlException ex) when (ex.Number == 916)
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911)
             {
                 return new();
             }
@@ -129,9 +121,7 @@ namespace DataWarehousePower.Repositories
             if (conn.State != ConnectionState.Open)
                 await conn.OpenAsync();
 
-            var safeDatabase = await ValidateDatabaseNameAsync(conn, sourceDatabase.Trim());
-            if (string.IsNullOrWhiteSpace(safeDatabase))
-                return new();
+            var safeDatabase = sourceDatabase.Trim();
 
             if (!string.IsNullOrWhiteSpace(sourceTable))
                 return await GetSourceColumnsFromTableOrViewAsync(conn, safeDatabase, sourceTable.Trim());
@@ -171,7 +161,7 @@ namespace DataWarehousePower.Repositories
                         items.Add(reader.GetString(0));
                 }
             }
-            catch (SqlException ex) when (ex.Number is 916 or 229)
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911)
             {
                 return new();
             }
@@ -238,7 +228,7 @@ namespace DataWarehousePower.Repositories
                         items.Add(name);
                 }
             }
-            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
             {
                 return new();
             }

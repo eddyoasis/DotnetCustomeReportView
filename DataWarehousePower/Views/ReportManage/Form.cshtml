@@ -28,37 +28,64 @@
 
             <div class="col-md-3">
                 <label asp-for="SourceDatabase" class="form-label"></label>
-                <select asp-for="SourceDatabase" class="form-select source-input" id="input-source-database">
-                    <option value="">-- Select database --</option>
-                    @foreach (var databaseName in Model.SourceDatabaseOptions)
-                    {
-                        <option value="@databaseName">@databaseName</option>
-                    }
-                </select>
+                <div class="dropdown searchable-source-dropdown" id="source-database-dropdown" data-bs-auto-close="outside">
+                    <input asp-for="SourceDatabase" type="hidden" class="source-input" id="input-source-database" />
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-database">
+                        -- Select database --
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-database">
+                        <input type="text" class="form-control form-control-sm mb-2 dropdown-search" id="search-source-database" placeholder="Search database..." autocomplete="off" />
+                        <div class="dropdown-options" id="options-source-database" style="max-height:220px; overflow:auto;">
+                            <button type="button" class="dropdown-item dropdown-option" data-value="">-- Select database --</button>
+                            @foreach (var databaseName in Model.SourceDatabaseOptions)
+                            {
+                                <button type="button" class="dropdown-item dropdown-option" data-value="@databaseName">@databaseName</button>
+                            }
+                        </div>
+                    </div>
+                </div>
                 <div class="form-text">Loaded from the connected SQL Server database list.</div>
             </div>
 
             <div class="col-md-3">
                 <label asp-for="SourceTable" class="form-label"></label>
-                <select asp-for="SourceTable" class="form-select source-input" id="input-source-table">
-                    <option value="">-- Select table or view --</option>
-                    @foreach (var sourceObjectName in Model.SourceTableOptions)
-                    {
-                        <option value="@sourceObjectName">@sourceObjectName</option>
-                    }
-                </select>
+                <div class="dropdown searchable-source-dropdown" id="source-table-dropdown" data-bs-auto-close="outside">
+                    <input asp-for="SourceTable" type="hidden" class="source-input" id="input-source-table" />
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-table">
+                        -- Select table or view --
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-table">
+                        <input type="text" class="form-control form-control-sm mb-2 dropdown-search" id="search-source-table" placeholder="Search table or view..." autocomplete="off" />
+                        <div class="dropdown-options" id="options-source-table" style="max-height:220px; overflow:auto;">
+                            <button type="button" class="dropdown-item dropdown-option" data-value="">-- Select table or view --</button>
+                            @foreach (var sourceObjectName in Model.SourceTableOptions)
+                            {
+                                <button type="button" class="dropdown-item dropdown-option" data-value="@sourceObjectName">@sourceObjectName</button>
+                            }
+                        </div>
+                    </div>
+                </div>
                 <div class="form-text">Loaded from the selected source database tables and views.</div>
             </div>
 
             <div class="col-md-3" hidden>
                 <label asp-for="SourceSP" class="form-label"></label>
-                <select asp-for="SourceSP" class="form-select source-input" id="input-source-sp">
-                    <option value="">-- Select stored procedure --</option>
-                    @foreach (var sourceProcedureName in Model.SourceSPOptions)
-                    {
-                        <option value="@sourceProcedureName">@sourceProcedureName</option>
-                    }
-                </select>
+                <div class="dropdown searchable-source-dropdown" id="source-sp-dropdown" data-bs-auto-close="outside">
+                    <input asp-for="SourceSP" type="hidden" class="source-input" id="input-source-sp" />
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-sp">
+                        -- Select stored procedure --
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-sp">
+                        <input type="text" class="form-control form-control-sm mb-2 dropdown-search" id="search-source-sp" placeholder="Search stored procedure..." autocomplete="off" />
+                        <div class="dropdown-options" id="options-source-sp" style="max-height:220px; overflow:auto;">
+                            <button type="button" class="dropdown-item dropdown-option" data-value="">-- Select stored procedure --</button>
+                            @foreach (var sourceProcedureName in Model.SourceSPOptions)
+                            {
+                                <button type="button" class="dropdown-item dropdown-option" data-value="@sourceProcedureName">@sourceProcedureName</button>
+                            }
+                        </div>
+                    </div>
+                </div>
                 <div class="form-text">Loaded from the selected source database stored procedures.</div>
             </div>
 
@@ -249,6 +276,137 @@ const sourceProceduresUrl = '@Url.Action("SourceProcedures", "ReportManage")';
 const sourceColumnsUrl = '@Url.Action("SourceColumns", "ReportManage")';
 let sourceObjectsRequestSeq = 0;
 let sourceProceduresRequestSeq = 0;
+const searchableDropdownStates = new Map();
+
+function getDropdownDisplayText(placeholder, value) {
+    const trimmed = (value || '').trim();
+    return trimmed ? trimmed : placeholder;
+}
+
+function createDropdownOption(value, text) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'dropdown-item dropdown-option';
+    button.dataset.value = value;
+    button.textContent = text;
+    return button;
+}
+
+function setDropdownItems(state, items) {
+    state.options = [
+        { value: '', text: state.placeholder },
+        ...items.map(item => ({ value: item, text: item }))
+    ];
+
+    state.optionsContainer.innerHTML = '';
+    state.options.forEach(option => {
+        state.optionsContainer.appendChild(createDropdownOption(option.value, option.text));
+    });
+
+    filterDropdownOptions(state);
+}
+
+function filterDropdownOptions(state) {
+    const keyword = (state.searchInput.value || '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    state.optionsContainer.querySelectorAll('.dropdown-option').forEach(optionButton => {
+        const value = optionButton.dataset.value || '';
+        const text = optionButton.textContent || '';
+        const isPlaceholder = value === '';
+        const isVisible =
+            isPlaceholder ||
+            keyword === '' ||
+            text.toLowerCase().includes(keyword) ||
+            value.toLowerCase().includes(keyword);
+
+        optionButton.classList.toggle('d-none', !isVisible);
+        if (isVisible) {
+            visibleCount++;
+        }
+    });
+
+    if (!state.noResultElement) {
+        state.noResultElement = document.createElement('div');
+        state.noResultElement.className = 'dropdown-item-text text-muted small py-2 no-results';
+        state.noResultElement.textContent = 'No matches found';
+        state.optionsContainer.appendChild(state.noResultElement);
+    }
+
+    state.noResultElement.classList.toggle('d-none', visibleCount > 0);
+}
+
+function updateDropdownSelection(state, value, triggerChange) {
+    const normalizedValue = (value || '').trim();
+    state.hiddenInput.value = normalizedValue;
+    state.toggleButton.textContent = getDropdownDisplayText(state.placeholder, normalizedValue);
+
+    state.optionsContainer.querySelectorAll('.dropdown-option').forEach(optionButton => {
+        const selected = (optionButton.dataset.value || '') === normalizedValue;
+        optionButton.classList.toggle('active', selected);
+    });
+
+    if (triggerChange) {
+        state.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+function initializeSearchableDropdown(config) {
+    const state = {
+        hiddenInput: config.hiddenInput,
+        toggleButton: config.toggleButton,
+        optionsContainer: config.optionsContainer,
+        searchInput: config.searchInput,
+        placeholder: config.placeholder,
+        options: [],
+        noResultElement: null
+    };
+
+    searchableDropdownStates.set(config.hiddenInput.id, state);
+
+    const initialItems = Array.from(config.optionsContainer.querySelectorAll('.dropdown-option'))
+        .map(btn => ({
+            value: btn.dataset.value || '',
+            text: btn.textContent || ''
+        }))
+        .filter(option => option.value !== '');
+
+    setDropdownItems(state, initialItems.map(option => option.value));
+    updateDropdownSelection(state, config.hiddenInput.value, false);
+
+    config.searchInput.addEventListener('input', () => {
+        filterDropdownOptions(state);
+    });
+
+    config.optionsContainer.addEventListener('click', e => {
+        const optionButton = e.target.closest('.dropdown-option');
+        if (!optionButton || optionButton.classList.contains('d-none')) return;
+
+        updateDropdownSelection(state, optionButton.dataset.value || '', true);
+        config.searchInput.value = '';
+        filterDropdownOptions(state);
+
+        const dropdown = bootstrap.Dropdown.getOrCreateInstance(config.toggleButton);
+        dropdown.hide();
+    });
+
+    config.toggleButton.addEventListener('shown.bs.dropdown', () => {
+        config.searchInput.value = '';
+        filterDropdownOptions(state);
+        config.searchInput.focus();
+    });
+
+    return state;
+}
+
+function setDropdownItemsByInputId(inputId, items, preferredValue) {
+    const state = searchableDropdownStates.get(inputId);
+    if (!state) return;
+
+    setDropdownItems(state, items);
+    const nextValue = items.includes((preferredValue || '').trim()) ? (preferredValue || '').trim() : '';
+    updateDropdownSelection(state, nextValue, false);
+}
 
 function toDefaultLabel(columnName) {
     return (columnName || '')
@@ -288,10 +446,9 @@ async function loadSourceObjects(selectedValue) {
     const requestSeq = ++sourceObjectsRequestSeq;
     const dbName = (databaseInput.value || '').trim();
 
-    tableInput.innerHTML = '<option value="">-- Select table or view --</option>';
-
     if (!dbName) {
         tableInput.value = '';
+        setDropdownItemsByInputId('input-source-table', [], '');
         highlightSource();
         return;
     }
@@ -309,24 +466,13 @@ async function loadSourceObjects(selectedValue) {
             return;
         }
 
-        for (const item of items) {
-            const option = document.createElement('option');
-            option.value = item;
-            option.textContent = item;
-            tableInput.appendChild(option);
-        }
-
-        const preferred = (selectedValue || '').trim();
-        if (preferred && items.includes(preferred)) {
-            tableInput.value = preferred;
-        } else {
-            tableInput.value = '';
-        }
+        setDropdownItemsByInputId('input-source-table', items, selectedValue || '');
     } catch {
         if (requestSeq !== sourceObjectsRequestSeq) {
             return;
         }
         tableInput.value = '';
+        setDropdownItemsByInputId('input-source-table', [], '');
     }
 
     highlightSource();
@@ -336,10 +482,9 @@ async function loadSourceProcedures(selectedValue) {
     const requestSeq = ++sourceProceduresRequestSeq;
     const dbName = (databaseInput.value || '').trim();
 
-    spInput.innerHTML = '<option value="">-- Select stored procedure --</option>';
-
     if (!dbName) {
         spInput.value = '';
+        setDropdownItemsByInputId('input-source-sp', [], '');
         highlightSource();
         return;
     }
@@ -357,24 +502,13 @@ async function loadSourceProcedures(selectedValue) {
             return;
         }
 
-        for (const item of items) {
-            const option = document.createElement('option');
-            option.value = item;
-            option.textContent = item;
-            spInput.appendChild(option);
-        }
-
-        const preferred = (selectedValue || '').trim();
-        if (preferred && items.includes(preferred)) {
-            spInput.value = preferred;
-        } else {
-            spInput.value = '';
-        }
+        setDropdownItemsByInputId('input-source-sp', items, selectedValue || '');
     } catch {
         if (requestSeq !== sourceProceduresRequestSeq) {
             return;
         }
         spInput.value = '';
+        setDropdownItemsByInputId('input-source-sp', [], '');
     }
 
     highlightSource();
@@ -454,6 +588,30 @@ spInput.addEventListener('change', () => {
 });
 
 document.getElementById('btn-auto-cols').addEventListener('click', autoGenerateColumnsFromSource);
+
+initializeSearchableDropdown({
+    hiddenInput: databaseInput,
+    toggleButton: document.getElementById('btn-source-database'),
+    optionsContainer: document.getElementById('options-source-database'),
+    searchInput: document.getElementById('search-source-database'),
+    placeholder: '-- Select database --'
+});
+
+initializeSearchableDropdown({
+    hiddenInput: tableInput,
+    toggleButton: document.getElementById('btn-source-table'),
+    optionsContainer: document.getElementById('options-source-table'),
+    searchInput: document.getElementById('search-source-table'),
+    placeholder: '-- Select table or view --'
+});
+
+initializeSearchableDropdown({
+    hiddenInput: spInput,
+    toggleButton: document.getElementById('btn-source-sp'),
+    optionsContainer: document.getElementById('options-source-sp'),
+    searchInput: document.getElementById('search-source-sp'),
+    placeholder: '-- Select stored procedure --'
+});
 
 loadSourceObjects(tableInput.value);
 loadSourceProcedures(spInput.value);
