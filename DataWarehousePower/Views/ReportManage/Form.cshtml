@@ -527,7 +527,7 @@ function renderSourceParameters(parameterNames, existingDefaults) {
         const defaultValue = defaultsByName.get(name) || '';
         row.innerHTML = `
             <div class="col-md-4">
-                <span class="badge bg-secondary-subtle text-secondary-emphasis border">@@${name}</span>
+                <span class="bg-secondary-subtle text-secondary-emphasis border">@@${name}</span>
             </div>
             <div class="col-md-8">
                 <input type="text" class="form-control form-control-sm" data-param-default="true" value="${escapeHtmlAttribute(defaultValue)}" placeholder="Default value (optional)" />
