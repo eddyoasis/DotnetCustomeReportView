@@ -27,6 +27,22 @@ namespace DataWarehousePower.Models
         /// </summary>
         public List<Dictionary<string, object?>> Rows { get; set; } = new();
 
+        /// <summary>Current page number (1-based).</summary>
+        public int Page { get; set; } = 1;
+
+        /// <summary>Number of records per page.</summary>
+        public int PageSize { get; set; } = 50;
+
+        /// <summary>Total number of records before pagination.</summary>
+        public int TotalRows { get; set; }
+
+        /// <summary>Total number of pages.</summary>
+        public int TotalPages { get; set; } = 1;
+
+        public int StartRow => TotalRows == 0 ? 0 : ((Page - 1) * PageSize) + 1;
+
+        public int EndRow => Math.Min(Page * PageSize, TotalRows);
+
         /// <summary>All registered reports for the navigation sidebar.</summary>
         public List<ReportDefinition> AllReports { get; set; } = new();
     }

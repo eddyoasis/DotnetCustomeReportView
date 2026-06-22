@@ -112,6 +112,7 @@
             <div class="card-body">
                 <form id="report-filter-form" method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
                     <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
+                    <input type="hidden" name="pageSize" value="@Model.PageSize" />
 
                     <div class="col-md-4">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
@@ -145,7 +146,7 @@
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                         <a class="btn btn-sm btn-outline-secondary w-100"
-                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, schemaTemplate = Model.SchemaTemplate, clientCode = Model.ClientCode })">Clear</a>
+                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, schemaTemplate = Model.SchemaTemplate, clientCode = Model.ClientCode, pageSize = Model.PageSize })">Clear</a>
                     </div>
                 </form>
             </div>
@@ -276,6 +277,25 @@
         </div>
 
         <!-- ════════ DATA TABLE ════════ -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+            <div class="small text-muted">
+                Showing @Model.StartRow to @Model.EndRow of @Model.TotalRows records
+            </div>
+            <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2">
+                <input type="hidden" name="schemaTemplate" value="@Model.SchemaTemplate" />
+                <input type="hidden" name="clientCode" value="@Model.ClientCode" />
+                <input type="hidden" name="dateFrom" value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="dateTo" value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                <label for="page-size" class="small text-muted mb-0">Rows per page</label>
+                <select id="page-size" name="pageSize" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="10" selected="@(Model.PageSize == 10 ? "selected" : null)">10</option>
+                    <option value="25" selected="@(Model.PageSize == 25 ? "selected" : null)">25</option>
+                    <option value="50" selected="@(Model.PageSize == 50 ? "selected" : null)">50</option>
+                    <option value="100" selected="@(Model.PageSize == 100 ? "selected" : null)">100</option>
+                </select>
+            </form>
+        </div>
+
         <div class="table-responsive shadow-sm">
             <table class="table table-bordered table-hover align-middle" id="report-table">
                 <thead class="table-dark">
@@ -298,6 +318,38 @@
                     }
                 </tbody>
             </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+            <div class="small text-muted">
+                Page @Model.Page of @Model.TotalPages
+            </div>
+            <div class="btn-group" role="group" aria-label="Pagination">
+                <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+                   href="@Url.Action("Index", "Report", new
+                   {
+                       id = Model.ReportId,
+                       schemaTemplate = Model.SchemaTemplate,
+                       clientCode = Model.ClientCode,
+                       dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
+                       dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd"),
+                       page = Model.Page - 1,
+                       pageSize = Model.PageSize
+                   })"
+                   aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
+                <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+                   href="@Url.Action("Index", "Report", new
+                   {
+                       id = Model.ReportId,
+                       schemaTemplate = Model.SchemaTemplate,
+                       clientCode = Model.ClientCode,
+                       dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
+                       dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd"),
+                       page = Model.Page + 1,
+                       pageSize = Model.PageSize
+                   })"
+                   aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
+            </div>
         </div>
 
     </div><!-- /col -->

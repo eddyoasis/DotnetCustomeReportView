@@ -41,7 +41,9 @@ namespace DataWarehousePower.Controllers
             string? schemaTemplate = null,
             string? clientCode = null,
             DateTime? dateFrom = null,
-            DateTime? dateTo = null)
+            DateTime? dateTo = null,
+            int page = 1,
+            int pageSize = 50)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -49,6 +51,22 @@ namespace DataWarehousePower.Controllers
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
+
+            int[] allowedPageSizes = [10, 25, 50, 100];
+            if (!allowedPageSizes.Contains(pageSize))
+            {
+                pageSize = 50;
+            }
+
+            int totalRows = vm.Rows.Count;
+            int totalPages = Math.Max(1, (int)Math.Ceiling(totalRows / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            vm.TotalRows = totalRows;
+            vm.PageSize = pageSize;
+            vm.TotalPages = totalPages;
+            vm.Page = page;
+            vm.Rows = vm.Rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
             return View(vm);
         }
