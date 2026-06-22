@@ -78,7 +78,10 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
             <span>Columns</span>
-            <button type="button" id="btn-add-col" class="btn btn-outline-primary btn-sm">+ Add Column</button>
+            <div class="d-flex gap-2">
+                <button type="button" id="btn-auto-cols" class="btn btn-outline-secondary btn-sm">Auto Generate</button>
+                <button type="button" id="btn-add-col" class="btn btn-outline-primary btn-sm">+ Add Column</button>
+            </div>
         </div>
         <div class="card-body p-0">
             <table class="table table-bordered mb-0" id="columns-table">
@@ -144,13 +147,15 @@
 let rowIndex = @Model.Columns.Count;
 
 // ── Add column row ────────────────────────────────────────────────────────────
-function addColumnRow() {
+function addColumnRow(seed) {
     const body = document.getElementById('columns-body');
     const tr   = document.createElement('tr');
     tr.className   = 'col-row';
     tr.dataset.index = rowIndex;
+    const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row)').length;
+    const displayOrder = seed?.displayOrder ?? (currentVisibleRows + 1);
     tr.innerHTML = `
-        <td class="text-center text-muted small row-num align-middle">${body.querySelectorAll('tr.col-row:not(.deleted-row)').length + 1}</td>
+        <td class="text-center text-muted small row-num align-middle">${currentVisibleRows + 1}</td>
         <td>
             <input type="hidden" name="Columns[${rowIndex}].Id" value="0" />
             <input type="hidden" name="Columns[${rowIndex}].IsDeleted" value="false" class="is-deleted-input" />
@@ -163,7 +168,7 @@ function addColumnRow() {
         </td>
         <td>
             <input name="Columns[${rowIndex}].DisplayOrder"
-                   type="number" min="1" max="999" value="${body.querySelectorAll('tr.col-row:not(.deleted-row)').length + 1}"
+                   type="number" min="1" max="999" value="${displayOrder}"
                    class="form-control form-control-sm" required />
         </td>
         <td class="text-center align-middle">
@@ -173,10 +178,18 @@ function addColumnRow() {
             <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
         </td>`;
     body.appendChild(tr);
+
+    const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
+    const labelInput = tr.querySelector('input[name$=".DefaultLabel"]');
+    if (propertyInput && seed?.propertyName) propertyInput.value = seed.propertyName;
+    if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
+
     rowIndex++;
     refreshRowNumbers();
     toggleNoColsMessage();
-    tr.querySelector('input[name$=".PropertyName"]').focus();
+    if (!seed) {
+        tr.querySelector('input[name$=".PropertyName"]').focus();
+    }
 }
 
 document.getElementById('btn-add-col').addEventListener('click', addColumnRow);
@@ -226,8 +239,30 @@ const tableInput = document.getElementById('input-source-table');
 const spInput    = document.getElementById('input-source-sp');
 const sourceObjectsUrl = '@Url.Action("SourceObjects", "ReportManage")';
 const sourceProceduresUrl = '@Url.Action("SourceProcedures", "ReportManage")';
+const sourceColumnsUrl = '@Url.Action("SourceColumns", "ReportManage")';
 let sourceObjectsRequestSeq = 0;
 let sourceProceduresRequestSeq = 0;
+
+function toDefaultLabel(columnName) {
+    return (columnName || '')
+        .replace(/_/g, ' ')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function markAllRowsAsDeleted() {
+    document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+        const deletedInput = tr.querySelector('.is-deleted-input');
+        if (deletedInput) {
+            deletedInput.value = 'true';
+        }
+        tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+        tr.classList.add('deleted-row');
+        tr.style.display = 'none';
+    });
+}
 
 function highlightSource() {
     const hasDatabase = databaseInput.value.trim() !== '';
@@ -338,10 +373,80 @@ async function loadSourceProcedures(selectedValue) {
     highlightSource();
 }
 
+async function autoGenerateColumnsFromSource() {
+    const dbName = (databaseInput.value || '').trim();
+    const sourceTable = (tableInput.value || '').trim();
+    const sourceSP = (spInput.value || '').trim();
+
+    if (!dbName) {
+        return;
+    }
+
+    if ((!sourceTable && !sourceSP) || (sourceTable && sourceSP)) {
+        return;
+    }
+
+    const visibleRows = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+    if (visibleRows > 0) {
+        const shouldReplace = confirm('Auto-generate will replace current visible column rows. Continue?');
+        if (!shouldReplace) {
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch(
+            `${sourceColumnsUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=${encodeURIComponent(sourceTable)}&sourceSP=${encodeURIComponent(sourceSP)}`,
+            { cache: 'no-store' }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to load source columns');
+        }
+
+        const items = await response.json();
+        if (!Array.isArray(items) || items.length === 0) {
+            alert('No columns were found for the selected source.');
+            return;
+        }
+
+        markAllRowsAsDeleted();
+
+        items.forEach((columnName, index) => {
+            addColumnRow({
+                propertyName: columnName,
+                defaultLabel: toDefaultLabel(columnName),
+                displayOrder: index + 1
+            });
+        });
+
+        refreshRowNumbers();
+        toggleNoColsMessage();
+    } catch {
+        alert('Failed to auto-generate columns from the selected source.');
+    }
+}
+
 databaseInput.addEventListener('change', () => {
     loadSourceObjects('');
     loadSourceProcedures('');
 });
+
+tableInput.addEventListener('change', () => {
+    if ((tableInput.value || '').trim()) {
+        spInput.value = '';
+        autoGenerateColumnsFromSource();
+    }
+});
+
+spInput.addEventListener('change', () => {
+    if ((spInput.value || '').trim()) {
+        tableInput.value = '';
+        autoGenerateColumnsFromSource();
+    }
+});
+
+document.getElementById('btn-auto-cols').addEventListener('click', autoGenerateColumnsFromSource);
 
 loadSourceObjects(tableInput.value);
 loadSourceProcedures(spInput.value);

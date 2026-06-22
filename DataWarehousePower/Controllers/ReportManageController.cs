@@ -265,6 +265,24 @@ namespace DataWarehousePower.Controllers
             }
         }
 
+        // GET /ReportManage/SourceColumns?sourceDatabase=YourDb&sourceTable=YourTable&sourceSP=YourSP
+        [HttpGet]
+        public async Task<IActionResult> SourceColumns(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            try
+            {
+                var items = await _service.GetSourceColumnsAsync(sourceDatabase, sourceTable, sourceSP);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Column metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    sourceDatabase, sourceTable, sourceSP);
+                return Json(Array.Empty<string>());
+            }
+        }
+
         private async Task PopulateSourceDatabaseOptionsAsync(ReportManageFormViewModel vm)
         {
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();

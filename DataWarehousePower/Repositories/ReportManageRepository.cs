@@ -120,6 +120,144 @@ namespace DataWarehousePower.Repositories
             return items;
         }
 
+        public async Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+                return new();
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var safeDatabase = await ValidateDatabaseNameAsync(conn, sourceDatabase.Trim());
+            if (string.IsNullOrWhiteSpace(safeDatabase))
+                return new();
+
+            if (!string.IsNullOrWhiteSpace(sourceTable))
+                return await GetSourceColumnsFromTableOrViewAsync(conn, safeDatabase, sourceTable.Trim());
+
+            if (!string.IsNullOrWhiteSpace(sourceSP))
+                return await GetSourceColumnsFromStoredProcedureAsync(conn, safeDatabase, sourceSP.Trim());
+
+            return new();
+        }
+
+        private static async Task<List<string>> GetSourceColumnsFromTableOrViewAsync(
+            System.Data.Common.DbConnection conn,
+            string safeDatabase,
+            string sourceTable)
+        {
+            var escapedDatabase = EscapeSqlIdentifier(safeDatabase);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT COLUMN_NAME " +
+                "FROM [" + escapedDatabase + "].INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_NAME = @tableName " +
+                "ORDER BY ORDINAL_POSITION";
+
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@tableName";
+            p.Value = sourceTable;
+            cmd.Parameters.Add(p);
+
+            var items = new List<string>();
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                        items.Add(reader.GetString(0));
+                }
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229)
+            {
+                return new();
+            }
+
+            return items;
+        }
+
+        private static async Task<List<string>> GetSourceColumnsFromStoredProcedureAsync(
+            System.Data.Common.DbConnection conn,
+            string safeDatabase,
+            string sourceSP)
+        {
+            var escapedDatabase = EscapeSqlIdentifier(safeDatabase);
+            var escapedProcedure = EscapeSqlIdentifier(sourceSP);
+
+            // Validate procedure exists in selected DB before describing result set.
+            await using (var validateCmd = conn.CreateCommand())
+            {
+                validateCmd.CommandText =
+                    "SELECT name FROM [" + escapedDatabase + "].sys.procedures " +
+                    "WHERE is_ms_shipped = 0 AND name = @spName";
+
+                var p = validateCmd.CreateParameter();
+                p.ParameterName = "@spName";
+                p.Value = sourceSP;
+                validateCmd.Parameters.Add(p);
+
+                var exists = await validateCmd.ExecuteScalarAsync() as string;
+                if (string.IsNullOrWhiteSpace(exists))
+                    return new();
+            }
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "DECLARE @tsql nvarchar(max) = N'EXEC [" + escapedProcedure + "]'; " +
+                "EXEC [" + escapedDatabase + "].sys.sp_describe_first_result_set " +
+                "@tsql = @tsql, @params = NULL, @browse_information_mode = 0;";
+
+            var items = new List<string>();
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                int nameOrdinal = TryGetOrdinal(reader, "name");
+                int hiddenOrdinal = TryGetOrdinal(reader, "is_hidden");
+                int errorOrdinal = TryGetOrdinal(reader, "error_number");
+
+                while (await reader.ReadAsync())
+                {
+                    string? name = nameOrdinal < 0 || reader.IsDBNull(nameOrdinal)
+                        ? null
+                        : reader.GetString(nameOrdinal);
+
+                    bool isHidden = hiddenOrdinal >= 0 &&
+                                    !reader.IsDBNull(hiddenOrdinal) &&
+                                    reader.GetBoolean(hiddenOrdinal);
+
+                    bool hasError = errorOrdinal >= 0 && !reader.IsDBNull(errorOrdinal);
+
+                    if (isHidden || hasError || string.IsNullOrWhiteSpace(name))
+                        continue;
+
+                    if (seen.Add(name))
+                        items.Add(name);
+                }
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            {
+                return new();
+            }
+
+            return items;
+        }
+
+        private static int TryGetOrdinal(System.Data.Common.DbDataReader reader, string columnName)
+        {
+            try
+            {
+                return reader.GetOrdinal(columnName);
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return -1;
+            }
+        }
+
         private static async Task<string?> ValidateDatabaseNameAsync(System.Data.Common.DbConnection conn, string databaseName)
         {
             await using var cmd = conn.CreateCommand();
