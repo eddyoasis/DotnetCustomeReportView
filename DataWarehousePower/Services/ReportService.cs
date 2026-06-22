@@ -27,12 +27,13 @@ namespace DataWarehousePower.Services
             _logger     = logger;
         }
 
-        public Task<List<ReportDefinition>> GetAllReportsAsync()
-            => _reportRepo.GetAllReportsAsync();
+        public Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null)
+            => _reportRepo.GetAllReportsAsync(userDepartment);
 
         public async Task<ReportViewModel?> BuildReportViewModelAsync(
             int reportId,
             string userId,
+            string? userDepartment = null,
             string? schemaTemplate = null,
             string? clientCode = null,
             DateTime? dateFrom = null,
@@ -40,7 +41,7 @@ namespace DataWarehousePower.Services
         {
             string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
             string? normalizedClientCode = NormalizeNullableClientCode(clientCode);
-            var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
+            var report = await _reportRepo.GetReportWithColumnsAsync(reportId, userDepartment);
             if (report is null) return null;
 
             // Build system column list from DB definition
@@ -86,7 +87,7 @@ namespace DataWarehousePower.Services
             }
 
             // All reports for sidebar navigation
-            var allReports = await _reportRepo.GetAllReportsAsync();
+            var allReports = await _reportRepo.GetAllReportsAsync(userDepartment);
             List<string> savedSchemaTemplates = await _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
             Dictionary<string, int> schemaTemplatePreferenceIds = await _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
             Dictionary<int, List<string>> reportSchemaTemplatesByReportId = await BuildReportSchemaTemplatesByReportIdAsync(userId, allReports);

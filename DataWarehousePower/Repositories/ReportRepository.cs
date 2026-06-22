@@ -15,18 +15,33 @@ namespace DataWarehousePower.Repositories
             _context = context;
         }
 
-        public async Task<List<ReportDefinition>> GetAllReportsAsync()
-            => await _context.ReportDefinitions
-                             .AsNoTracking()
-                             .Where(r => r.IsActive)
-                             .OrderBy(r => r.ReportName)
-                             .ToListAsync();
+        public async Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null)
+        {
+            List<ReportDefinition> reports = await _context.ReportDefinitions
+                .AsNoTracking()
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.ReportName)
+                .ToListAsync();
 
-        public async Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId)
-            => await _context.ReportDefinitions
-                             .AsNoTracking()
-                             .Include(r => r.Columns)
-                             .FirstOrDefaultAsync(r => r.Id == reportId);
+            return reports
+                .Where(report => IsVisibleToDepartment(report.Departments, userDepartment))
+                .ToList();
+        }
+
+        public async Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId, string? userDepartment = null)
+        {
+            ReportDefinition? report = await _context.ReportDefinitions
+                .AsNoTracking()
+                .Include(r => r.Columns)
+                .FirstOrDefaultAsync(r => r.Id == reportId && r.IsActive);
+
+            if (report is null)
+            {
+                return null;
+            }
+
+            return IsVisibleToDepartment(report.Departments, userDepartment) ? report : null;
+        }
 
         // ── Table mode ────────────────────────────────────────────────────────
 
@@ -205,5 +220,24 @@ namespace DataWarehousePower.Repositories
 
         private static string EscapeSqlIdentifier(string value)
             => value.Replace("]", "]]", StringComparison.Ordinal);
+
+        private static bool IsVisibleToDepartment(string? reportDepartments, string? userDepartment)
+        {
+            if (string.IsNullOrWhiteSpace(reportDepartments))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                return false;
+            }
+
+            string normalizedUserDepartment = userDepartment.Trim();
+
+            return reportDepartments
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(department => string.Equals(department, normalizedUserDepartment, StringComparison.OrdinalIgnoreCase));
+        }
     }
 }

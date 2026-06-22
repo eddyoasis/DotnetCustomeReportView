@@ -44,7 +44,8 @@ namespace DataWarehousePower.Controllers
             DateTime? dateTo = null)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, schemaTemplate, clientCode, dateFrom, dateTo);
+            string? userDepartment = ResolveUserDepartment();
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, schemaTemplate, clientCode, dateFrom, dateTo);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -59,7 +60,8 @@ namespace DataWarehousePower.Controllers
             DateTime? dateFrom = null,
             DateTime? dateTo = null)
         {
-            var reports = await _reportService.GetAllReportsAsync();
+            string? userDepartment = ResolveUserDepartment();
+            var reports = await _reportService.GetAllReportsAsync(userDepartment);
             if (reports.Count == 0)
                 return View("NoReports");
 
@@ -98,9 +100,10 @@ namespace DataWarehousePower.Controllers
             SavePreferencesRequest requestModel = request;
 
             var userId = _prefService.ResolveUserId(HttpContext);
+            string? userDepartment = ResolveUserDepartment();
 
             // Load the system columns for this report to validate against
-            var vm = await _reportService.BuildReportViewModelAsync(id, userId, requestModel.SchemaTemplate);
+            var vm = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, requestModel.SchemaTemplate);
             if (vm is null)
                 return NotFound(new { success = false, error = "Report not found." });
 
@@ -222,6 +225,7 @@ namespace DataWarehousePower.Controllers
             ReportViewModel? vm = await _reportService.BuildReportViewModelAsync(
                 id,
                 userId,
+                ResolveUserDepartment(),
                 request.SchemaTemplate,
                 request.ClientCode,
                 request.DateFrom,
@@ -304,6 +308,9 @@ namespace DataWarehousePower.Controllers
 
             return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Anonymous" : User.Identity!.Name!.Trim();
         }
+
+        private string? ResolveUserDepartment()
+            => HttpContext.Session.GetString("UserDepartment");
     }
 
     public class SavePreferencesRequest

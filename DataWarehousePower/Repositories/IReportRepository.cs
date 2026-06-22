@@ -4,8 +4,8 @@ namespace DataWarehousePower.Repositories
 {
     public interface IReportRepository
     {
-        Task<List<ReportDefinition>> GetAllReportsAsync();
-        Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId);
+        Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null);
+        Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId, string? userDepartment = null);
 
         /// <summary>
         /// Fetches data by querying a table/view directly (SourceTable mode).

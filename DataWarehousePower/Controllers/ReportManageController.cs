@@ -151,7 +151,8 @@ namespace DataWarehousePower.Controllers
                             created.SourceDatabase,
                             created.SourceTable,
                             created.SourceSP,
-                            created.IsActive
+                            created.IsActive,
+                            created.Departments
                         },
                         detail: "Report definition created.");
                 }
@@ -183,7 +184,8 @@ namespace DataWarehousePower.Controllers
                             existing.SourceDatabase,
                             existing.SourceTable,
                             existing.SourceSP,
-                            existing.IsActive
+                            existing.IsActive,
+                            existing.Departments
                         },
                         newValues: new
                         {
@@ -192,7 +194,8 @@ namespace DataWarehousePower.Controllers
                             form.SourceDatabase,
                             form.SourceTable,
                             form.SourceSP,
-                            form.IsActive
+                            form.IsActive,
+                            form.Departments
                         },
                         detail: "Report definition updated.");
                 }
@@ -222,7 +225,8 @@ namespace DataWarehousePower.Controllers
                         form.SourceDatabase,
                         form.SourceTable,
                         form.SourceSP,
-                        form.IsActive
+                        form.IsActive,
+                        form.Departments
                     },
                     detail: ex.Message);
                 ModelState.AddModelError("", "An error occurred while saving. Please try again.");
@@ -335,7 +339,8 @@ namespace DataWarehousePower.Controllers
                         existing.SourceDatabase,
                         existing.SourceTable,
                         existing.SourceSP,
-                        existing.IsActive
+                        existing.IsActive,
+                        existing.Departments
                     },
                     newValues: null,
                     detail: "Report definition deleted.");
@@ -359,7 +364,8 @@ namespace DataWarehousePower.Controllers
                         existing.SourceDatabase,
                         existing.SourceTable,
                         existing.SourceSP,
-                        existing.IsActive
+                        existing.IsActive,
+                        existing.Departments
                     },
                     newValues: null,
                     detail: ex.Message);

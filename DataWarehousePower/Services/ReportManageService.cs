@@ -68,6 +68,7 @@ namespace DataWarehousePower.Services
                 SourceTable     = r.SourceTable,
                 SourceSP        = r.SourceSP,
                 IsActive        = r.IsActive,
+                Departments     = r.Departments,
                 Columns         = r.Columns.Select(c => new ReportColumnFormModel
                 {
                     Id           = c.Id,
@@ -87,7 +88,8 @@ namespace DataWarehousePower.Services
                 SourceDatabase  = string.IsNullOrWhiteSpace(form.SourceDatabase) ? null : form.SourceDatabase.Trim(),
                 SourceTable     = string.IsNullOrWhiteSpace(form.SourceTable) ? null : form.SourceTable.Trim(),
                 SourceSP        = string.IsNullOrWhiteSpace(form.SourceSP) ? null : form.SourceSP.Trim(),
-                IsActive        = form.IsActive
+                IsActive        = form.IsActive,
+                Departments     = string.IsNullOrWhiteSpace(form.Departments) ? null : form.Departments.Trim()
             };
 
             var activeColumns = form.Columns

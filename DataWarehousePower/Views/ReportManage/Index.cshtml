@@ -38,6 +38,7 @@ else
                     <th>Source Database</th>
                     <th>Source Table</th>
                     <th>Source SP</th>
+                    <th>Departments</th>
                     <th>Columns</th>
                     <th style="width:90px;" class="text-center">Active</th>
                     <th style="width:160px;">Actions</th>
@@ -62,6 +63,7 @@ else
                         <td>@(string.IsNullOrEmpty(r.SourceDatabase) ? "—" : r.SourceDatabase)</td>
                         <td>@(string.IsNullOrEmpty(r.SourceTable) ? "—" : r.SourceTable)</td>
                         <td>@(string.IsNullOrEmpty(r.SourceSP) ? "—" : r.SourceSP)</td>
+                        <td>@(string.IsNullOrWhiteSpace(r.Departments) ? "All" : r.Departments)</td>
                         <td>
                             @foreach (var col in r.Columns.OrderBy(c => c.DisplayOrder))
                             {

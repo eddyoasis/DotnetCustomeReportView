@@ -32,12 +32,12 @@ public sealed class ScheduledReportExecutionService(
         (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
 
         ReportViewModel? reportViewModel = await reportService.BuildReportViewModelAsync(
-            job.ReportDefinitionId,
-            job.CreatedByUserId,
-            job.SchemaTemplate,
-            job.ClientCode,
-            effectiveDateFrom,
-            effectiveDateTo);
+            reportId: job.ReportDefinitionId,
+            userId: job.CreatedByUserId,
+            schemaTemplate: job.SchemaTemplate,
+            clientCode: job.ClientCode,
+            dateFrom: effectiveDateFrom,
+            dateTo: effectiveDateTo);
 
         if (reportViewModel is null)
         {

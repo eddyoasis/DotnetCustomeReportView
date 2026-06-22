@@ -4,7 +4,7 @@ namespace DataWarehousePower.Services
 {
     public interface IReportService
     {
-        Task<List<ReportDefinition>> GetAllReportsAsync();
+        Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null);
 
         /// <summary>
         /// Builds the complete ReportViewModel for the given report:
@@ -14,6 +14,7 @@ namespace DataWarehousePower.Services
         Task<ReportViewModel?> BuildReportViewModelAsync(
             int reportId,
             string userId,
+            string? userDepartment = null,
             string? schemaTemplate = null,
             string? clientCode = null,
             DateTime? dateFrom = null,

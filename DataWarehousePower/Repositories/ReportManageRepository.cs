@@ -319,6 +319,7 @@ namespace DataWarehousePower.Repositories
             existing.SourceTable = report.SourceTable;
             existing.SourceSP = report.SourceSP;
             existing.IsActive = report.IsActive;
+            existing.Departments = report.Departments;
 
             // Delete removed columns
             foreach (var colId in deletedColumnIds)

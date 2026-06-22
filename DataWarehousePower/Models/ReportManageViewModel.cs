@@ -42,6 +42,10 @@ namespace DataWarehousePower.Models
         [Display(Name = "Active")]
         public bool IsActive { get; set; } = true;
 
+        [MaxLength(1000)]
+        [Display(Name = "Departments")]
+        public string? Departments { get; set; }
+
         /// <summary>Columns bound from the dynamic form rows.</summary>
         public List<ReportColumnFormModel> Columns { get; set; } = new();
     }

@@ -46,6 +46,13 @@ namespace DataWarehousePower.Models
         /// </summary>
         public bool IsActive { get; set; } = true;
 
+        /// <summary>
+        /// Comma-separated department names allowed to view this report
+        /// (e.g. "Sales,HR,Finance"). Empty means visible to all departments.
+        /// </summary>
+        [MaxLength(1000)]
+        public string? Departments { get; set; }
+
         // Navigation
         public ICollection<ReportColumn> Columns { get; set; } = new List<ReportColumn>();
     }
