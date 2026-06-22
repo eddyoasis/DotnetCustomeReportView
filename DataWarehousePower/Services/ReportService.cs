@@ -75,7 +75,10 @@ namespace DataWarehousePower.Services
             else if (!string.IsNullOrWhiteSpace(report.SourceTable))
             {
                 var columnNames = report.Columns.Select(c => c.PropertyName);
-                rows = await _reportRepo.GetReportDataFromTableAsync(report.SourceTable, columnNames);
+                rows = await _reportRepo.GetReportDataFromTableAsync(
+                    report.SourceTable,
+                    columnNames,
+                    report.SourceDatabase);
             }
             else
             {

@@ -30,9 +30,9 @@
                 <label asp-for="SourceDatabase" class="form-label"></label>
                 <select asp-for="SourceDatabase" class="form-select source-input" id="input-source-database">
                     <option value="">-- Select database --</option>
-                    @foreach (var tableName in Model.SourceDatabaseOptions)
+                    @foreach (var databaseName in Model.SourceDatabaseOptions)
                     {
-                        <option value="@tableName">@tableName</option>
+                        <option value="@databaseName">@databaseName</option>
                     }
                 </select>
                 <div class="form-text">Loaded from the connected SQL Server database list.</div>
@@ -40,9 +40,14 @@
 
             <div class="col-md-3">
                 <label asp-for="SourceTable" class="form-label"></label>
-                <input asp-for="SourceTable" class="form-control source-input" id="input-source-table"
-                       placeholder="e.g. ReportSales" />
-                <div class="form-text">Direct table query. Leave blank if using a SP.</div>
+                <select asp-for="SourceTable" class="form-select source-input" id="input-source-table">
+                    <option value="">-- Select table or view --</option>
+                    @foreach (var sourceObjectName in Model.SourceTableOptions)
+                    {
+                        <option value="@sourceObjectName">@sourceObjectName</option>
+                    }
+                </select>
+                <div class="form-text">Loaded from the selected source database tables and views.</div>
             </div>
 
             <div class="col-md-3">
@@ -214,6 +219,8 @@ function toggleNoColsMessage() {
 const databaseInput = document.getElementById('input-source-database');
 const tableInput = document.getElementById('input-source-table');
 const spInput    = document.getElementById('input-source-sp');
+const sourceObjectsUrl = '@Url.Action("SourceObjects", "ReportManage")';
+let sourceObjectsRequestSeq = 0;
 
 function highlightSource() {
     const hasDatabase = databaseInput.value.trim() !== '';
@@ -224,8 +231,60 @@ function highlightSource() {
     spInput.classList.toggle('border-warning',    hasTable && hasSP);
 }
 
-databaseInput.addEventListener('input', highlightSource);
-tableInput.addEventListener('input', highlightSource);
+databaseInput.addEventListener('change', highlightSource);
+tableInput.addEventListener('change', highlightSource);
 spInput.addEventListener('input',    highlightSource);
+
+async function loadSourceObjects(selectedValue) {
+    const requestSeq = ++sourceObjectsRequestSeq;
+    const dbName = (databaseInput.value || '').trim();
+
+    tableInput.innerHTML = '<option value="">-- Select table or view --</option>';
+
+    if (!dbName) {
+        tableInput.value = '';
+        highlightSource();
+        return;
+    }
+
+    try {
+        const response = await fetch(`${sourceObjectsUrl}?sourceDatabase=${encodeURIComponent(dbName)}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to load source objects');
+        }
+
+        const items = await response.json();
+        if (requestSeq !== sourceObjectsRequestSeq) {
+            return;
+        }
+
+        for (const item of items) {
+            const option = document.createElement('option');
+            option.value = item;
+            option.textContent = item;
+            tableInput.appendChild(option);
+        }
+
+        const preferred = (selectedValue || '').trim();
+        if (preferred && items.includes(preferred)) {
+            tableInput.value = preferred;
+        } else {
+            tableInput.value = '';
+        }
+    } catch {
+        if (requestSeq !== sourceObjectsRequestSeq) {
+            return;
+        }
+        tableInput.value = '';
+    }
+
+    highlightSource();
+}
+
+databaseInput.addEventListener('change', () => loadSourceObjects(''));
+
+loadSourceObjects(tableInput.value);
 </script>
 }

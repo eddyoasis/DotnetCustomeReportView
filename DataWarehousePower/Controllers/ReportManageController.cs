@@ -1,6 +1,7 @@
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -49,6 +50,7 @@ namespace DataWarehousePower.Controllers
             };
 
             await PopulateSourceDatabaseOptionsAsync(vm);
+            await PopulateSourceTableOptionsAsync(vm);
             return View("Form", vm);
         }
 
@@ -59,6 +61,7 @@ namespace DataWarehousePower.Controllers
             {
                 var vm = await _service.GetFormViewModelAsync(id);
                 await PopulateSourceDatabaseOptionsAsync(vm);
+                await PopulateSourceTableOptionsAsync(vm);
                 return View("Form", vm);
             }
             catch (InvalidOperationException)
@@ -89,6 +92,7 @@ namespace DataWarehousePower.Controllers
             if (!ModelState.IsValid)
             {
                 await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -97,6 +101,7 @@ namespace DataWarehousePower.Controllers
             {
                 ModelState.AddModelError("", "At least one column is required.");
                 await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -108,12 +113,14 @@ namespace DataWarehousePower.Controllers
             {
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure.");
                 await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
                 return View("Form", form);
             }
             if (hasTable && hasSP)
             {
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure — not both.");
                 await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -214,13 +221,35 @@ namespace DataWarehousePower.Controllers
                     detail: ex.Message);
                 ModelState.AddModelError("", "An error occurred while saving. Please try again.");
                 await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
                 return View("Form", form);
+            }
+        }
+
+        // GET /ReportManage/SourceObjects?sourceDatabase=YourDb
+        [HttpGet]
+        public async Task<IActionResult> SourceObjects(string? sourceDatabase)
+        {
+            try
+            {
+                var items = await _service.GetSourceTableOptionsAsync(sourceDatabase);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229)
+            {
+                _logger.LogWarning(ex, "Metadata access denied for source database {SourceDatabase}", sourceDatabase);
+                return Json(Array.Empty<string>());
             }
         }
 
         private async Task PopulateSourceDatabaseOptionsAsync(ReportManageFormViewModel vm)
         {
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
+        }
+
+        private async Task PopulateSourceTableOptionsAsync(ReportManageFormViewModel vm)
+        {
+            vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
         }
 
         // POST /ReportManage/Delete/{id}

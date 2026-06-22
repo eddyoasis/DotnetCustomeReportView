@@ -8,11 +8,13 @@ namespace DataWarehousePower.Repositories
         Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId);
 
         /// <summary>
-        /// Fetches data by querying a table directly (SourceTable mode).
+        /// Fetches data by querying a table/view directly (SourceTable mode).
         /// Column names are whitelisted against INFORMATION_SCHEMA before use.
         /// </summary>
         Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
-            string sourceTable, IEnumerable<string> columnNames);
+            string sourceTable,
+            IEnumerable<string> columnNames,
+            string? sourceDatabase = null);
 
         /// <summary>
         /// Fetches data by executing a stored procedure (SourceSP mode).

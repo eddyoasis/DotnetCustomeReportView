@@ -1,5 +1,6 @@
 using DataWarehousePower.Data;
 using DataWarehousePower.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 
@@ -24,7 +25,7 @@ namespace DataWarehousePower.Repositories
             cmd.CommandText =
                 "SELECT name " +
                 "FROM sys.databases " +
-                "WHERE state_desc = 'ONLINE' " +
+                "WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 " +
                 "ORDER BY name";
 
             var items = new List<string>();
@@ -37,6 +38,65 @@ namespace DataWarehousePower.Repositories
 
             return items;
         }
+
+        public async Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+                return new();
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var safeDatabase = await ValidateDatabaseNameAsync(conn, sourceDatabase.Trim());
+            if (string.IsNullOrWhiteSpace(safeDatabase))
+                return new();
+
+            var escapedDatabase = EscapeSqlIdentifier(safeDatabase);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT DISTINCT TABLE_NAME " +
+                "FROM [" + escapedDatabase + "].INFORMATION_SCHEMA.TABLES " +
+                "WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW') " +
+                "ORDER BY TABLE_NAME";
+
+            var items = new List<string>();
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                        items.Add(reader.GetString(0));
+                }
+            }
+            catch (SqlException ex) when (ex.Number == 916)
+            {
+                // Database exists but current login has no access.
+                return new();
+            }
+
+            return items;
+        }
+
+        private static async Task<string?> ValidateDatabaseNameAsync(System.Data.Common.DbConnection conn, string databaseName)
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name FROM sys.databases " +
+                "WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 AND name = @name";
+
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@name";
+            p.Value = databaseName;
+            cmd.Parameters.Add(p);
+
+            return await cmd.ExecuteScalarAsync() as string;
+        }
+
+        private static string EscapeSqlIdentifier(string value)
+            => value.Replace("]", "]]", StringComparison.Ordinal);
 
         public async Task<List<ReportDefinition>> GetAllWithColumnsAsync()
             => await _context.ReportDefinitions

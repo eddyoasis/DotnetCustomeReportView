@@ -32,22 +32,28 @@ namespace DataWarehousePower.Repositories
 
         public async Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
             string sourceTable,
-            IEnumerable<string> columnNames)
+            IEnumerable<string> columnNames,
+            string? sourceDatabase = null)
         {
             var conn = _context.Database.GetDbConnection();
             if (conn.State != ConnectionState.Open)
                 await conn.OpenAsync();
 
-            var safeTable = await ValidateTableNameAsync(conn, sourceTable);
+            var safeDatabase = await ResolveDatabaseNameAsync(conn, sourceDatabase);
+            if (safeDatabase is null)
+                return new();
+
+            var safeTable = await ValidateTableNameAsync(conn, sourceTable, safeDatabase);
             if (string.IsNullOrEmpty(safeTable))
                 return new();
 
-            var safeCols = await ValidateColumnNamesAsync(conn, sourceTable, columnNames);
+            var safeCols = await ValidateColumnNamesAsync(conn, sourceTable, columnNames, safeDatabase);
             if (safeCols.Count == 0)
                 return new();
 
             var colList = string.Join(", ", safeCols.Select(c => $"[{c}]"));
-            var sql     = $"SELECT {colList} FROM [{safeTable}]";
+            var escapedDb = EscapeSqlIdentifier(safeDatabase);
+            var sql = $"SELECT {colList} FROM [{escapedDb}]..[{safeTable}]";
 
             return await ExecuteReaderAsync(conn, sql, CommandType.Text);
         }
@@ -116,23 +122,43 @@ namespace DataWarehousePower.Repositories
 
         // ── Schema validation helpers ─────────────────────────────────────────
 
-        private static async Task<string?> ValidateTableNameAsync(DbConnection conn, string tableName)
+        private static async Task<string?> ResolveDatabaseNameAsync(DbConnection conn, string? sourceDatabase)
         {
+            var candidate = string.IsNullOrWhiteSpace(sourceDatabase)
+                ? conn.Database
+                : sourceDatabase.Trim();
+
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
-                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES " +
-                "WHERE TABLE_NAME = @name AND TABLE_TYPE = 'BASE TABLE'";
+                "SELECT name FROM sys.databases " +
+                "WHERE state_desc = 'ONLINE' AND name = @name";
+            AddParam(cmd, "@name", candidate);
+            return await cmd.ExecuteScalarAsync() as string;
+        }
+
+        private static async Task<string?> ValidateTableNameAsync(DbConnection conn, string tableName, string sourceDatabase)
+        {
+            var escapedDb = EscapeSqlIdentifier(sourceDatabase);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name FROM [" + escapedDb + "].sys.objects " +
+                "WHERE name = @name AND type IN ('U', 'V')";
             AddParam(cmd, "@name", tableName);
             return await cmd.ExecuteScalarAsync() as string;
         }
 
         private static async Task<List<string>> ValidateColumnNamesAsync(
-            DbConnection conn, string tableName, IEnumerable<string> columns)
+            DbConnection conn, string tableName, IEnumerable<string> columns, string sourceDatabase)
         {
+            var escapedDb = EscapeSqlIdentifier(sourceDatabase);
+
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @name";
-            AddParam(cmd, "@name", tableName);
+                "SELECT name FROM [" + escapedDb + "].sys.columns " +
+                "WHERE object_id IN (" +
+                "SELECT object_id FROM [" + escapedDb + "].sys.objects WHERE name = @objectName AND type IN ('U', 'V'))";
+            AddParam(cmd, "@objectName", tableName);
 
             var valid = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -176,5 +202,8 @@ namespace DataWarehousePower.Repositories
             p.Value         = value ?? DBNull.Value;
             cmd.Parameters.Add(p);
         }
+
+        private static string EscapeSqlIdentifier(string value)
+            => value.Replace("]", "]]", StringComparison.Ordinal);
     }
 }

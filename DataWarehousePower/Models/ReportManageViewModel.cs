@@ -22,11 +22,14 @@ namespace DataWarehousePower.Models
         [Display(Name = "Source Table")]
         public string? SourceTable { get; set; }
 
+            /// <summary>Dropdown options loaded from the selected source database (tables + views).</summary>
+            public List<string> SourceTableOptions { get; set; } = new();
+
         [MaxLength(200)]
         [Display(Name = "Source Database")]
         public string? SourceDatabase { get; set; }
 
-        /// <summary>Dropdown options loaded from the connected database table list.</summary>
+        /// <summary>Dropdown options loaded from the connected SQL Server database list.</summary>
         public List<string> SourceDatabaseOptions { get; set; } = new();
 
         [MaxLength(200)]
