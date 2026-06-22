@@ -26,6 +26,9 @@ namespace DataWarehousePower.Models
         [Display(Name = "Source Database")]
         public string? SourceDatabase { get; set; }
 
+        /// <summary>Dropdown options loaded from the connected database table list.</summary>
+        public List<string> SourceDatabaseOptions { get; set; } = new();
+
         [MaxLength(200)]
         [Display(Name = "Source Stored Procedure")]
         public string? SourceSP { get; set; }

@@ -38,7 +38,7 @@ namespace DataWarehousePower.Controllers
         }
 
         // GET /ReportManage/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
             var vm = new ReportManageFormViewModel
             {
@@ -47,6 +47,8 @@ namespace DataWarehousePower.Controllers
                     new() { PropertyName = "", DefaultLabel = "", DisplayOrder = 1 }
                 }
             };
+
+            await PopulateSourceDatabaseOptionsAsync(vm);
             return View("Form", vm);
         }
 
@@ -56,6 +58,7 @@ namespace DataWarehousePower.Controllers
             try
             {
                 var vm = await _service.GetFormViewModelAsync(id);
+                await PopulateSourceDatabaseOptionsAsync(vm);
                 return View("Form", vm);
             }
             catch (InvalidOperationException)
@@ -84,12 +87,16 @@ namespace DataWarehousePower.Controllers
             }
 
             if (!ModelState.IsValid)
+            {
+                await PopulateSourceDatabaseOptionsAsync(form);
                 return View("Form", form);
+            }
 
             // Must have at least one active column
             if (!form.Columns.Any(c => !c.IsDeleted))
             {
                 ModelState.AddModelError("", "At least one column is required.");
+                await PopulateSourceDatabaseOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -100,11 +107,13 @@ namespace DataWarehousePower.Controllers
             if (!hasTable && !hasSP)
             {
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure.");
+                await PopulateSourceDatabaseOptionsAsync(form);
                 return View("Form", form);
             }
             if (hasTable && hasSP)
             {
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure — not both.");
+                await PopulateSourceDatabaseOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -204,8 +213,14 @@ namespace DataWarehousePower.Controllers
                     },
                     detail: ex.Message);
                 ModelState.AddModelError("", "An error occurred while saving. Please try again.");
+                await PopulateSourceDatabaseOptionsAsync(form);
                 return View("Form", form);
             }
+        }
+
+        private async Task PopulateSourceDatabaseOptionsAsync(ReportManageFormViewModel vm)
+        {
+            vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
         }
 
         // POST /ReportManage/Delete/{id}

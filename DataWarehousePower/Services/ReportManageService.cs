@@ -18,6 +18,9 @@ namespace DataWarehousePower.Services
             return new ReportManageListViewModel { Reports = reports };
         }
 
+        public Task<List<string>> GetSourceDatabaseOptionsAsync()
+            => _repo.GetSourceDatabaseOptionsAsync();
+
         public async Task<ReportManageFormViewModel> GetFormViewModelAsync(int id)
         {
             var report = await _repo.GetByIdWithColumnsAsync(id);

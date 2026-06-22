@@ -28,9 +28,14 @@
 
             <div class="col-md-3">
                 <label asp-for="SourceDatabase" class="form-label"></label>
-                <input asp-for="SourceDatabase" class="form-control source-input" id="input-source-database"
-                       placeholder="e.g. ReportingDb" />
-                <div class="form-text">Database name for direct table mode.</div>
+                <select asp-for="SourceDatabase" class="form-select source-input" id="input-source-database">
+                    <option value="">-- Select database --</option>
+                    @foreach (var tableName in Model.SourceDatabaseOptions)
+                    {
+                        <option value="@tableName">@tableName</option>
+                    }
+                </select>
+                <div class="form-text">Loaded from the connected SQL Server database list.</div>
             </div>
 
             <div class="col-md-3">

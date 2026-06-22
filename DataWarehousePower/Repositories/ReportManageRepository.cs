@@ -1,6 +1,7 @@
 using DataWarehousePower.Data;
 using DataWarehousePower.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace DataWarehousePower.Repositories
 {
@@ -11,6 +12,30 @@ namespace DataWarehousePower.Repositories
         public ReportManageRepository(AppDbContext context)
         {
             _context = context;
+        }
+
+        public async Task<List<string>> GetSourceDatabaseOptionsAsync()
+        {
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name " +
+                "FROM sys.databases " +
+                "WHERE state_desc = 'ONLINE' " +
+                "ORDER BY name";
+
+            var items = new List<string>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (!reader.IsDBNull(0))
+                    items.Add(reader.GetString(0));
+            }
+
+            return items;
         }
 
         public async Task<List<ReportDefinition>> GetAllWithColumnsAsync()

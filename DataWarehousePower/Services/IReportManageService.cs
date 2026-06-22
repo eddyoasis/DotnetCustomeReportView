@@ -4,6 +4,7 @@ namespace DataWarehousePower.Services
 {
     public interface IReportManageService
     {
+        Task<List<string>> GetSourceDatabaseOptionsAsync();
         Task<ReportManageListViewModel> GetListViewModelAsync();
         Task<ReportManageFormViewModel> GetFormViewModelAsync(int id);
         Task<ReportDefinition> CreateReportAsync(ReportManageFormViewModel form);
