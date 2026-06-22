@@ -36,6 +36,9 @@ namespace DataWarehousePower.Models
         [Display(Name = "Source Stored Procedure")]
         public string? SourceSP { get; set; }
 
+        [Display(Name = "Parameters")]
+        public string? Parameters { get; set; }
+
         /// <summary>Dropdown options loaded from the selected source database stored procedures.</summary>
         public List<string> SourceSPOptions { get; set; } = new();
 
@@ -70,5 +73,11 @@ namespace DataWarehousePower.Models
 
         /// <summary>Marked true by the UI when the user removes a row.</summary>
         public bool IsDeleted { get; set; } = false;
+    }
+
+    public class ReportParameterFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? DefaultValue { get; set; }
     }
 }

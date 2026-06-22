@@ -79,7 +79,8 @@ namespace DataWarehousePower.Repositories
             string sourceSp,
             string? clientCode = null,
             DateTime? dateFrom = null,
-            DateTime? dateTo = null)
+            DateTime? dateTo = null,
+            IReadOnlyDictionary<string, string?>? parameterValues = null)
         {
             var conn = _context.Database.GetDbConnection();
             if (conn.State != ConnectionState.Open)
@@ -90,19 +91,42 @@ namespace DataWarehousePower.Repositories
             if (string.IsNullOrEmpty(safeSp))
                 return new();
 
-            var spParameterNames = await GetStoredProcedureParameterNamesAsync(conn, safeSp);
-            var parameters = new Dictionary<string, object?>();
+            var spParameterNames = await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp);
+            var parameters = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-            if (spParameterNames.Contains("@ClientCode"))
+            foreach (string parameterName in spParameterNames)
+            {
+                if (TryResolveInputParameterValue(parameterValues, parameterName, out string? parameterValue))
+                {
+                    parameters[parameterName] = string.IsNullOrWhiteSpace(parameterValue)
+                        ? DBNull.Value
+                        : parameterValue;
+                }
+            }
+
+            if (spParameterNames.Contains("@ClientCode") && !parameters.ContainsKey("@ClientCode"))
                 parameters["@ClientCode"] = string.IsNullOrWhiteSpace(clientCode) ? DBNull.Value : clientCode;
 
-            if (spParameterNames.Contains("@DateFrom"))
+            if (spParameterNames.Contains("@DateFrom") && !parameters.ContainsKey("@DateFrom"))
                 parameters["@DateFrom"] = dateFrom.HasValue ? dateFrom.Value.Date : DBNull.Value;
 
-            if (spParameterNames.Contains("@DateTo"))
+            if (spParameterNames.Contains("@DateTo") && !parameters.ContainsKey("@DateTo"))
                 parameters["@DateTo"] = dateTo.HasValue ? dateTo.Value.Date : DBNull.Value;
 
             return await ExecuteReaderAsync(conn, $"[{safeSp}]", CommandType.StoredProcedure, parameters);
+        }
+
+        public async Task<List<string>> GetStoredProcedureParameterNamesAsync(string sourceSp)
+        {
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var safeSp = await ValidateSpNameAsync(conn, sourceSp);
+            if (string.IsNullOrEmpty(safeSp))
+                return new();
+
+            return (await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp)).ToList();
         }
 
         // ── Shared reader helper ──────────────────────────────────────────────
@@ -192,14 +216,14 @@ namespace DataWarehousePower.Repositories
             return await cmd.ExecuteScalarAsync() as string;
         }
 
-        private static async Task<HashSet<string>> GetStoredProcedureParameterNamesAsync(DbConnection conn, string spName)
+        private static async Task<HashSet<string>> GetStoredProcedureParameterNamesCoreAsync(DbConnection conn, string spName)
         {
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
                 "SELECT p.name " +
                 "FROM sys.parameters p " +
                 "INNER JOIN sys.procedures sp ON p.object_id = sp.object_id " +
-                "WHERE sp.name = @name";
+                "WHERE sp.name = @name AND p.parameter_id > 0 AND p.is_output = 0";
             AddParam(cmd, "@name", spName);
 
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -208,6 +232,37 @@ namespace DataWarehousePower.Repositories
                 names.Add(reader.GetString(0));
 
             return names;
+        }
+
+        private static bool TryResolveInputParameterValue(
+            IReadOnlyDictionary<string, string?>? parameterValues,
+            string parameterName,
+            out string? value)
+        {
+            value = null;
+            if (parameterValues is null)
+            {
+                return false;
+            }
+
+            if (parameterValues.TryGetValue(parameterName, out value))
+            {
+                return true;
+            }
+
+            string normalizedName = parameterName.TrimStart('@');
+            if (parameterValues.TryGetValue(normalizedName, out value))
+            {
+                return true;
+            }
+
+            string prefixedName = "@" + normalizedName;
+            if (parameterValues.TryGetValue(prefixedName, out value))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private static void AddParam(System.Data.Common.DbCommand cmd, string name, object? value)

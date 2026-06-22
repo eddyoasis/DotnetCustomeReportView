@@ -18,7 +18,8 @@ namespace DataWarehousePower.Services
             string? schemaTemplate = null,
             string? clientCode = null,
             DateTime? dateFrom = null,
-            DateTime? dateTo = null);
+            DateTime? dateTo = null,
+            IReadOnlyDictionary<string, string?>? parameterValues = null);
 
         /// <summary>
         /// Persists the user's column preferences for a specific report.

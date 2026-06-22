@@ -2,6 +2,7 @@ using DataWarehousePower.Authorization;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DataWarehousePower.Controllers
@@ -47,7 +48,8 @@ namespace DataWarehousePower.Controllers
         {
             var userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, schemaTemplate, clientCode, dateFrom, dateTo);
+            Dictionary<string, string?> runtimeParameters = ResolveRuntimeParameters(Request.Query);
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, schemaTemplate, clientCode, dateFrom, dateTo, runtimeParameters);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -247,7 +249,8 @@ namespace DataWarehousePower.Controllers
                 request.SchemaTemplate,
                 request.ClientCode,
                 request.DateFrom,
-                request.DateTo);
+                request.DateTo,
+                request.Parameters);
 
             if (vm is null)
             {
@@ -329,6 +332,34 @@ namespace DataWarehousePower.Controllers
 
         private string? ResolveUserDepartment()
             => HttpContext.Session.GetString("UserDepartment");
+
+        private static Dictionary<string, string?> ResolveRuntimeParameters(IQueryCollection query)
+        {
+            HashSet<string> reservedKeys = new(StringComparer.OrdinalIgnoreCase)
+            {
+                "id",
+                "schemaTemplate",
+                "clientCode",
+                "dateFrom",
+                "dateTo",
+                "page",
+                "pageSize"
+            };
+
+            Dictionary<string, string?> values = new(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, Microsoft.Extensions.Primitives.StringValues> pair in query)
+            {
+                if (reservedKeys.Contains(pair.Key))
+                {
+                    continue;
+                }
+
+                string? value = pair.Value.Count > 0 ? pair.Value[0] : null;
+                values[pair.Key] = value;
+            }
+
+            return values;
+        }
     }
 
     public class SavePreferencesRequest

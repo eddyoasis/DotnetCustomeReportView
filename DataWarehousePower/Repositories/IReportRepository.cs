@@ -24,6 +24,9 @@ namespace DataWarehousePower.Repositories
             string sourceSp,
             string? clientCode = null,
             DateTime? dateFrom = null,
-            DateTime? dateTo = null);
+            DateTime? dateTo = null,
+            IReadOnlyDictionary<string, string?>? parameterValues = null);
+
+        Task<List<string>> GetStoredProcedureParameterNamesAsync(string sourceSp);
     }
 }

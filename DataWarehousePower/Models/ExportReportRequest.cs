@@ -10,5 +10,6 @@ namespace DataWarehousePower.Models
         public string? ClientCode { get; set; }
         public DateTime? DateFrom { get; set; }
         public DateTime? DateTo { get; set; }
+        public Dictionary<string, string?>? Parameters { get; set; }
     }
 }

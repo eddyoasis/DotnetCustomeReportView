@@ -41,6 +41,12 @@ namespace DataWarehousePower.Models
         public string? SourceSP { get; set; }
 
         /// <summary>
+        /// JSON configuration for source parameters, including optional default values.
+        /// Example: [{"Name":"@RegionCode","DefaultValue":"NA"}]
+        /// </summary>
+        public string? Parameters { get; set; }
+
+        /// <summary>
         /// When false the report is hidden from the report selection list.
         /// Defaults to true so all new reports are immediately visible.
         /// </summary>

@@ -151,6 +151,7 @@ namespace DataWarehousePower.Controllers
                             created.SourceDatabase,
                             created.SourceTable,
                             created.SourceSP,
+                            created.Parameters,
                             created.IsActive,
                             created.Departments
                         },
@@ -184,6 +185,7 @@ namespace DataWarehousePower.Controllers
                             existing.SourceDatabase,
                             existing.SourceTable,
                             existing.SourceSP,
+                            existing.Parameters,
                             existing.IsActive,
                             existing.Departments
                         },
@@ -194,6 +196,7 @@ namespace DataWarehousePower.Controllers
                             form.SourceDatabase,
                             form.SourceTable,
                             form.SourceSP,
+                            form.Parameters,
                             form.IsActive,
                             form.Departments
                         },
@@ -225,6 +228,7 @@ namespace DataWarehousePower.Controllers
                         form.SourceDatabase,
                         form.SourceTable,
                         form.SourceSP,
+                        form.Parameters,
                         form.IsActive,
                         form.Departments
                     },
@@ -287,6 +291,24 @@ namespace DataWarehousePower.Controllers
             }
         }
 
+        // GET /ReportManage/SourceParameters?sourceDatabase=YourDb&sourceTable=YourTable&sourceSP=YourSP
+        [HttpGet]
+        public async Task<IActionResult> SourceParameters(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            try
+            {
+                var items = await _service.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Parameter metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    sourceDatabase, sourceTable, sourceSP);
+                return Json(Array.Empty<string>());
+            }
+        }
+
         private async Task PopulateSourceDatabaseOptionsAsync(ReportManageFormViewModel vm)
         {
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
@@ -339,6 +361,7 @@ namespace DataWarehousePower.Controllers
                         existing.SourceDatabase,
                         existing.SourceTable,
                         existing.SourceSP,
+                        existing.Parameters,
                         existing.IsActive,
                         existing.Departments
                     },
@@ -364,6 +387,7 @@ namespace DataWarehousePower.Controllers
                         existing.SourceDatabase,
                         existing.SourceTable,
                         existing.SourceSP,
+                        existing.Parameters,
                         existing.IsActive,
                         existing.Departments
                     },

@@ -12,6 +12,9 @@ namespace DataWarehousePower.Models
         public string ClientCode { get; set; } = string.Empty;
         public DateTime? FilterDateFrom { get; set; }
         public DateTime? FilterDateTo { get; set; }
+        public List<ReportRuntimeParameter> RuntimeParameters { get; set; } = new();
+        public bool HasMissingRequiredParameters { get; set; }
+        public Dictionary<string, string> ActiveParameterValues { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public List<string> AvailableSchemaTemplates { get; set; } = new();
         public Dictionary<string, int> SchemaTemplatePreferenceIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<int, List<string>> ReportSchemaTemplatesByReportId { get; set; } = new();
@@ -45,5 +48,14 @@ namespace DataWarehousePower.Models
 
         /// <summary>All registered reports for the navigation sidebar.</summary>
         public List<ReportDefinition> AllReports { get; set; } = new();
+    }
+
+    public class ReportRuntimeParameter
+    {
+        public string Name { get; set; } = string.Empty;
+        public string QueryKey { get; set; } = string.Empty;
+        public string? DefaultValue { get; set; }
+        public string? Value { get; set; }
+        public bool IsRequired { get; set; } = true;
     }
 }

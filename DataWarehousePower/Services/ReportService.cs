@@ -7,6 +7,12 @@ namespace DataWarehousePower.Services
     public class ReportService : IReportService
     {
         private const int MaxLabelLen = 100;
+        private static readonly HashSet<string> _reservedFilterParameters = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "ClientCode",
+            "DateFrom",
+            "DateTo"
+        };
 
         private static readonly JsonSerializerOptions _jsonOpts =
             new() { PropertyNameCaseInsensitive = true };
@@ -37,12 +43,34 @@ namespace DataWarehousePower.Services
             string? schemaTemplate = null,
             string? clientCode = null,
             DateTime? dateFrom = null,
-            DateTime? dateTo = null)
+            DateTime? dateTo = null,
+            IReadOnlyDictionary<string, string?>? parameterValues = null)
         {
             string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
             string? normalizedClientCode = NormalizeNullableClientCode(clientCode);
             var report = await _reportRepo.GetReportWithColumnsAsync(reportId, userDepartment);
             if (report is null) return null;
+
+            List<ReportRuntimeParameter> runtimeParameters = new();
+            Dictionary<string, string> activeParameterValues = new(StringComparer.OrdinalIgnoreCase);
+            bool hasMissingRequiredParameters = false;
+
+            if (!string.IsNullOrWhiteSpace(report.SourceSP))
+            {
+                List<string> sourceParameterNames = await _reportRepo.GetStoredProcedureParameterNamesAsync(report.SourceSP);
+                List<ReportParameterFormModel> configuredParameters = DeserializeConfiguredParameters(report.Parameters);
+
+                runtimeParameters = BuildRuntimeParameters(sourceParameterNames, configuredParameters, parameterValues);
+                hasMissingRequiredParameters = runtimeParameters.Any(parameter =>
+                    parameter.IsRequired && string.IsNullOrWhiteSpace(parameter.Value));
+
+                activeParameterValues = runtimeParameters
+                    .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Value))
+                    .ToDictionary(
+                        parameter => parameter.QueryKey,
+                        parameter => parameter.Value!,
+                        StringComparer.OrdinalIgnoreCase);
+            }
 
             // Build system column list from DB definition
             var systemColumns = report.Columns
@@ -65,13 +93,24 @@ namespace DataWarehousePower.Services
             List<Dictionary<string, object?>> rows;
             if (!string.IsNullOrWhiteSpace(report.SourceSP))
             {
-                // SP returns its own columns; the ReportColumns definition is used
-                // only for labelling/ordering in the UI — not for filtering SELECT columns
-                rows = await _reportRepo.GetReportDataFromSpAsync(
-                    report.SourceSP,
-                    normalizedClientCode,
-                    dateFrom,
-                    dateTo);
+                if (hasMissingRequiredParameters)
+                {
+                    rows = new List<Dictionary<string, object?>>();
+                }
+                else
+                {
+                    // SP returns its own columns; the ReportColumns definition is used
+                    // only for labelling/ordering in the UI — not for filtering SELECT columns
+                    rows = await _reportRepo.GetReportDataFromSpAsync(
+                        report.SourceSP,
+                        normalizedClientCode,
+                        dateFrom,
+                        dateTo,
+                        runtimeParameters.ToDictionary(
+                            parameter => parameter.Name,
+                            parameter => parameter.Value,
+                            StringComparer.OrdinalIgnoreCase));
+                }
             }
             else if (!string.IsNullOrWhiteSpace(report.SourceTable))
             {
@@ -105,6 +144,9 @@ namespace DataWarehousePower.Services
                 ClientCode = normalizedClientCode ?? string.Empty,
                 FilterDateFrom   = dateFrom,
                 FilterDateTo     = dateTo,
+                RuntimeParameters = runtimeParameters,
+                HasMissingRequiredParameters = hasMissingRequiredParameters,
+                ActiveParameterValues = activeParameterValues,
                 AvailableSchemaTemplates = availableSchemaTemplates,
                 SchemaTemplatePreferenceIds = schemaTemplatePreferenceIds,
                 ReportSchemaTemplatesByReportId = reportSchemaTemplatesByReportId,
@@ -289,5 +331,85 @@ namespace DataWarehousePower.Services
                 IsVisible    = true,
                 Order        = i + 1
             }).ToList();
+
+        private static List<ReportRuntimeParameter> BuildRuntimeParameters(
+            IEnumerable<string> sourceParameterNames,
+            IEnumerable<ReportParameterFormModel> configuredParameters,
+            IReadOnlyDictionary<string, string?>? requestParameterValues)
+        {
+            Dictionary<string, ReportParameterFormModel> configuredByName = configuredParameters
+                .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Name))
+                .GroupBy(parameter => NormalizeParameterName(parameter.Name), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            List<ReportRuntimeParameter> runtimeParameters = new();
+            foreach (string sourceParameterName in sourceParameterNames)
+            {
+                string normalizedName = NormalizeParameterName(sourceParameterName);
+                if (_reservedFilterParameters.Contains(normalizedName))
+                {
+                    continue;
+                }
+
+                configuredByName.TryGetValue(normalizedName, out ReportParameterFormModel? configured);
+
+                string? defaultValue = configured?.DefaultValue?.Trim();
+                string? requestValue = ResolveRequestParameterValue(requestParameterValues, normalizedName);
+                string? effectiveValue = !string.IsNullOrWhiteSpace(requestValue) ? requestValue : defaultValue;
+
+                runtimeParameters.Add(new ReportRuntimeParameter
+                {
+                    Name = "@" + normalizedName,
+                    QueryKey = normalizedName,
+                    DefaultValue = defaultValue,
+                    Value = effectiveValue,
+                    IsRequired = true
+                });
+            }
+
+            return runtimeParameters;
+        }
+
+        private static List<ReportParameterFormModel> DeserializeConfiguredParameters(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new();
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<ReportParameterFormModel>>(json, _jsonOpts) ?? new();
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
+        private static string NormalizeParameterName(string name)
+            => name.Trim().TrimStart('@');
+
+        private static string? ResolveRequestParameterValue(
+            IReadOnlyDictionary<string, string?>? requestParameterValues,
+            string normalizedParameterName)
+        {
+            if (requestParameterValues is null)
+            {
+                return null;
+            }
+
+            if (requestParameterValues.TryGetValue(normalizedParameterName, out string? value))
+            {
+                return value?.Trim();
+            }
+
+            if (requestParameterValues.TryGetValue("@" + normalizedParameterName, out value))
+            {
+                return value?.Trim();
+            }
+
+            return null;
+        }
     }
 }

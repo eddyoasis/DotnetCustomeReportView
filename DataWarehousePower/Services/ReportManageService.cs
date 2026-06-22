@@ -30,6 +30,9 @@ namespace DataWarehousePower.Services
         public Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
             => _repo.GetSourceColumnsAsync(sourceDatabase, sourceTable, sourceSP);
 
+        public Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+            => _repo.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
+
         public async Task<ReportManageFormViewModel> GetFormViewModelAsync(int id)
         {
             var report = await _repo.GetByIdWithColumnsAsync(id);
@@ -67,6 +70,7 @@ namespace DataWarehousePower.Services
                 SourceDatabase  = r.SourceDatabase,
                 SourceTable     = r.SourceTable,
                 SourceSP        = r.SourceSP,
+                Parameters      = r.Parameters,
                 IsActive        = r.IsActive,
                 Departments     = r.Departments,
                 Columns         = r.Columns.Select(c => new ReportColumnFormModel
@@ -88,6 +92,7 @@ namespace DataWarehousePower.Services
                 SourceDatabase  = string.IsNullOrWhiteSpace(form.SourceDatabase) ? null : form.SourceDatabase.Trim(),
                 SourceTable     = string.IsNullOrWhiteSpace(form.SourceTable) ? null : form.SourceTable.Trim(),
                 SourceSP        = string.IsNullOrWhiteSpace(form.SourceSP) ? null : form.SourceSP.Trim(),
+                Parameters      = string.IsNullOrWhiteSpace(form.Parameters) ? null : form.Parameters.Trim(),
                 IsActive        = form.IsActive,
                 Departments     = string.IsNullOrWhiteSpace(form.Departments) ? null : form.Departments.Trim()
             };

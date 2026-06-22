@@ -1,6 +1,54 @@
 @model DataWarehousePower.Models.ReportViewModel
+@using Microsoft.AspNetCore.WebUtilities
 @{
     ViewData["Title"] = Model.ReportName;
+
+    string BuildReportUrl(int reportId, int? page = null, int? pageSize = null, string? overrideSchemaTemplate = null)
+    {
+        string baseUrl = Url.Action("Index", "Report", new { id = reportId }) ?? $"/Report/{reportId}";
+
+        Dictionary<string, string?> queryValues = new(StringComparer.OrdinalIgnoreCase);
+        string schemaTemplate = overrideSchemaTemplate ?? Model.SchemaTemplate;
+        if (!string.IsNullOrWhiteSpace(schemaTemplate))
+        {
+            queryValues["schemaTemplate"] = schemaTemplate;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Model.ClientCode))
+        {
+            queryValues["clientCode"] = Model.ClientCode;
+        }
+
+        if (Model.FilterDateFrom.HasValue)
+        {
+            queryValues["dateFrom"] = Model.FilterDateFrom.Value.ToString("yyyy-MM-dd");
+        }
+
+        if (Model.FilterDateTo.HasValue)
+        {
+            queryValues["dateTo"] = Model.FilterDateTo.Value.ToString("yyyy-MM-dd");
+        }
+
+        foreach (var parameter in Model.RuntimeParameters)
+        {
+            if (!string.IsNullOrWhiteSpace(parameter.Value))
+            {
+                queryValues[parameter.QueryKey] = parameter.Value;
+            }
+        }
+
+        if (page.HasValue)
+        {
+            queryValues["page"] = page.Value.ToString();
+        }
+
+        if (pageSize.HasValue)
+        {
+            queryValues["pageSize"] = pageSize.Value.ToString();
+        }
+
+        return queryValues.Count == 0 ? baseUrl : QueryHelpers.AddQueryString(baseUrl, queryValues);
+    }
 }
 
 <div class="row">
@@ -21,13 +69,8 @@
                     <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
                         <div class="d-flex align-items-center gap-2">
                             <a href="@Url.Action("Index", "Report", new
-                                             {
-                                                 id = r.Id,
-                                                 schemaTemplate = targetSchemaTemplate,
-                                                 clientCode = Model.ClientCode,
-                                                 dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
-                                                 dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")
-                                             })"
+                                             { id = r.Id })"
+                               data-target-url="@BuildReportUrl(r.Id, null, null, targetSchemaTemplate)"
                                class="text-decoration-none flex-grow-1 @(r.Id == Model.ReportId ? "text-white" : "")"
                                style="font-size:.85rem;">
                                 @r.ReportName
@@ -146,8 +189,37 @@
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                         <a class="btn btn-sm btn-outline-secondary w-100"
-                           href="@Url.Action("Index", "Report", new { id = Model.ReportId, schemaTemplate = Model.SchemaTemplate, clientCode = Model.ClientCode, pageSize = Model.PageSize })">Clear</a>
+                           href="@BuildReportUrl(Model.ReportId, null, Model.PageSize)">Clear</a>
                     </div>
+
+                    @if (Model.RuntimeParameters.Count > 0)
+                    {
+                        <div class="col-12"><hr class="my-2" /></div>
+
+                        @if (Model.HasMissingRequiredParameters)
+                        {
+                            <div class="col-12">
+                                <div class="alert alert-warning small mb-2 py-2">
+                                    This report requires parameter input before data can be loaded.
+                                </div>
+                            </div>
+                        }
+
+                        @foreach (var parameter in Model.RuntimeParameters)
+                        {
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="param-@parameter.QueryKey">@parameter.Name</label>
+                                <input id="param-@parameter.QueryKey"
+                                       name="@parameter.QueryKey"
+                                       data-runtime-param="true"
+                                       data-param-key="@parameter.QueryKey"
+                                       type="text"
+                                       class="form-control form-control-sm"
+                                       value="@parameter.Value"
+                                       placeholder="@(string.IsNullOrWhiteSpace(parameter.DefaultValue) ? "Required" : $"Default: {parameter.DefaultValue}")" />
+                            </div>
+                        }
+                    }
                 </form>
             </div>
         </div>
@@ -286,6 +358,10 @@
                 <input type="hidden" name="clientCode" value="@Model.ClientCode" />
                 <input type="hidden" name="dateFrom" value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
                 <input type="hidden" name="dateTo" value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                @foreach (var parameter in Model.RuntimeParameters)
+                {
+                    <input type="hidden" name="@parameter.QueryKey" value="@parameter.Value" />
+                }
                 <label for="page-size" class="small text-muted mb-0">Rows per page</label>
                 <select id="page-size" name="pageSize" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="10" selected="@(Model.PageSize == 10 ? "selected" : null)">10</option>
@@ -326,28 +402,10 @@
             </div>
             <div class="btn-group" role="group" aria-label="Pagination">
                 <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
-                   href="@Url.Action("Index", "Report", new
-                   {
-                       id = Model.ReportId,
-                       schemaTemplate = Model.SchemaTemplate,
-                       clientCode = Model.ClientCode,
-                       dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
-                       dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd"),
-                       page = Model.Page - 1,
-                       pageSize = Model.PageSize
-                   })"
+                   href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize)"
                    aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
                 <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
-                   href="@Url.Action("Index", "Report", new
-                   {
-                       id = Model.ReportId,
-                       schemaTemplate = Model.SchemaTemplate,
-                       clientCode = Model.ClientCode,
-                       dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
-                       dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd"),
-                       page = Model.Page + 1,
-                       pageSize = Model.PageSize
-                   })"
+                   href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize)"
                    aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
             </div>
         </div>
@@ -382,6 +440,7 @@
         const filterClientCodeInput = document.getElementById('filter-client-code');
         const filterDateFromInput = document.getElementById('filter-date-from');
         const filterDateToInput = document.getElementById('filter-date-to');
+        const runtimeParameterInputs = [...document.querySelectorAll('[data-runtime-param="true"]')];
         const exportPasswordModalElement = document.getElementById('export-password-modal');
         const exportPasswordInput = document.getElementById('export-password-input');
         const exportPasswordError = document.getElementById('export-password-error');
@@ -478,6 +537,7 @@
                 const scheduleUrl = new URL(`/Report/ScheduleReport/${reportId}`, window.location.origin);
                 const schemaTemplate = getActiveSchemaTemplate();
                 const clientCode = filterClientCodeInput.value.trim();
+                const runtimeParameters = getRuntimeParameterValues();
                 const selectedFormats = getSelectedExportFormats();
                 const returnUrl = new URL(window.location.href);
 
@@ -506,6 +566,14 @@
                 } else {
                     returnUrl.searchParams.delete('dateTo');
                 }
+
+                Object.entries(runtimeParameters).forEach(([key, value]) => {
+                    if (value) {
+                        returnUrl.searchParams.set(key, value);
+                    } else {
+                        returnUrl.searchParams.delete(key);
+                    }
+                });
 
                 selectedFormats.forEach(format => scheduleUrl.searchParams.append('formats', format));
                 scheduleUrl.searchParams.set('returnUrl', `${returnUrl.pathname}${returnUrl.search}`);
@@ -970,7 +1038,7 @@
                 return;
             }
 
-            const option = [...SchemaTemplateSelect.options].find(item =>
+            const option = [...schemaTemplateSelect.options].find(item =>
                 item.value.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0);
 
             if (option) {
@@ -1067,7 +1135,8 @@
                 schemaTemplate: getActiveSchemaTemplate(),
                 clientCode: filterClientCodeInput.value.trim() || null,
                 dateFrom: filterDateFromInput.value || null,
-                dateTo: filterDateToInput.value || null
+                    dateTo: filterDateToInput.value || null,
+                    parameters: getRuntimeParameterValues()
             };
 
             try {
@@ -1112,11 +1181,31 @@
             return [...exportFormatSelect.selectedOptions].map(option => option.value);
         }
 
+        function getRuntimeParameterValues() {
+            return runtimeParameterInputs.reduce((acc, input) => {
+                const key = input.getAttribute('data-param-key') || '';
+                if (!key) {
+                    return acc;
+                }
+
+                const value = (input.value || '').trim();
+                acc[key] = value || null;
+                return acc;
+            }, {});
+        }
+
         if (filterForm && filterSchemaTemplateInput) {
             filterForm.addEventListener('submit', () => {
                 filterSchemaTemplateInput.value = getActiveSchemaTemplate();
             });
         }
+
+        document.querySelectorAll('a[data-target-url]').forEach(link => {
+            const targetUrl = link.getAttribute('data-target-url');
+            if (targetUrl) {
+                link.setAttribute('href', targetUrl);
+            }
+        });
 
         syncSchemaTemplateUi(initialSchemaTemplate);
     </script>

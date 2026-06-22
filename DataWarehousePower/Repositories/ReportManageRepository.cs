@@ -132,6 +132,48 @@ namespace DataWarehousePower.Repositories
             return new();
         }
 
+        public async Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase) || string.IsNullOrWhiteSpace(sourceSP))
+                return new();
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var escapedDatabase = EscapeSqlIdentifier(sourceDatabase.Trim());
+            var items = new List<string>();
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT p.name " +
+                "FROM [" + escapedDatabase + "].sys.parameters p " +
+                "INNER JOIN [" + escapedDatabase + "].sys.procedures sp ON p.object_id = sp.object_id " +
+                "WHERE sp.name = @spName AND p.parameter_id > 0 AND p.is_output = 0 " +
+                "ORDER BY p.parameter_id";
+
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@spName";
+            p.Value = sourceSP.Trim();
+            cmd.Parameters.Add(p);
+
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                        items.Add(reader.GetString(0));
+                }
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911)
+            {
+                return new();
+            }
+
+            return items;
+        }
+
         private static async Task<List<string>> GetSourceColumnsFromTableOrViewAsync(
             System.Data.Common.DbConnection conn,
             string safeDatabase,
@@ -308,6 +350,7 @@ namespace DataWarehousePower.Repositories
             existing.SourceDatabase = report.SourceDatabase;
             existing.SourceTable = report.SourceTable;
             existing.SourceSP = report.SourceSP;
+            existing.Parameters = report.Parameters;
             existing.IsActive = report.IsActive;
             existing.Departments = report.Departments;
 

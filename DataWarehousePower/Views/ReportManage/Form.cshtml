@@ -68,7 +68,7 @@
                 <div class="form-text">Loaded from the selected source database tables and views.</div>
             </div>
 
-            <div class="col-md-3" hidden>
+            <div class="col-md-3">
                 <label asp-for="SourceSP" class="form-label"></label>
                 <div class="dropdown searchable-source-dropdown" id="source-sp-dropdown" data-bs-auto-close="outside">
                     <input asp-for="SourceSP" type="hidden" class="source-input" id="input-source-sp" />
@@ -87,6 +87,15 @@
                     </div>
                 </div>
                 <div class="form-text">Loaded from the selected source database stored procedures.</div>
+            </div>
+
+            <div class="col-md-12">
+                <input asp-for="Parameters" type="hidden" id="input-parameters" />
+                <label class="form-label">Parameters</label>
+                <div id="source-parameters-list" class="border rounded p-2 bg-light-subtle">
+                    <div id="source-parameters-empty" class="text-muted small">No required parameters detected for this source.</div>
+                </div>
+                <div class="form-text">Detected from selected source object. Set defaults here; if left blank, users will be prompted when opening the report.</div>
             </div>
 
             <div class="col-md-12">
@@ -271,11 +280,16 @@ function toggleNoColsMessage() {
 const databaseInput = document.getElementById('input-source-database');
 const tableInput = document.getElementById('input-source-table');
 const spInput    = document.getElementById('input-source-sp');
+const parametersInput = document.getElementById('input-parameters');
+const sourceParametersList = document.getElementById('source-parameters-list');
+const sourceParametersEmpty = document.getElementById('source-parameters-empty');
 const sourceObjectsUrl = '@Url.Action("SourceObjects", "ReportManage")';
 const sourceProceduresUrl = '@Url.Action("SourceProcedures", "ReportManage")';
 const sourceColumnsUrl = '@Url.Action("SourceColumns", "ReportManage")';
+const sourceParametersUrl = '@Url.Action("SourceParameters", "ReportManage")';
 let sourceObjectsRequestSeq = 0;
 let sourceProceduresRequestSeq = 0;
+let sourceParametersRequestSeq = 0;
 const searchableDropdownStates = new Map();
 
 function getDropdownDisplayText(placeholder, value) {
@@ -438,6 +452,129 @@ function highlightSource() {
     spInput.classList.toggle('border-warning',    hasTable && hasSP);
 }
 
+function normalizeParameterName(name) {
+    return (name || '').trim().replace(/^@@+/, '');
+}
+
+function escapeHtmlAttribute(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function parseConfiguredParameters() {
+    const raw = (parametersInput.value || '').trim();
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .map(item => ({
+                name: normalizeParameterName(item?.name || item?.Name || ''),
+                defaultValue: (item?.defaultValue || item?.DefaultValue || '').toString().trim()
+            }))
+            .filter(item => item.name);
+    } catch {
+        return [];
+    }
+}
+
+function serializeParametersFromUi() {
+    const rows = [...sourceParametersList.querySelectorAll('[data-param-row]')];
+    const payload = rows
+        .map(row => {
+            const name = normalizeParameterName(row.getAttribute('data-param-name') || '');
+            const input = row.querySelector('input[data-param-default]');
+            const defaultValue = (input?.value || '').trim();
+            return name ? { Name: `@@${name}`, DefaultValue: defaultValue || null } : null;
+        })
+        .filter(Boolean);
+
+    parametersInput.value = payload.length ? JSON.stringify(payload) : '';
+}
+
+function renderSourceParameters(parameterNames, existingDefaults) {
+    sourceParametersList.querySelectorAll('[data-param-row]').forEach(item => item.remove());
+
+    const defaultsByName = new Map(
+        existingDefaults.map(item => [normalizeParameterName(item.name), item.defaultValue || ''])
+    );
+
+    const uniqueNames = [...new Set((parameterNames || []).map(name => normalizeParameterName(name)).filter(Boolean))];
+
+    if (uniqueNames.length === 0) {
+        sourceParametersEmpty.style.display = 'block';
+        parametersInput.value = '';
+        return;
+    }
+
+    sourceParametersEmpty.style.display = 'none';
+    uniqueNames.forEach(name => {
+        const row = document.createElement('div');
+        row.className = 'row g-2 align-items-center mb-2';
+        row.setAttribute('data-param-row', 'true');
+        row.setAttribute('data-param-name', name);
+
+        const defaultValue = defaultsByName.get(name) || '';
+        row.innerHTML = `
+            <div class="col-md-4">
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border">@@${name}</span>
+            </div>
+            <div class="col-md-8">
+                <input type="text" class="form-control form-control-sm" data-param-default="true" value="${escapeHtmlAttribute(defaultValue)}" placeholder="Default value (optional)" />
+            </div>`;
+
+        sourceParametersList.appendChild(row);
+    });
+
+    serializeParametersFromUi();
+}
+
+async function loadSourceParameters() {
+    const requestSeq = ++sourceParametersRequestSeq;
+    const dbName = (databaseInput.value || '').trim();
+    const sourceSP = (spInput.value || '').trim();
+
+    if (!dbName || !sourceSP) {
+        renderSourceParameters([], []);
+        return;
+    }
+
+    const existingDefaults = parseConfiguredParameters();
+
+    try {
+        const response = await fetch(
+            `${sourceParametersUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=&sourceSP=${encodeURIComponent(sourceSP)}`,
+            { cache: 'no-store' }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to load source parameters');
+        }
+
+        const items = await response.json();
+        if (requestSeq !== sourceParametersRequestSeq) {
+            return;
+        }
+
+        renderSourceParameters(Array.isArray(items) ? items : [], existingDefaults);
+    } catch {
+        if (requestSeq !== sourceParametersRequestSeq) {
+            return;
+        }
+        renderSourceParameters([], existingDefaults);
+    }
+}
+
 databaseInput.addEventListener('change', highlightSource);
 tableInput.addEventListener('change', highlightSource);
 spInput.addEventListener('change',   highlightSource);
@@ -571,11 +708,13 @@ async function autoGenerateColumnsFromSource() {
 databaseInput.addEventListener('change', () => {
     loadSourceObjects('');
     loadSourceProcedures('');
+    loadSourceParameters();
 });
 
 tableInput.addEventListener('change', () => {
     if ((tableInput.value || '').trim()) {
         spInput.value = '';
+        loadSourceParameters();
         autoGenerateColumnsFromSource();
     }
 });
@@ -584,6 +723,13 @@ spInput.addEventListener('change', () => {
     if ((spInput.value || '').trim()) {
         tableInput.value = '';
         autoGenerateColumnsFromSource();
+    }
+    loadSourceParameters();
+});
+
+sourceParametersList.addEventListener('input', e => {
+    if (e.target instanceof HTMLInputElement && e.target.matches('[data-param-default]')) {
+        serializeParametersFromUi();
     }
 });
 
@@ -615,5 +761,6 @@ initializeSearchableDropdown({
 
 loadSourceObjects(tableInput.value);
 loadSourceProcedures(spInput.value);
+loadSourceParameters();
 </script>
 }

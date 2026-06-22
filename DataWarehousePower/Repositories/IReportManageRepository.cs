@@ -8,6 +8,7 @@ namespace DataWarehousePower.Repositories
         Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+        Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
         Task<List<ReportDefinition>> GetAllWithColumnsAsync();
         Task<ReportDefinition?> GetByIdWithColumnsAsync(int id);
         Task<ReportDefinition> CreateAsync(ReportDefinition report, IEnumerable<ReportColumn> columns);
