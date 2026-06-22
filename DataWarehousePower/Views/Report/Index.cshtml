@@ -19,18 +19,26 @@
                     : null;
 
                     <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
-                        <a href="@Url.Action("Index", "Report", new
-                                         {
-                                             id = r.Id,
-                                             schemaTemplate = targetSchemaTemplate,
-                                             clientCode = Model.ClientCode,
-                                             dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
-                                             dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")
-                                         })"
-                           class="text-decoration-none @(r.Id == Model.ReportId ? "text-white" : "")"
-                           style="font-size:.85rem;">
-                            @r.ReportName
-                        </a>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="@Url.Action("Index", "Report", new
+                                             {
+                                                 id = r.Id,
+                                                 schemaTemplate = targetSchemaTemplate,
+                                                 clientCode = Model.ClientCode,
+                                                 dateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
+                                                 dateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd")
+                                             })"
+                               class="text-decoration-none flex-grow-1 @(r.Id == Model.ReportId ? "text-white" : "")"
+                               style="font-size:.85rem;">
+                                @r.ReportName
+                            </a>
+                            <a href="@Url.Action("Edit", "ReportManage", new { id = r.Id })"
+                               class="btn btn-sm @(r.Id == Model.ReportId ? "btn-light text-primary" : "btn-outline-primary")"
+                               title="Edit this report"
+                               aria-label="Edit @r.ReportName">
+                                Edit
+                            </a>
+                        </div>
                     </li>
                 }
             </ul>
