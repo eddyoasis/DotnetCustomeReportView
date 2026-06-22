@@ -2,6 +2,9 @@
 @using Microsoft.AspNetCore.WebUtilities
 @{
     ViewData["Title"] = Model.ReportName;
+    var visibleRuntimeParameters = Model.RuntimeParameters
+        .Where(parameter => string.IsNullOrWhiteSpace(parameter.DefaultValue))
+        .ToList();
 
     string BuildReportUrl(int reportId, int? page = null, int? pageSize = null, string? overrideSchemaTemplate = null)
     {
@@ -192,7 +195,7 @@
                            href="@BuildReportUrl(Model.ReportId, null, Model.PageSize)">Clear</a>
                     </div>
 
-                    @if (Model.RuntimeParameters.Count > 0)
+                    @if (visibleRuntimeParameters.Count > 0)
                     {
                         <div class="col-12"><hr class="my-2" /></div>
 
@@ -205,7 +208,7 @@
                             </div>
                         }
 
-                        @foreach (var parameter in Model.RuntimeParameters)
+                        @foreach (var parameter in visibleRuntimeParameters)
                         {
                             <div class="col-md-4">
                                 <label class="form-label small fw-semibold" for="param-@parameter.QueryKey">@parameter.Name</label>
@@ -216,7 +219,7 @@
                                        type="text"
                                        class="form-control form-control-sm"
                                        value="@parameter.Value"
-                                       placeholder="@(string.IsNullOrWhiteSpace(parameter.DefaultValue) ? "Required" : $"Default: {parameter.DefaultValue}")" />
+                                       placeholder="Required" />
                             </div>
                         }
                     }
