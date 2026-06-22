@@ -22,7 +22,8 @@ public sealed class ScheduledJobController(
     public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
-        ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId);
+        string? userDepartment = ResolveUserDepartment();
+        ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         viewModel.ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
         if (reportDefinitionId.HasValue && reportDefinitionId.Value > 0)
@@ -69,7 +70,8 @@ public sealed class ScheduledJobController(
         try
         {
             string userId = columnPreferenceService.ResolveUserId(HttpContext);
-            ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId);
+            string? userDepartment = ResolveUserDepartment();
+            ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
             return View("Form", viewModel);
         }
         catch (InvalidOperationException)
@@ -86,17 +88,18 @@ public sealed class ScheduledJobController(
 
         if (!ModelState.IsValid)
         {
-            await PopulateFormLookupsAsync(form, userId);
+            await PopulateFormLookupsAsync(form, userId, ResolveUserDepartment());
             return View("Form", form);
         }
 
         string username = ResolveAuditUsername();
+        string userDepartment = ResolveUserDepartment();
 
         try
         {
             if (form.Id == 0)
             {
-                int id = await scheduledReportJobService.CreateAsync(form, userId, username);
+                int id = await scheduledReportJobService.CreateAsync(form, userId, username, userDepartment);
                 TempData["Success"] = $"Scheduled job created (ID: {id}).";
 
                 if (Url.IsLocalUrl(form.ReturnUrl))
@@ -106,7 +109,7 @@ public sealed class ScheduledJobController(
             }
             else
             {
-                await scheduledReportJobService.UpdateAsync(form, userId, username);
+                await scheduledReportJobService.UpdateAsync(form, userId, username, userDepartment);
                 TempData["Success"] = "Scheduled job updated.";
             }
 
@@ -116,14 +119,14 @@ public sealed class ScheduledJobController(
         {
             logger.LogWarning(ex, "Validation failed when saving scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, ex.Message);
-            await PopulateFormLookupsAsync(form, userId);
+            await PopulateFormLookupsAsync(form, userId, ResolveUserDepartment());
             return View("Form", form);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, "An unexpected error occurred while saving the job.");
-            await PopulateFormLookupsAsync(form, userId);
+            await PopulateFormLookupsAsync(form, userId, ResolveUserDepartment());
             return View("Form", form);
         }
     }
@@ -154,12 +157,14 @@ public sealed class ScheduledJobController(
         try
         {
             string userId = columnPreferenceService.ResolveUserId(HttpContext);
-            ScheduledJobFormViewModel form = await scheduledReportJobService.GetEditFormAsync(id, userId);
+            string? userDepartment = ResolveUserDepartment();
+            ScheduledJobFormViewModel form = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
             form.IsActive = !form.IsActive;
             await scheduledReportJobService.UpdateAsync(
                 form,
                 userId,
-                ResolveAuditUsername());
+                ResolveAuditUsername(),
+                ResolveUserDepartment());
             TempData["Success"] = "Scheduled job status updated.";
         }
         catch (Exception ex)
@@ -182,9 +187,12 @@ public sealed class ScheduledJobController(
         return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Anonymous" : User.Identity!.Name!.Trim();
     }
 
-    private async Task PopulateFormLookupsAsync(ScheduledJobFormViewModel form, string userId)
+    private string? ResolveUserDepartment()
+        => HttpContext.Session.GetString("UserDepartment");
+
+    private async Task PopulateFormLookupsAsync(ScheduledJobFormViewModel form, string userId, string? userDepartment)
     {
-        ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId);
+        ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         form.AvailableReports = lookupForm.AvailableReports;
         form.AvailableSchemaTemplatesByReportId = lookupForm.AvailableSchemaTemplatesByReportId;
         form.AvailableParametersByReportId = lookupForm.AvailableParametersByReportId;
@@ -194,7 +202,7 @@ public sealed class ScheduledJobController(
 
         if (form.Id > 0 && string.IsNullOrWhiteSpace(form.ExistingPassword))
         {
-            ScheduledJobFormViewModel editForm = await scheduledReportJobService.GetEditFormAsync(form.Id, userId);
+            ScheduledJobFormViewModel editForm = await scheduledReportJobService.GetEditFormAsync(form.Id, userId, userDepartment);
             form.ExistingPassword = editForm.ExistingPassword;
         }
     }

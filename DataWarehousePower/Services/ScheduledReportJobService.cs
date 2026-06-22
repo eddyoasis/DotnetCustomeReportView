@@ -135,12 +135,12 @@ public sealed class ScheduledReportJobService(
         return existingJob?.Id;
     }
 
-    public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId)
+    public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId, string? userDepartment = null)
     {
-        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
+        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
-            await BuildParameterLookupByReportIdAsync(availableReports);
+            await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
 
         return new ScheduledJobFormViewModel
         {
@@ -162,15 +162,15 @@ public sealed class ScheduledReportJobService(
         };
     }
 
-    public async Task<ScheduledJobFormViewModel> GetEditFormAsync(int id, string userId)
+    public async Task<ScheduledJobFormViewModel> GetEditFormAsync(int id, string userId, string? userDepartment = null)
     {
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserAsync(id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
-        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync();
+        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
-            await BuildParameterLookupByReportIdAsync(availableReports);
+            await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
 
         ScheduledJobFormViewModel form = new()
         {
@@ -204,13 +204,13 @@ public sealed class ScheduledReportJobService(
         return form;
     }
 
-    public async Task<int> CreateAsync(ScheduledJobFormViewModel form, string userId, string username)
+    public async Task<int> CreateAsync(ScheduledJobFormViewModel form, string userId, string username, string userDepartment)
     {
         ValidateForm(form);
-        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId);
+        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId, userDepartment);
         string? normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
 
-        string generatedJobName = await BuildJobNameAsync(form, userId);
+        string generatedJobName = await BuildJobNameAsync(form, userId, userDepartment);
 
         ScheduledReportJob entity = new()
         {
@@ -241,16 +241,16 @@ public sealed class ScheduledReportJobService(
         return entity.Id;
     }
 
-    public async Task UpdateAsync(ScheduledJobFormViewModel form, string userId, string username)
+    public async Task UpdateAsync(ScheduledJobFormViewModel form, string userId, string username, string userDepartment)
     {
         ValidateForm(form);
-        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId);
+        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId, userDepartment);
         string? normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
 
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserUpdateAsync(form.Id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {form.Id} was not found.");
 
-        string newJobName = await BuildJobNameAsync(form, userId, form.Id);
+        string newJobName = await BuildJobNameAsync(form, userId, userDepartment, form.Id);
         string oldHangfireJobId = entity.HangfireJobId;
         string newHangfireJobId = newJobName;
 
@@ -337,17 +337,17 @@ public sealed class ScheduledReportJobService(
             });
     }
 
-    private async Task<List<ReportDefinitionLookupItem>> GetReportLookupAsync()
+    private async Task<List<ReportDefinitionLookupItem>> GetReportLookupAsync(string? userDepartment)
     {
-        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync();
+        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
         return reports
             .Select(report => new ReportDefinitionLookupItem { Id = report.Id, ReportName = report.ReportName })
             .ToList();
     }
 
-    private async Task<ReportDefinition> GetReportDefinitionAsync(int reportDefinitionId)
+    private async Task<ReportDefinition> GetReportDefinitionAsync(int reportDefinitionId, string userDepartment)
     {
-        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync();
+        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
         return reports.FirstOrDefault(candidate => candidate.Id == reportDefinitionId)
             ?? throw new InvalidOperationException("Report was not found.");
     }
@@ -376,9 +376,10 @@ public sealed class ScheduledReportJobService(
             .ToList();
 
     private async Task<Dictionary<int, List<ScheduledJobParameterInputViewModel>>> BuildParameterLookupByReportIdAsync(
-        IEnumerable<ReportDefinitionLookupItem> reports)
+        IEnumerable<ReportDefinitionLookupItem> reports,
+        string? userDepartment)
     {
-        List<ReportDefinition> reportDefinitions = await reportRepository.GetAllReportsAsync();
+        List<ReportDefinition> reportDefinitions = await reportRepository.GetAllReportsAsync(userDepartment);
         Dictionary<int, ReportDefinition> reportById = reportDefinitions
             .GroupBy(report => report.Id)
             .ToDictionary(group => group.Key, group => group.First());
@@ -392,13 +393,13 @@ public sealed class ScheduledReportJobService(
                 continue;
             }
 
-            parametersByReportId[report.Id] = await GetRequiredScheduledParametersAsync(reportDefinition);
+            parametersByReportId[report.Id] = await GetScheduledParametersAsync(reportDefinition);
         }
 
         return parametersByReportId;
     }
 
-    private async Task<List<ScheduledJobParameterInputViewModel>> GetRequiredScheduledParametersAsync(ReportDefinition report)
+    private async Task<List<ScheduledJobParameterInputViewModel>> GetScheduledParametersAsync(ReportDefinition report)
     {
         if (string.IsNullOrWhiteSpace(report.SourceSP))
         {
@@ -421,16 +422,12 @@ public sealed class ScheduledReportJobService(
                 ? configuredDefault
                 : null;
 
-            if (!string.IsNullOrWhiteSpace(defaultValue))
-            {
-                continue;
-            }
-
             items.Add(new ScheduledJobParameterInputViewModel
             {
                 Name = "@" + queryKey,
                 QueryKey = queryKey,
-                DefaultValue = defaultValue
+                DefaultValue = defaultValue,
+                IsRequired = string.IsNullOrWhiteSpace(defaultValue)
             });
         }
 
@@ -439,8 +436,8 @@ public sealed class ScheduledReportJobService(
 
     private async Task<string?> NormalizeScheduledParametersJsonAsync(string? inputJson, ReportDefinition report)
     {
-        List<ScheduledJobParameterInputViewModel> requiredParameters = await GetRequiredScheduledParametersAsync(report);
-        if (requiredParameters.Count == 0)
+        List<ScheduledJobParameterInputViewModel> scheduledParameters = await GetScheduledParametersAsync(report);
+        if (scheduledParameters.Count == 0)
         {
             return null;
         }
@@ -448,21 +445,32 @@ public sealed class ScheduledReportJobService(
         Dictionary<string, string?> inputValues = ParseScheduledParameterValues(inputJson);
         List<ScheduledJobParameterValue> result = [];
 
-        foreach (ScheduledJobParameterInputViewModel requiredParameter in requiredParameters)
+        foreach (ScheduledJobParameterInputViewModel parameter in scheduledParameters)
         {
-            if (!inputValues.TryGetValue(requiredParameter.QueryKey, out string? value) || string.IsNullOrWhiteSpace(value))
+            bool hasInput = inputValues.TryGetValue(parameter.QueryKey, out string? rawValue);
+            string? inputValue = rawValue?.Trim();
+            string? effectiveValue = !string.IsNullOrWhiteSpace(inputValue)
+                ? inputValue
+                : parameter.DefaultValue?.Trim();
+
+            if (parameter.IsRequired && string.IsNullOrWhiteSpace(effectiveValue))
             {
-                throw new InvalidOperationException($"Parameter {requiredParameter.Name} is required for this report.");
+                throw new InvalidOperationException($"Parameter {parameter.Name} is required for this report.");
+            }
+
+            if (!hasInput && string.IsNullOrWhiteSpace(effectiveValue))
+            {
+                continue;
             }
 
             result.Add(new ScheduledJobParameterValue
             {
-                Name = requiredParameter.Name,
-                Value = value.Trim()
+                Name = parameter.Name,
+                Value = effectiveValue
             });
         }
 
-        return JsonSerializer.Serialize(result);
+        return result.Count == 0 ? null : JsonSerializer.Serialize(result);
     }
 
     private static Dictionary<string, string?> ParseReportParameterDefaults(string? json)
@@ -526,9 +534,9 @@ public sealed class ScheduledReportJobService(
         public string? Value { get; set; }
     }
 
-    private async Task<string> BuildJobNameAsync(ScheduledJobFormViewModel form, string userId, int? currentJobId = null)
+    private async Task<string> BuildJobNameAsync(ScheduledJobFormViewModel form, string userId, string userDepartment, int? currentJobId = null)
     {
-        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync();
+        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
         ReportDefinition report = reports.FirstOrDefault(candidate => candidate.Id == form.ReportDefinitionId)
             ?? throw new InvalidOperationException("Report was not found.");
 

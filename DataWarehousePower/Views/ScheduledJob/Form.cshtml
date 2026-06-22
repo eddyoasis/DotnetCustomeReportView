@@ -240,9 +240,9 @@
                     <input asp-for="Parameters" type="hidden" id="scheduled-job-parameters" />
                     <label class="form-label">Parameters</label>
                     <div id="scheduled-parameters-container" class="border rounded p-3">
-                        <div id="scheduled-parameters-empty" class="text-muted small">No required parameters for the selected report.</div>
+                        <div id="scheduled-parameters-empty" class="text-muted small">No parameters for the selected report.</div>
                     </div>
-                    <div class="form-text">These values are used when this scheduled job runs report export.</div>
+                    <div class="form-text">These values are used when this scheduled job runs report export. Parameters with defaults are prefilled and can be overridden.</div>
                     <span asp-validation-for="Parameters" class="text-danger"></span>
                 </div>
 
@@ -524,7 +524,13 @@
                 reportParameters.forEach(parameter => {
                     const queryKey = normalizeParameterName(parameter.queryKey || parameter.QueryKey || '');
                     const name = (parameter.name || parameter.Name || '').toString().trim() || `@@${queryKey}`;
-                    const value = existingValues.get(queryKey) || '';
+                    const defaultValue = (parameter.defaultValue || parameter.DefaultValue || '').toString().trim();
+                    const value = existingValues.has(queryKey)
+                        ? (existingValues.get(queryKey) || '')
+                        : defaultValue;
+                    const isRequired = !!(parameter.isRequired || parameter.IsRequired);
+                    const labelText = isRequired ? `${name} *` : name;
+                    const placeholder = isRequired ? 'Required' : 'Optional';
 
                     const row = document.createElement('div');
                     row.className = 'row g-2 align-items-center mb-2';
@@ -532,10 +538,10 @@
                     row.setAttribute('data-param-query-key', queryKey);
                     row.innerHTML = `
                         <div class="col-md-4">
-                            <span class="bg-secondary-subtle text-secondary-emphasis border">${name}</span>
+                            <span class="bg-secondary-subtle text-secondary-emphasis border">${labelText}</span>
                         </div>
                         <div class="col-md-8">
-                            <input type="text" class="form-control form-control-sm" data-scheduled-param-value="true" placeholder="Required" value="${escapeHtmlAttribute(value)}" />
+                            <input type="text" class="form-control form-control-sm" data-scheduled-param-value="true" placeholder="${placeholder}" value="${escapeHtmlAttribute(value)}" />
                         </div>`;
 
                     scheduledParametersContainer.appendChild(row);

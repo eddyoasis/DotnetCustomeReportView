@@ -148,6 +148,7 @@ public sealed class ScheduledJobParameterInputViewModel
     public string Name { get; set; } = string.Empty;
     public string QueryKey { get; set; } = string.Empty;
     public string? DefaultValue { get; set; }
+    public bool IsRequired { get; set; }
 }
 
 public sealed class ReportDefinitionLookupItem
