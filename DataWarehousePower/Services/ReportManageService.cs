@@ -50,12 +50,13 @@ namespace DataWarehousePower.Services
         private static ReportManageFormViewModel MapToForm(ReportDefinition r) =>
             new()
             {
-                Id          = r.Id,
-                ReportName  = r.ReportName,
-                SourceTable = r.SourceTable,
-                SourceSP    = r.SourceSP,
-                IsActive    = r.IsActive,
-                Columns     = r.Columns.Select(c => new ReportColumnFormModel
+                Id             = r.Id,
+                ReportName      = r.ReportName,
+                SourceDatabase  = r.SourceDatabase,
+                SourceTable     = r.SourceTable,
+                SourceSP        = r.SourceSP,
+                IsActive        = r.IsActive,
+                Columns         = r.Columns.Select(c => new ReportColumnFormModel
                 {
                     Id           = c.Id,
                     PropertyName = c.PropertyName,
@@ -69,11 +70,12 @@ namespace DataWarehousePower.Services
         {
             var report = new ReportDefinition
             {
-                Id          = form.Id,
-                ReportName  = form.ReportName.Trim(),
-                SourceTable = string.IsNullOrWhiteSpace(form.SourceTable) ? null : form.SourceTable.Trim(),
-                SourceSP    = string.IsNullOrWhiteSpace(form.SourceSP)    ? null : form.SourceSP.Trim(),
-                IsActive    = form.IsActive
+                Id             = form.Id,
+                ReportName      = form.ReportName.Trim(),
+                SourceDatabase  = string.IsNullOrWhiteSpace(form.SourceDatabase) ? null : form.SourceDatabase.Trim(),
+                SourceTable     = string.IsNullOrWhiteSpace(form.SourceTable) ? null : form.SourceTable.Trim(),
+                SourceSP        = string.IsNullOrWhiteSpace(form.SourceSP) ? null : form.SourceSP.Trim(),
+                IsActive        = form.IsActive
             };
 
             var activeColumns = form.Columns

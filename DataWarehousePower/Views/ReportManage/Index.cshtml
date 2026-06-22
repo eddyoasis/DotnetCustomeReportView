@@ -35,6 +35,7 @@ else
                 <tr>
                     <th style="width:40px;">#</th>
                     <th>Report Name</th>
+                    <th>Source Database</th>
                     <th>Source Table</th>
                     <th>Source SP</th>
                     <th>Columns</th>
@@ -58,6 +59,7 @@ else
                                 <span class="fw-semibold">@r.ReportName</span>
                             }
                         </td>
+                        <td>@(string.IsNullOrEmpty(r.SourceDatabase) ? "—" : r.SourceDatabase)</td>
                         <td>@(string.IsNullOrEmpty(r.SourceTable) ? "—" : r.SourceTable)</td>
                         <td>@(string.IsNullOrEmpty(r.SourceSP) ? "—" : r.SourceSP)</td>
                         <td>

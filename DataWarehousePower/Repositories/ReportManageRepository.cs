@@ -51,10 +51,11 @@ namespace DataWarehousePower.Repositories
             var existing = await _context.ReportDefinitions.FindAsync(report.Id)
                            ?? throw new InvalidOperationException($"Report {report.Id} not found.");
 
-            existing.ReportName  = report.ReportName;
+            existing.ReportName = report.ReportName;
+            existing.SourceDatabase = report.SourceDatabase;
             existing.SourceTable = report.SourceTable;
-            existing.SourceSP    = report.SourceSP;
-            existing.IsActive    = report.IsActive;
+            existing.SourceSP = report.SourceSP;
+            existing.IsActive = report.IsActive;
 
             // Delete removed columns
             foreach (var colId in deletedColumnIds)

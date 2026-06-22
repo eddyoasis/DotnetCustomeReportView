@@ -126,6 +126,7 @@ namespace DataWarehousePower.Controllers
                         {
                             created.Id,
                             created.ReportName,
+                            created.SourceDatabase,
                             created.SourceTable,
                             created.SourceSP,
                             created.IsActive
@@ -157,6 +158,7 @@ namespace DataWarehousePower.Controllers
                         {
                             existing.Id,
                             existing.ReportName,
+                            existing.SourceDatabase,
                             existing.SourceTable,
                             existing.SourceSP,
                             existing.IsActive
@@ -165,6 +167,7 @@ namespace DataWarehousePower.Controllers
                         {
                             form.Id,
                             form.ReportName,
+                            form.SourceDatabase,
                             form.SourceTable,
                             form.SourceSP,
                             form.IsActive
@@ -194,6 +197,7 @@ namespace DataWarehousePower.Controllers
                     {
                         form.Id,
                         form.ReportName,
+                        form.SourceDatabase,
                         form.SourceTable,
                         form.SourceSP,
                         form.IsActive
@@ -238,6 +242,7 @@ namespace DataWarehousePower.Controllers
                     {
                         existing.Id,
                         existing.ReportName,
+                        existing.SourceDatabase,
                         existing.SourceTable,
                         existing.SourceSP,
                         existing.IsActive
@@ -261,6 +266,7 @@ namespace DataWarehousePower.Controllers
                     {
                         existing.Id,
                         existing.ReportName,
+                        existing.SourceDatabase,
                         existing.SourceTable,
                         existing.SourceSP,
                         existing.IsActive

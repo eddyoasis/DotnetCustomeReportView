@@ -27,6 +27,13 @@
             </div>
 
             <div class="col-md-3">
+                <label asp-for="SourceDatabase" class="form-label"></label>
+                <input asp-for="SourceDatabase" class="form-control source-input" id="input-source-database"
+                       placeholder="e.g. ReportingDb" />
+                <div class="form-text">Database name for direct table mode.</div>
+            </div>
+
+            <div class="col-md-3">
                 <label asp-for="SourceTable" class="form-label"></label>
                 <input asp-for="SourceTable" class="form-control source-input" id="input-source-table"
                        placeholder="e.g. ReportSales" />
@@ -199,16 +206,20 @@ function toggleNoColsMessage() {
 }
 
 // ── Mutual exclusivity hint for SourceTable / SourceSP ───────────────────────
+const databaseInput = document.getElementById('input-source-database');
 const tableInput = document.getElementById('input-source-table');
 const spInput    = document.getElementById('input-source-sp');
 
 function highlightSource() {
+    const hasDatabase = databaseInput.value.trim() !== '';
     const hasTable = tableInput.value.trim() !== '';
     const hasSP    = spInput.value.trim() !== '';
+    databaseInput.classList.toggle('border-warning', hasDatabase && hasSP);
     tableInput.classList.toggle('border-warning', hasTable && hasSP);
     spInput.classList.toggle('border-warning',    hasTable && hasSP);
 }
 
+databaseInput.addEventListener('input', highlightSource);
 tableInput.addEventListener('input', highlightSource);
 spInput.addEventListener('input',    highlightSource);
 </script>

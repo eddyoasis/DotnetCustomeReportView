@@ -23,6 +23,10 @@ namespace DataWarehousePower.Models
         public string? SourceTable { get; set; }
 
         [MaxLength(200)]
+        [Display(Name = "Source Database")]
+        public string? SourceDatabase { get; set; }
+
+        [MaxLength(200)]
         [Display(Name = "Source Stored Procedure")]
         public string? SourceSP { get; set; }
 

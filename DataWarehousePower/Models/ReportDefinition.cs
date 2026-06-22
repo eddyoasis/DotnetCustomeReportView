@@ -19,6 +19,13 @@ namespace DataWarehousePower.Models
         public string ReportName { get; set; } = string.Empty;
 
         /// <summary>
+        /// Direct table query mode: the exact database name that contains the table.
+        /// Leave null when not needed.
+        /// </summary>
+        [MaxLength(200)]
+        public string? SourceDatabase { get; set; }
+
+        /// <summary>
         /// Direct table query mode: the exact DB table name to SELECT from.
         /// Leave null when using SourceSP instead.
         /// </summary>
