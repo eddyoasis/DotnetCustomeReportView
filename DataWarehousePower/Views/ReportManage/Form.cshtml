@@ -52,9 +52,14 @@
 
             <div class="col-md-3">
                 <label asp-for="SourceSP" class="form-label"></label>
-                <input asp-for="SourceSP" class="form-control source-input" id="input-source-sp"
-                       placeholder="e.g. sp_GetSalesReport" />
-                <div class="form-text">Stored procedure. Leave blank if using a table.</div>
+                <select asp-for="SourceSP" class="form-select source-input" id="input-source-sp">
+                    <option value="">-- Select stored procedure --</option>
+                    @foreach (var sourceProcedureName in Model.SourceSPOptions)
+                    {
+                        <option value="@sourceProcedureName">@sourceProcedureName</option>
+                    }
+                </select>
+                <div class="form-text">Loaded from the selected source database stored procedures.</div>
             </div>
 
             <div class="col-md-12">
@@ -220,7 +225,9 @@ const databaseInput = document.getElementById('input-source-database');
 const tableInput = document.getElementById('input-source-table');
 const spInput    = document.getElementById('input-source-sp');
 const sourceObjectsUrl = '@Url.Action("SourceObjects", "ReportManage")';
+const sourceProceduresUrl = '@Url.Action("SourceProcedures", "ReportManage")';
 let sourceObjectsRequestSeq = 0;
+let sourceProceduresRequestSeq = 0;
 
 function highlightSource() {
     const hasDatabase = databaseInput.value.trim() !== '';
@@ -233,7 +240,7 @@ function highlightSource() {
 
 databaseInput.addEventListener('change', highlightSource);
 tableInput.addEventListener('change', highlightSource);
-spInput.addEventListener('input',    highlightSource);
+spInput.addEventListener('change',   highlightSource);
 
 async function loadSourceObjects(selectedValue) {
     const requestSeq = ++sourceObjectsRequestSeq;
@@ -283,8 +290,60 @@ async function loadSourceObjects(selectedValue) {
     highlightSource();
 }
 
-databaseInput.addEventListener('change', () => loadSourceObjects(''));
+async function loadSourceProcedures(selectedValue) {
+    const requestSeq = ++sourceProceduresRequestSeq;
+    const dbName = (databaseInput.value || '').trim();
+
+    spInput.innerHTML = '<option value="">-- Select stored procedure --</option>';
+
+    if (!dbName) {
+        spInput.value = '';
+        highlightSource();
+        return;
+    }
+
+    try {
+        const response = await fetch(`${sourceProceduresUrl}?sourceDatabase=${encodeURIComponent(dbName)}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to load stored procedures');
+        }
+
+        const items = await response.json();
+        if (requestSeq !== sourceProceduresRequestSeq) {
+            return;
+        }
+
+        for (const item of items) {
+            const option = document.createElement('option');
+            option.value = item;
+            option.textContent = item;
+            spInput.appendChild(option);
+        }
+
+        const preferred = (selectedValue || '').trim();
+        if (preferred && items.includes(preferred)) {
+            spInput.value = preferred;
+        } else {
+            spInput.value = '';
+        }
+    } catch {
+        if (requestSeq !== sourceProceduresRequestSeq) {
+            return;
+        }
+        spInput.value = '';
+    }
+
+    highlightSource();
+}
+
+databaseInput.addEventListener('change', () => {
+    loadSourceObjects('');
+    loadSourceProcedures('');
+});
 
 loadSourceObjects(tableInput.value);
+loadSourceProcedures(spInput.value);
 </script>
 }

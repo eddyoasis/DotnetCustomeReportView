@@ -24,6 +24,9 @@ namespace DataWarehousePower.Services
         public Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase)
             => _repo.GetSourceTableOptionsAsync(sourceDatabase);
 
+        public Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase)
+            => _repo.GetSourceStoredProcedureOptionsAsync(sourceDatabase);
+
         public async Task<ReportManageFormViewModel> GetFormViewModelAsync(int id)
         {
             var report = await _repo.GetByIdWithColumnsAsync(id);

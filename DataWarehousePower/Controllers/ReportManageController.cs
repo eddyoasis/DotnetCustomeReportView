@@ -51,6 +51,7 @@ namespace DataWarehousePower.Controllers
 
             await PopulateSourceDatabaseOptionsAsync(vm);
             await PopulateSourceTableOptionsAsync(vm);
+            await PopulateSourceSPOptionsAsync(vm);
             return View("Form", vm);
         }
 
@@ -62,6 +63,7 @@ namespace DataWarehousePower.Controllers
                 var vm = await _service.GetFormViewModelAsync(id);
                 await PopulateSourceDatabaseOptionsAsync(vm);
                 await PopulateSourceTableOptionsAsync(vm);
+                await PopulateSourceSPOptionsAsync(vm);
                 return View("Form", vm);
             }
             catch (InvalidOperationException)
@@ -93,6 +95,7 @@ namespace DataWarehousePower.Controllers
             {
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -102,6 +105,7 @@ namespace DataWarehousePower.Controllers
                 ModelState.AddModelError("", "At least one column is required.");
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -114,6 +118,7 @@ namespace DataWarehousePower.Controllers
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure.");
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
                 return View("Form", form);
             }
             if (hasTable && hasSP)
@@ -121,6 +126,7 @@ namespace DataWarehousePower.Controllers
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure — not both.");
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -222,6 +228,7 @@ namespace DataWarehousePower.Controllers
                 ModelState.AddModelError("", "An error occurred while saving. Please try again.");
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
                 return View("Form", form);
             }
         }
@@ -242,6 +249,22 @@ namespace DataWarehousePower.Controllers
             }
         }
 
+        // GET /ReportManage/SourceProcedures?sourceDatabase=YourDb
+        [HttpGet]
+        public async Task<IActionResult> SourceProcedures(string? sourceDatabase)
+        {
+            try
+            {
+                var items = await _service.GetSourceStoredProcedureOptionsAsync(sourceDatabase);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229)
+            {
+                _logger.LogWarning(ex, "Stored procedure metadata access denied for source database {SourceDatabase}", sourceDatabase);
+                return Json(Array.Empty<string>());
+            }
+        }
+
         private async Task PopulateSourceDatabaseOptionsAsync(ReportManageFormViewModel vm)
         {
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
@@ -250,6 +273,11 @@ namespace DataWarehousePower.Controllers
         private async Task PopulateSourceTableOptionsAsync(ReportManageFormViewModel vm)
         {
             vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
+        }
+
+        private async Task PopulateSourceSPOptionsAsync(ReportManageFormViewModel vm)
+        {
+            vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(vm.SourceDatabase);
         }
 
         // POST /ReportManage/Delete/{id}

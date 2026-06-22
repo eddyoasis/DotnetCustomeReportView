@@ -36,6 +36,9 @@ namespace DataWarehousePower.Models
         [Display(Name = "Source Stored Procedure")]
         public string? SourceSP { get; set; }
 
+        /// <summary>Dropdown options loaded from the selected source database stored procedures.</summary>
+        public List<string> SourceSPOptions { get; set; } = new();
+
         [Display(Name = "Active")]
         public bool IsActive { get; set; } = true;
 

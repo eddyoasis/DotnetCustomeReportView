@@ -80,6 +80,46 @@ namespace DataWarehousePower.Repositories
             return items;
         }
 
+        public async Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+                return new();
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var safeDatabase = await ValidateDatabaseNameAsync(conn, sourceDatabase.Trim());
+            if (string.IsNullOrWhiteSpace(safeDatabase))
+                return new();
+
+            var escapedDatabase = EscapeSqlIdentifier(safeDatabase);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name " +
+                "FROM [" + escapedDatabase + "].sys.procedures " +
+                "WHERE is_ms_shipped = 0 " +
+                "ORDER BY name";
+
+            var items = new List<string>();
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                        items.Add(reader.GetString(0));
+                }
+            }
+            catch (SqlException ex) when (ex.Number == 916)
+            {
+                return new();
+            }
+
+            return items;
+        }
+
         private static async Task<string?> ValidateDatabaseNameAsync(System.Data.Common.DbConnection conn, string databaseName)
         {
             await using var cmd = conn.CreateCommand();
