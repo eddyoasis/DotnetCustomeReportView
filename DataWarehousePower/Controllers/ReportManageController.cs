@@ -35,9 +35,15 @@ namespace DataWarehousePower.Controllers
         }
 
         // GET /ReportManage
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search, bool? isActive)
         {
-            var vm = await _service.GetListViewModelAsync();
+            var filter = new ReportManageFilterViewModel
+            {
+                Search = search,
+                IsActive = isActive
+            };
+
+            var vm = await _service.GetListViewModelAsync(filter);
             ViewData["DepartmentLookup"] = (await _departmentService.GetAllAsync())
                 .GroupBy(department => department.Id)
                 .ToDictionary(group => group.Key, group => group.First().Name);

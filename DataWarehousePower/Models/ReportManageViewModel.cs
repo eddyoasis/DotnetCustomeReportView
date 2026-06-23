@@ -2,9 +2,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace DataWarehousePower.Models
 {
+    /// <summary>Filters for the report manage list.</summary>
+    public class ReportManageFilterViewModel
+    {
+        public string? Search { get; set; }
+        public bool? IsActive { get; set; }
+    }
+
     /// <summary>List view — all report definitions.</summary>
     public class ReportManageListViewModel
     {
+        public ReportManageFilterViewModel Filter { get; set; } = new();
         public List<ReportDefinition> Reports { get; set; } = new();
     }
 

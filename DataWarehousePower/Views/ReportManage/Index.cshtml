@@ -9,6 +9,27 @@
     <a asp-action="Create" class="btn btn-primary btn-sm">+ New Report</a>
 </div>
 
+<form method="get" asp-action="Index" class="card card-body shadow-sm mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-8">
+            <label class="form-label">Search</label>
+            <input class="form-control" type="text" name="search" value="@Model.Filter.Search" placeholder="name, source, department, or column" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Status</label>
+            <select class="form-select" name="isActive">
+                <option value="">All</option>
+                <option value="true" selected="@(Model.Filter.IsActive == true)">Active</option>
+                <option value="false" selected="@(Model.Filter.IsActive == false)">Inactive</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">Filter</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </div>
+</form>
+
 @if (TempData["Success"] != null)
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -26,7 +47,14 @@
 
 @if (!Model.Reports.Any())
 {
-    <div class="alert alert-info">No reports defined yet. Click <strong>+ New Report</strong> to get started.</div>
+    @if (string.IsNullOrWhiteSpace(Model.Filter.Search) && !Model.Filter.IsActive.HasValue)
+    {
+        <div class="alert alert-info">No reports defined yet. Click <strong>+ New Report</strong> to get started.</div>
+    }
+    else
+    {
+        <div class="alert alert-info">No reports match the selected filters.</div>
+    }
 }
 else
 {

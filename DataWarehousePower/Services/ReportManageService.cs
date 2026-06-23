@@ -12,10 +12,39 @@ namespace DataWarehousePower.Services
             _repo = repo;
         }
 
-        public async Task<ReportManageListViewModel> GetListViewModelAsync()
+        public async Task<ReportManageListViewModel> GetListViewModelAsync(ReportManageFilterViewModel? filter = null)
         {
             var reports = await _repo.GetAllWithColumnsAsync();
-            return new ReportManageListViewModel { Reports = reports };
+            filter ??= new ReportManageFilterViewModel();
+
+            string? search = string.IsNullOrWhiteSpace(filter.Search)
+                ? null
+                : filter.Search.Trim();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                reports = reports.Where(report =>
+                        ContainsIgnoreCase(report.ReportName, search) ||
+                        ContainsIgnoreCase(report.SourceDatabase, search) ||
+                        ContainsIgnoreCase(report.SourceTable, search) ||
+                        ContainsIgnoreCase(report.SourceSP, search) ||
+                        ContainsIgnoreCase(report.Departments, search) ||
+                        report.Columns.Any(column =>
+                            ContainsIgnoreCase(column.PropertyName, search) ||
+                            ContainsIgnoreCase(column.DefaultLabel, search)))
+                    .ToList();
+            }
+
+            if (filter.IsActive.HasValue)
+            {
+                reports = reports.Where(report => report.IsActive == filter.IsActive.Value).ToList();
+            }
+
+            return new ReportManageListViewModel
+            {
+                Filter = filter,
+                Reports = reports
+            };
         }
 
         public Task<List<string>> GetSourceDatabaseOptionsAsync()
@@ -59,6 +88,10 @@ namespace DataWarehousePower.Services
 
         public Task ToggleActiveAsync(int id)
             => _repo.ToggleActiveAsync(id);
+
+        private static bool ContainsIgnoreCase(string? value, string search)
+            => !string.IsNullOrWhiteSpace(value) &&
+               value.Contains(search, StringComparison.OrdinalIgnoreCase);
 
         // ── Mapping helpers ───────────────────────────────────────────────────
 

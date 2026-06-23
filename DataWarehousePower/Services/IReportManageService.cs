@@ -9,7 +9,7 @@ namespace DataWarehousePower.Services
         Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
         Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
-        Task<ReportManageListViewModel> GetListViewModelAsync();
+        Task<ReportManageListViewModel> GetListViewModelAsync(ReportManageFilterViewModel? filter = null);
         Task<ReportManageFormViewModel> GetFormViewModelAsync(int id);
         Task<ReportDefinition> CreateReportAsync(ReportManageFormViewModel form);
         Task UpdateReportAsync(ReportManageFormViewModel form);
