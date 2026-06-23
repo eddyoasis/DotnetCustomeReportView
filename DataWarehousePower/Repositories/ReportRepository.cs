@@ -23,8 +23,10 @@ namespace DataWarehousePower.Repositories
                 .OrderBy(r => r.ReportName)
                 .ToListAsync();
 
+            int? userDepartmentId = await ResolveUserDepartmentIdAsync(userDepartment);
+
             return reports
-                .Where(report => IsVisibleToDepartment(report.Departments, userDepartment))
+                .Where(report => IsVisibleToDepartment(report.Departments, userDepartment, userDepartmentId))
                 .ToList();
         }
 
@@ -40,7 +42,9 @@ namespace DataWarehousePower.Repositories
                 return null;
             }
 
-            return IsVisibleToDepartment(report.Departments, userDepartment) ? report : null;
+            int? userDepartmentId = await ResolveUserDepartmentIdAsync(userDepartment);
+
+            return IsVisibleToDepartment(report.Departments, userDepartment, userDepartmentId) ? report : null;
         }
 
         // ── Table mode ────────────────────────────────────────────────────────
@@ -276,7 +280,24 @@ namespace DataWarehousePower.Repositories
         private static string EscapeSqlIdentifier(string value)
             => value.Replace("]", "]]", StringComparison.Ordinal);
 
-        private static bool IsVisibleToDepartment(string? reportDepartments, string? userDepartment)
+        private async Task<int?> ResolveUserDepartmentIdAsync(string? userDepartment)
+        {
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                return null;
+            }
+
+            string normalizedUserDepartment = userDepartment.Trim();
+
+            return await _context.Departments
+                .AsNoTracking()
+                .Where(department => department.IsActive)
+                .Where(department => department.Name == normalizedUserDepartment)
+                .Select(department => (int?)department.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        private static bool IsVisibleToDepartment(string? reportDepartments, string? userDepartment, int? userDepartmentId)
         {
             if (string.IsNullOrWhiteSpace(reportDepartments))
             {
@@ -290,9 +311,23 @@ namespace DataWarehousePower.Repositories
 
             string normalizedUserDepartment = userDepartment.Trim();
 
-            return reportDepartments
+            HashSet<string> configuredDepartments = reportDepartments
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(department => string.Equals(department, normalizedUserDepartment, StringComparison.OrdinalIgnoreCase));
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (configuredDepartments.Contains(normalizedUserDepartment))
+            {
+                return true;
+            }
+
+            if (!userDepartmentId.HasValue)
+            {
+                return false;
+            }
+
+            string userDepartmentIdToken = userDepartmentId.Value.ToString();
+
+            return configuredDepartments.Contains(userDepartmentIdToken);
         }
     }
 }

@@ -49,6 +49,12 @@ namespace DataWarehousePower.Models
         [Display(Name = "Departments")]
         public string? Departments { get; set; }
 
+        /// <summary>Active departments shown as checkbox options.</summary>
+        public List<DepartmentSelectionItem> ActiveDepartmentOptions { get; set; } = new();
+
+        /// <summary>Selected department IDs from the checkbox list.</summary>
+        public List<int> SelectedDepartmentIds { get; set; } = new();
+
         /// <summary>Columns bound from the dynamic form rows.</summary>
         public List<ReportColumnFormModel> Columns { get; set; } = new();
     }
@@ -79,5 +85,11 @@ namespace DataWarehousePower.Models
     {
         public string Name { get; set; } = string.Empty;
         public string? DefaultValue { get; set; }
+    }
+
+    public class DepartmentSelectionItem
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }

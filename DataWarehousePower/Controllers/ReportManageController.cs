@@ -15,17 +15,20 @@ namespace DataWarehousePower.Controllers
     public class ReportManageController : Controller
     {
         private readonly IReportManageService _service;
+        private readonly IDepartmentService _departmentService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<ReportManageController> _logger;
 
         public ReportManageController(
             IReportManageService service,
+            IDepartmentService departmentService,
             IColumnPreferenceService prefService,
             IAuditLogService auditLogService,
             ILogger<ReportManageController> logger)
         {
             _service = service;
+            _departmentService = departmentService;
             _prefService = prefService;
             _auditLogService = auditLogService;
             _logger  = logger;
@@ -35,6 +38,9 @@ namespace DataWarehousePower.Controllers
         public async Task<IActionResult> Index()
         {
             var vm = await _service.GetListViewModelAsync();
+            ViewData["DepartmentLookup"] = (await _departmentService.GetAllAsync())
+                .GroupBy(department => department.Id)
+                .ToDictionary(group => group.Key, group => group.First().Name);
             return View(vm);
         }
 
@@ -52,6 +58,7 @@ namespace DataWarehousePower.Controllers
             await PopulateSourceDatabaseOptionsAsync(vm);
             await PopulateSourceTableOptionsAsync(vm);
             await PopulateSourceSPOptionsAsync(vm);
+            await PopulateDepartmentOptionsAsync(vm);
             return View("Form", vm);
         }
 
@@ -64,6 +71,7 @@ namespace DataWarehousePower.Controllers
                 await PopulateSourceDatabaseOptionsAsync(vm);
                 await PopulateSourceTableOptionsAsync(vm);
                 await PopulateSourceSPOptionsAsync(vm);
+                await PopulateDepartmentOptionsAsync(vm);
                 return View("Form", vm);
             }
             catch (InvalidOperationException)
@@ -91,11 +99,14 @@ namespace DataWarehousePower.Controllers
                 }
             }
 
+            await NormalizeDepartmentSelectionsAsync(form);
+
             if (!ModelState.IsValid)
             {
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
                 await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -106,6 +117,7 @@ namespace DataWarehousePower.Controllers
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
                 await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -119,6 +131,7 @@ namespace DataWarehousePower.Controllers
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
                 await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
                 return View("Form", form);
             }
             if (hasTable && hasSP)
@@ -127,6 +140,7 @@ namespace DataWarehousePower.Controllers
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
                 await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
                 return View("Form", form);
             }
 
@@ -237,6 +251,7 @@ namespace DataWarehousePower.Controllers
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
                 await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
                 return View("Form", form);
             }
         }
@@ -322,6 +337,74 @@ namespace DataWarehousePower.Controllers
         private async Task PopulateSourceSPOptionsAsync(ReportManageFormViewModel vm)
         {
             vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(vm.SourceDatabase);
+        }
+
+        private async Task PopulateDepartmentOptionsAsync(ReportManageFormViewModel vm)
+        {
+            List<Department> activeDepartments = (await _departmentService.GetAllAsync())
+                .Where(department => department.IsActive)
+                .OrderBy(department => department.Name)
+                .ToList();
+
+            vm.ActiveDepartmentOptions = activeDepartments
+                .Select(department => new DepartmentSelectionItem
+                {
+                    Id = department.Id,
+                    Name = department.Name
+                })
+                .ToList();
+
+            if (vm.SelectedDepartmentIds.Count > 0)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(vm.Departments))
+            {
+                return;
+            }
+
+            var selectedIds = new HashSet<int>();
+            var departmentsByName = activeDepartments
+                .GroupBy(department => department.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First().Id, StringComparer.OrdinalIgnoreCase);
+
+            foreach (string token in vm.Departments.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (int.TryParse(token, out int departmentId))
+                {
+                    if (activeDepartments.Any(department => department.Id == departmentId))
+                    {
+                        selectedIds.Add(departmentId);
+                    }
+                    continue;
+                }
+
+                if (departmentsByName.TryGetValue(token, out int mappedId))
+                {
+                    selectedIds.Add(mappedId);
+                }
+            }
+
+            vm.SelectedDepartmentIds = selectedIds.OrderBy(id => id).ToList();
+        }
+
+        private async Task NormalizeDepartmentSelectionsAsync(ReportManageFormViewModel vm)
+        {
+            HashSet<int> activeDepartmentIds = (await _departmentService.GetAllAsync())
+                .Where(department => department.IsActive)
+                .Select(department => department.Id)
+                .ToHashSet();
+
+            vm.SelectedDepartmentIds = vm.SelectedDepartmentIds
+                .Where(id => activeDepartmentIds.Contains(id))
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+
+            vm.Departments = vm.SelectedDepartmentIds.Count == 0
+                ? null
+                : string.Join(',', vm.SelectedDepartmentIds);
         }
 
         // POST /ReportManage/Delete/{id}

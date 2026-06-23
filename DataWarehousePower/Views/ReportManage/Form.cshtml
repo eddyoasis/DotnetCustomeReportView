@@ -109,8 +109,34 @@
 
             <div class="col-md-12">
                 <label asp-for="Departments" class="form-label"></label>
-                <input asp-for="Departments" class="form-control" placeholder="e.g. Sales, HR, Finance" maxlength="1000" />
-                <div class="form-text">Comma-separated list of departments allowed to view this report. Leave blank to allow all departments.</div>
+                <input asp-for="Departments" type="hidden" />
+
+                @if (Model.ActiveDepartmentOptions.Any())
+                {
+                    <div class="row row-cols-1 row-cols-md-3 g-2">
+                        @foreach (var department in Model.ActiveDepartmentOptions)
+                        {
+                            var isChecked = Model.SelectedDepartmentIds.Contains(department.Id);
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           name="SelectedDepartmentIds"
+                                           id="dept-@department.Id"
+                                           value="@department.Id"
+                                           @(isChecked ? "checked" : null) />
+                                    <label class="form-check-label" for="dept-@department.Id">@department.Name</label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted small">No active departments available.</div>
+                }
+
+                <div class="form-text">Select departments allowed to view this report. Leave all unchecked to allow all departments.</div>
                 <span asp-validation-for="Departments" class="text-danger small"></span>
             </div>
 

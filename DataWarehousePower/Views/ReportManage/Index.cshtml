@@ -1,6 +1,7 @@
 @model DataWarehousePower.Models.ReportManageListViewModel
 @{
     ViewData["Title"] = "Manage Reports";
+    var departmentLookup = ViewData["DepartmentLookup"] as Dictionary<int, string> ?? new Dictionary<int, string>();
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -63,7 +64,24 @@ else
                         <td>@(string.IsNullOrEmpty(r.SourceDatabase) ? "—" : r.SourceDatabase)</td>
                         <td>@(string.IsNullOrEmpty(r.SourceTable) ? "—" : r.SourceTable)</td>
                         <td>@(string.IsNullOrEmpty(r.SourceSP) ? "—" : r.SourceSP)</td>
-                        <td>@(string.IsNullOrWhiteSpace(r.Departments) ? "All" : r.Departments)</td>
+                        <td>
+                            @if (string.IsNullOrWhiteSpace(r.Departments))
+                            {
+                                @:All
+                            }
+                            else
+                            {
+                                var tokens = r.Departments
+                                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                                var displayNames = tokens
+                                    .Select(token => int.TryParse(token, out int id)
+                                        ? (departmentLookup.TryGetValue(id, out var name) ? name : $"Unknown ({id})")
+                                        : token)
+                                    .ToList();
+
+                                @string.Join(", ", displayNames)
+                            }
+                        </td>
                         <td>
                             @foreach (var col in r.Columns.OrderBy(c => c.DisplayOrder))
                             {
