@@ -17,6 +17,7 @@ namespace DataWarehousePower.Services
             ReportViewModel report,
             IReadOnlyCollection<string> formats,
             string password,
+            string zipSubFileName,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(password))
@@ -73,7 +74,7 @@ namespace DataWarehousePower.Services
                     _ => throw new ArgumentOutOfRangeException(nameof(formats), "Supported formats are CSV, Excel, and PDF.")
                 };
 
-                string baseFileName = BuildSafeFileName(report.ReportName, normalizedFormat);
+                string baseFileName = BuildSafeFileName(zipSubFileName, normalizedFormat);
                 exportFiles.Add(($"{baseFileName}.{exportPayload.extension}", exportPayload.fileBytes));
             }
 
@@ -223,16 +224,21 @@ namespace DataWarehousePower.Services
             return $"\"{escaped}\"";
         }
 
-        private static string BuildSafeFileName(string reportName, string format)
+        private static string BuildSafeFileName(string zipSubFileName, string format)
         {
-            string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            string sanitizedName = new(reportName
-                .Select(character => invalidChars.Contains(character) ? '_' : character)
-                .ToArray());
-
-            return $"{sanitizedName}_{format}_{timestamp}";
+            return zipSubFileName.Replace("format", format);
         }
+
+        //private static string BuildSafeFileName(string reportName, string format)
+        //{
+        //    string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        //    char[] invalidChars = Path.GetInvalidFileNameChars();
+        //    string sanitizedName = new(reportName
+        //        .Select(character => invalidChars.Contains(character) ? '_' : character)
+        //        .ToArray());
+
+        //    return $"{sanitizedName}_{format}_{timestamp}";
+        //}
 
         private byte[] BuildPasswordProtectedZip(IReadOnlyCollection<(string FileName, byte[] FileBytes)> files, string password)
         {

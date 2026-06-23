@@ -1,6 +1,8 @@
 using DataWarehousePower.Authorization;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
+using Hangfire.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -260,14 +262,20 @@ namespace DataWarehousePower.Controllers
 
             try
             {
+                var reportDate = request.DateFrom == request.DateTo ?
+                   $"{request.DateFrom:yyyy-MM-dd}" :
+                   $"{request.DateFrom:yyyy-MM-dd}_{request.DateTo:yyyy-MM-dd}";
+
+                string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                string zipFileName = $"{reportName}_{request.ClientCode}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
+                string zipSubFileName = $"{reportName}_format_{request.ClientCode}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+
                 byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
                     vm,
                     normalizedFormats,
                     request.Password,
+                    zipSubFileName,
                     cancellationToken);
-
-                string reportName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-                string zipFileName = $"{reportName}_export.zip";
 
                 await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);
 

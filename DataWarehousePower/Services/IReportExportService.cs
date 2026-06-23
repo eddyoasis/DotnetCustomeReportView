@@ -8,6 +8,7 @@ namespace DataWarehousePower.Services
             ReportViewModel report,
             IReadOnlyCollection<string> formats,
             string password,
+            string zipSubFileName,
             CancellationToken cancellationToken = default);
     }
 }

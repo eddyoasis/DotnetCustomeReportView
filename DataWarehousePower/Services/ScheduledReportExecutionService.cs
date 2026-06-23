@@ -51,20 +51,25 @@ public sealed class ScheduledReportExecutionService(
             return;
         }
 
-        byte[] zipBytes = await reportExportService.BuildPasswordProtectedZipAsync(
-            reportViewModel,
-            normalizedFormats,
-            password);
-
-        string baseDirectory = ResolveExportDirectory(job.ExportLocation);
-        Directory.CreateDirectory(baseDirectory);
-
         var reportDate = effectiveDateFrom == effectiveDateTo ?
                 $"{effectiveDateFrom:yyyy-MM-dd}" :
                 $"{effectiveDateFrom:yyyy-MM-dd}_{effectiveDateTo:yyyy-MM-dd}";
 
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-        string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}.zip";
+        //string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}.zip";
+        string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
+        string zipSubFileName = $"{safeReportName}_format_{job.ClientCode}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+
+        byte[] zipBytes = await reportExportService.BuildPasswordProtectedZipAsync(
+            reportViewModel,
+            normalizedFormats,
+            password,
+            zipSubFileName);
+
+        string baseDirectory = ResolveExportDirectory(job.ExportLocation);
+        Directory.CreateDirectory(baseDirectory);
+
+        
         string fullPath = Path.Combine(baseDirectory, fileName);
 
         await File.WriteAllBytesAsync(fullPath, zipBytes);
