@@ -283,12 +283,120 @@ namespace DataWarehousePower.Data
                 pendingAuditEntries.Add(pendingAuditEntry);
             }
 
-            foreach (PendingAuditEntry pendingAuditEntry in pendingAuditEntries.Where(a => a.TemporaryProperties.Count == 0))
+            // Consolidate all ReportColumn entries into one summary entry per (report, action) group.
+            List<PendingAuditEntry> columnEntries    = pendingAuditEntries.Where(IsReportColumnEntry).ToList();
+            List<PendingAuditEntry> nonColumnEntries = pendingAuditEntries.Where(e => !IsReportColumnEntry(e)).ToList();
+
+            foreach (PendingAuditEntry consolidated in BuildConsolidatedColumnAuditEntries(columnEntries))
+            {
+                AuditLogs.Add(consolidated.ToAuditLog());
+            }
+
+            foreach (PendingAuditEntry pendingAuditEntry in nonColumnEntries.Where(a => a.TemporaryProperties.Count == 0))
             {
                 AuditLogs.Add(pendingAuditEntry.ToAuditLog());
             }
 
-            return pendingAuditEntries.Where(a => a.TemporaryProperties.Count > 0).ToList();
+            return nonColumnEntries.Where(a => a.TemporaryProperties.Count > 0).ToList();
+        }
+
+        private static bool IsReportColumnEntry(PendingAuditEntry entry)
+            => string.Equals(entry.EntityName, "TBL_ReportColumns", StringComparison.OrdinalIgnoreCase);
+
+        private List<PendingAuditEntry> BuildConsolidatedColumnAuditEntries(List<PendingAuditEntry> columnEntries)
+        {
+            if (columnEntries.Count == 0)
+                return new();
+
+            var consolidated = new List<PendingAuditEntry>();
+
+            var groups = columnEntries.GroupBy(e => (
+                ReportDefinitionId: (e.Entry.Entity as ReportColumn)?.ReportDefinitionId ?? 0,
+                e.ActionType
+            ));
+
+            foreach (var group in groups)
+            {
+                var items = group.ToList();
+                int reportDefinitionId = group.Key.ReportDefinitionId;
+                string actionType = group.Key.ActionType;
+                int count = items.Count;
+
+                string? reportName = reportDefinitionId > 0
+                    ? ReportDefinitions.AsNoTracking()
+                        .Where(r => r.Id == reportDefinitionId)
+                        .Select(r => r.ReportName)
+                        .FirstOrDefault()
+                    : null;
+
+                string actionLabel = actionType switch
+                {
+                    "Create" => "added",
+                    "Update" => "updated",
+                    "Delete" => "removed",
+                    _ => actionType.ToLowerInvariant()
+                };
+
+                string countNoun = count == 1 ? "column" : "columns";
+                string resourceLabel = string.IsNullOrWhiteSpace(reportName)
+                    ? $"{count} {countNoun} {actionLabel}"
+                    : $"{reportName} - {count} {countNoun} {actionLabel}";
+
+                PendingAuditEntry first = items[0];
+                PendingAuditEntry summary = new(first.Entry)
+                {
+                    UserId        = first.UserId,
+                    Username      = first.Username,
+                    CorrelationId = first.CorrelationId,
+                    IpAddress     = first.IpAddress,
+                    Host          = first.Host,
+                    RequestMethod = first.RequestMethod,
+                    RequestPath   = first.RequestPath,
+                    QueryString   = first.QueryString,
+                    UserAgent     = first.UserAgent,
+                    Referrer      = first.Referrer,
+                    Protocol      = first.Protocol,
+                    StatusCode    = first.StatusCode,
+                    SessionId     = first.SessionId,
+                    TimestampUtc  = first.TimestampUtc,
+                    ActionType    = actionType,
+                    EntityName    = first.EntityName,
+                    ResourceLabel = resourceLabel,
+                };
+
+                if (reportDefinitionId > 0)
+                    summary.KeyValues["ReportDefinitionId"] = reportDefinitionId;
+
+                List<Dictionary<string, object?>> columnsNewValues = items
+                    .Where(e => e.NewValues.Count > 0)
+                    .Select(e => e.NewValues
+                        .Where(kv => kv.Key != "ReportDefinitionId")
+                        .ToDictionary(kv => kv.Key, kv => kv.Value))
+                    .ToList();
+
+                List<Dictionary<string, object?>> columnsOldValues = items
+                    .Where(e => e.OldValues.Count > 0)
+                    .Select(e => e.OldValues
+                        .Where(kv => kv.Key != "ReportDefinitionId")
+                        .ToDictionary(kv => kv.Key, kv => kv.Value))
+                    .ToList();
+
+                if (columnsNewValues.Count > 0)
+                {
+                    summary.NewValues["Count"]   = count;
+                    summary.NewValues["Columns"] = columnsNewValues;
+                }
+
+                if (columnsOldValues.Count > 0)
+                {
+                    summary.OldValues["Count"]   = count;
+                    summary.OldValues["Columns"] = columnsOldValues;
+                }
+
+                consolidated.Add(summary);
+            }
+
+            return consolidated;
         }
 
         private string ResolveCurrentUserId()
