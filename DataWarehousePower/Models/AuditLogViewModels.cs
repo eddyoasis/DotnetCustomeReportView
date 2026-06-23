@@ -5,6 +5,8 @@ namespace DataWarehousePower.Models
         public string? UserId { get; set; }
         public string? ActionType { get; set; }
         public string? EntityName { get; set; }
+        public string? IpAddress { get; set; }
+        public string? Host { get; set; }
         public DateTime? DateFromUtc { get; set; }
         public DateTime? DateToUtc { get; set; }
         public string? Search { get; set; }
@@ -22,6 +24,10 @@ namespace DataWarehousePower.Models
         public string Description { get; set; } = string.Empty;
         public string EntityName { get; set; } = string.Empty;
         public string? EntityId { get; set; }
+        public string? IpAddress { get; set; }
+        public string? Host { get; set; }
+        public string? RequestMethod { get; set; }
+        public string? RequestPath { get; set; }
         public string? ChangedColumns { get; set; }
         public string? OldValues { get; set; }
         public string? NewValues { get; set; }
@@ -60,6 +66,17 @@ namespace DataWarehousePower.Models
         public string EntityName { get; set; } = string.Empty;
         public string? EntityId { get; set; }
         public string? CorrelationId { get; set; }
+        public string? IpAddress { get; set; }
+        public string? Host { get; set; }
+        public string? RequestMethod { get; set; }
+        public string? RequestPath { get; set; }
+        public string? QueryString { get; set; }
+        public string? UserAgent { get; set; }
+        public string? Referrer { get; set; }
+        public string? Protocol { get; set; }
+        public int? StatusCode { get; set; }
+        public string? SessionId { get; set; }
+        public long? DurationMs { get; set; }
         public string? Metadata { get; set; }
         public string? ChangedColumns { get; set; }
         public string? OldValuesJson { get; set; }

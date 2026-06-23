@@ -35,6 +35,37 @@ namespace DataWarehousePower.Models
         [MaxLength(128)]
         public string? CorrelationId { get; set; }
 
+        [MaxLength(64)]
+        public string? IpAddress { get; set; }
+
+        [MaxLength(256)]
+        public string? Host { get; set; }
+
+        [MaxLength(16)]
+        public string? RequestMethod { get; set; }
+
+        [MaxLength(2048)]
+        public string? RequestPath { get; set; }
+
+        [MaxLength(2048)]
+        public string? QueryString { get; set; }
+
+        [MaxLength(1024)]
+        public string? UserAgent { get; set; }
+
+        [MaxLength(1024)]
+        public string? Referrer { get; set; }
+
+        [MaxLength(16)]
+        public string? Protocol { get; set; }
+
+        public int? StatusCode { get; set; }
+
+        [MaxLength(128)]
+        public string? SessionId { get; set; }
+
+        public long? DurationMs { get; set; }
+
         public DateTime TimestampUtc { get; set; }
     }
 }

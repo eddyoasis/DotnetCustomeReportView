@@ -2,6 +2,7 @@ using DataWarehousePower.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.Extensions.Primitives;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -94,6 +95,15 @@ namespace DataWarehousePower.Data
                 e.Property(a => a.NewValues).HasColumnType("nvarchar(max)");
                 e.Property(a => a.ChangedColumns).HasColumnType("nvarchar(max)");
                 e.Property(a => a.Metadata).HasColumnType("nvarchar(max)");
+                e.Property(a => a.IpAddress).HasMaxLength(64);
+                e.Property(a => a.Host).HasMaxLength(256);
+                e.Property(a => a.RequestMethod).HasMaxLength(16);
+                e.Property(a => a.RequestPath).HasMaxLength(2048);
+                e.Property(a => a.QueryString).HasMaxLength(2048);
+                e.Property(a => a.UserAgent).HasMaxLength(1024);
+                e.Property(a => a.Referrer).HasMaxLength(1024);
+                e.Property(a => a.Protocol).HasMaxLength(16);
+                e.Property(a => a.SessionId).HasMaxLength(128);
                 e.HasIndex(a => a.TimestampUtc);
                 e.HasIndex(a => a.UserId);
             });
@@ -172,6 +182,17 @@ namespace DataWarehousePower.Data
             string userId = ResolveCurrentUserId();
             string? correlationId = _httpContextAccessor?.HttpContext?.TraceIdentifier;
             DateTime timestampUtc = DateTime.UtcNow;
+            HttpContext? httpContext = _httpContextAccessor?.HttpContext;
+            string? ipAddress = ResolveIpAddress(httpContext);
+            string? host = ResolveHost(httpContext);
+            string? requestMethod = ResolveRequestMethod(httpContext);
+            string? requestPath = ResolveRequestPath(httpContext);
+            string? queryString = ResolveQueryString(httpContext);
+            string? userAgent = ResolveHeaderValue(httpContext, "User-Agent", 1024);
+            string? referrer = ResolveHeaderValue(httpContext, "Referer", 1024);
+            string? protocol = ResolveProtocol(httpContext);
+            int? statusCode = ResolveStatusCode(httpContext);
+            string? sessionId = ResolveSessionId(httpContext);
 
             List<PendingAuditEntry> pendingAuditEntries = new();
 
@@ -193,6 +214,16 @@ namespace DataWarehousePower.Data
                     UserId = userId,
                     Username = ResolveCurrentUsername(),
                     CorrelationId = correlationId,
+                    IpAddress = ipAddress,
+                    Host = host,
+                    RequestMethod = requestMethod,
+                    RequestPath = requestPath,
+                    QueryString = queryString,
+                    UserAgent = userAgent,
+                    Referrer = referrer,
+                    Protocol = protocol,
+                    StatusCode = statusCode,
+                    SessionId = sessionId,
                     TimestampUtc = timestampUtc,
                     ActionType = entry.State switch
                     {
@@ -505,6 +536,150 @@ namespace DataWarehousePower.Data
                 : reportName.Trim();
         }
 
+        private static string? ResolveIpAddress(HttpContext? context)
+        {
+            if (context is null)
+            {
+                return null;
+            }
+
+            string? forwarded = ResolveHeaderValue(context, "X-Forwarded-For", 256);
+            if (!string.IsNullOrWhiteSpace(forwarded))
+            {
+                string firstIp = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(firstIp))
+                {
+                    return firstIp.Length > 64 ? firstIp[..64] : firstIp;
+                }
+            }
+
+            string? realIp = ResolveHeaderValue(context, "X-Real-IP", 64);
+            if (!string.IsNullOrWhiteSpace(realIp))
+            {
+                return realIp;
+            }
+
+            string? remoteIp = context.Connection.RemoteIpAddress?.ToString();
+            if (string.IsNullOrWhiteSpace(remoteIp))
+            {
+                return null;
+            }
+
+            return remoteIp.Length > 64 ? remoteIp[..64] : remoteIp;
+        }
+
+        private static string? ResolveHost(HttpContext? context)
+        {
+            string? host = context?.Request.Host.Value;
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                return null;
+            }
+
+            string trimmed = host.Trim();
+            return trimmed.Length > 256 ? trimmed[..256] : trimmed;
+        }
+
+        private static string? ResolveRequestMethod(HttpContext? context)
+        {
+            string? method = context?.Request.Method;
+            if (string.IsNullOrWhiteSpace(method))
+            {
+                return null;
+            }
+
+            string trimmed = method.Trim();
+            return trimmed.Length > 16 ? trimmed[..16] : trimmed;
+        }
+
+        private static string? ResolveRequestPath(HttpContext? context)
+        {
+            if (context is null)
+            {
+                return null;
+            }
+
+            string pathValue = $"{context.Request.PathBase}{context.Request.Path}";
+            if (string.IsNullOrWhiteSpace(pathValue))
+            {
+                return null;
+            }
+
+            return pathValue.Length > 2048 ? pathValue[..2048] : pathValue;
+        }
+
+        private static string? ResolveQueryString(HttpContext? context)
+        {
+            string? queryValue = context?.Request.QueryString.Value;
+            if (string.IsNullOrWhiteSpace(queryValue))
+            {
+                return null;
+            }
+
+            return queryValue.Length > 2048 ? queryValue[..2048] : queryValue;
+        }
+
+        private static string? ResolveProtocol(HttpContext? context)
+        {
+            string? protocol = context?.Request.Protocol;
+            if (string.IsNullOrWhiteSpace(protocol))
+            {
+                return null;
+            }
+
+            string trimmed = protocol.Trim();
+            return trimmed.Length > 16 ? trimmed[..16] : trimmed;
+        }
+
+        private static int? ResolveStatusCode(HttpContext? context)
+            => context?.Response?.StatusCode;
+
+        private static string? ResolveSessionId(HttpContext? context)
+        {
+            if (context is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                string? sessionId = context.Session.Id;
+                if (string.IsNullOrWhiteSpace(sessionId))
+                {
+                    return null;
+                }
+
+                string trimmed = sessionId.Trim();
+                return trimmed.Length > 128 ? trimmed[..128] : trimmed;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        private static string? ResolveHeaderValue(HttpContext? context, string headerName, int maxLength)
+        {
+            if (context is null)
+            {
+                return null;
+            }
+
+            if (!context.Request.Headers.TryGetValue(headerName, out StringValues values))
+            {
+                return null;
+            }
+
+            string? value = values.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            string trimmed = value.Trim();
+            return trimmed.Length > maxLength ? trimmed[..maxLength] : trimmed;
+        }
+
         private static string? ResolveReportColumnLabel(Dictionary<string, object?> values)
         {
             if (TryResolveNonEmptyString(values, nameof(ReportColumn.PropertyName), out string propertyName))
@@ -529,6 +704,16 @@ namespace DataWarehousePower.Data
             public string Description { get; set; } = string.Empty;
             public string EntityName { get; set; } = string.Empty;
             public string? CorrelationId { get; set; }
+            public string? IpAddress { get; set; }
+            public string? Host { get; set; }
+            public string? RequestMethod { get; set; }
+            public string? RequestPath { get; set; }
+            public string? QueryString { get; set; }
+            public string? UserAgent { get; set; }
+            public string? Referrer { get; set; }
+            public string? Protocol { get; set; }
+            public int? StatusCode { get; set; }
+            public string? SessionId { get; set; }
             public DateTime TimestampUtc { get; set; }
             public Dictionary<string, object?> KeyValues { get; } = new();
             public Dictionary<string, object?> OldValues { get; } = new();
@@ -553,6 +738,16 @@ namespace DataWarehousePower.Data
                     NewValues = NewValues.Count == 0 ? null : JsonSerializer.Serialize(NewValues),
                     ChangedColumns = ChangedColumns.Count == 0 ? null : JsonSerializer.Serialize(ChangedColumns),
                     CorrelationId = CorrelationId,
+                    IpAddress = IpAddress,
+                    Host = Host,
+                    RequestMethod = RequestMethod,
+                    RequestPath = RequestPath,
+                    QueryString = QueryString,
+                    UserAgent = UserAgent,
+                    Referrer = Referrer,
+                    Protocol = Protocol,
+                    StatusCode = StatusCode,
+                    SessionId = SessionId,
                     TimestampUtc = TimestampUtc
                 };
             }

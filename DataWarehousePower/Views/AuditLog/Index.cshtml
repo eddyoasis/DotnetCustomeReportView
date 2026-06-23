@@ -8,6 +8,8 @@
             ["userId"] = Model.Filter.UserId,
             ["actionType"] = Model.Filter.ActionType,
             ["entityName"] = Model.Filter.EntityName,
+            ["ipAddress"] = Model.Filter.IpAddress,
+            ["host"] = Model.Filter.Host,
             ["dateFromUtc"] = Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd"),
             ["dateToUtc"] = Model.Filter.DateToUtc?.ToString("yyyy-MM-dd"),
             ["search"] = Model.Filter.Search,
@@ -65,6 +67,14 @@
             <input class="form-control" type="text" name="search" value="@Model.Filter.Search" placeholder="user/action/entity/metadata" />
         </div>
         <div class="col-md-3">
+            <label class="form-label">IP Address</label>
+            <input class="form-control" type="text" name="ipAddress" value="@Model.Filter.IpAddress" placeholder="contains IP" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Host</label>
+            <input class="form-control" type="text" name="host" value="@Model.Filter.Host" placeholder="contains host" />
+        </div>
+        <div class="col-md-3">
             <label class="form-label">Date From (UTC)</label>
             <input class="form-control" type="date" name="dateFromUtc" value="@Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd")" />
         </div>
@@ -101,6 +111,7 @@ else
                     <th style="width: 120px;">Entity</th>
                     <th style="width: 160px;">Action</th>
                     <th style="width: 220px;">Description</th>
+                    <th style="width: 180px;">Request</th>
                     <th style="width: 160px;">Username</th>
                     <th style="width: 170px;">Timestamp (UTC)</th>
                     @* <th style="width: 120px;">Entity Id</th> *@
@@ -114,6 +125,11 @@ else
                         <td>@row.EntityName</td>
                         <td>@row.ActionType</td>
                         <td class="text-break">@row.Description</td>
+                        <td>
+                            <div class="fw-semibold">@row.RequestMethod</div>
+                            <div class="small text-muted text-break">@row.RequestPath</div>
+                            <div class="small text-muted text-break">@row.IpAddress | @row.Host</div>
+                        </td>
                         <td>
                             <div class="fw-semibold">@row.Username</div>
                             <div class="text-muted small">@row.UserId</div>

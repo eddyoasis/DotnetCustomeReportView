@@ -118,6 +118,30 @@
                     <div class="fw-semibold text-break">@FormatValue(Model.CorrelationId)</div>
                 </div>
                 <div class="mb-3">
+                    <div class="text-muted small text-uppercase">Request</div>
+                    <div class="fw-semibold text-break">@FormatValue(Model.RequestMethod) @FormatValue(Model.RequestPath)</div>
+                    <div class="text-muted text-break">Query: @FormatValue(Model.QueryString)</div>
+                </div>
+                <div class="mb-3">
+                    <div class="text-muted small text-uppercase">Network</div>
+                    <div class="fw-semibold text-break">IP: @FormatValue(Model.IpAddress)</div>
+                    <div class="text-muted text-break">Host: @FormatValue(Model.Host)</div>
+                    <div class="text-muted text-break">Protocol: @FormatValue(Model.Protocol)</div>
+                </div>
+                <div class="mb-3">
+                    <div class="text-muted small text-uppercase">Client</div>
+                    <div class="fw-semibold text-break">User Agent</div>
+                    <div class="text-muted text-break">@FormatValue(Model.UserAgent)</div>
+                    <div class="fw-semibold text-break mt-2">Referrer</div>
+                    <div class="text-muted text-break">@FormatValue(Model.Referrer)</div>
+                </div>
+                <div class="mb-3">
+                    <div class="text-muted small text-uppercase">Response / Session</div>
+                    <div class="fw-semibold text-break">Status: @FormatValue(Model.StatusCode?.ToString())</div>
+                    <div class="text-muted text-break">Session: @FormatValue(Model.SessionId)</div>
+                    <div class="text-muted text-break">Duration (ms): @FormatValue(Model.DurationMs?.ToString())</div>
+                </div>
+                <div class="mb-3">
                     <div class="text-muted small text-uppercase">Description</div>
                     <div class="fw-semibold text-break">@FormatValue(Model.Description)</div>
                 </div>

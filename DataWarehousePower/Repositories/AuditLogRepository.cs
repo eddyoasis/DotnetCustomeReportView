@@ -41,6 +41,18 @@ namespace DataWarehousePower.Repositories
                 query = query.Where(a => a.EntityName == entityName);
             }
 
+            if (!string.IsNullOrWhiteSpace(filter.IpAddress))
+            {
+                string ipAddress = filter.IpAddress.Trim();
+                query = query.Where(a => a.IpAddress != null && EF.Functions.Like(a.IpAddress, $"%{ipAddress}%"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Host))
+            {
+                string host = filter.Host.Trim();
+                query = query.Where(a => a.Host != null && EF.Functions.Like(a.Host, $"%{host}%"));
+            }
+
             if (filter.DateFromUtc.HasValue)
             {
                 DateTime start = filter.DateFromUtc.Value.Date;
@@ -63,6 +75,10 @@ namespace DataWarehousePower.Repositories
                     EF.Functions.Like(a.Description, $"%{keyword}%") ||
                     EF.Functions.Like(a.EntityName, $"%{keyword}%") ||
                     (a.EntityId != null && EF.Functions.Like(a.EntityId, $"%{keyword}%")) ||
+                        (a.IpAddress != null && EF.Functions.Like(a.IpAddress, $"%{keyword}%")) ||
+                        (a.Host != null && EF.Functions.Like(a.Host, $"%{keyword}%")) ||
+                        (a.RequestPath != null && EF.Functions.Like(a.RequestPath, $"%{keyword}%")) ||
+                        (a.RequestMethod != null && EF.Functions.Like(a.RequestMethod, $"%{keyword}%")) ||
                     (a.Metadata != null && EF.Functions.Like(a.Metadata, $"%{keyword}%")));
             }
 
