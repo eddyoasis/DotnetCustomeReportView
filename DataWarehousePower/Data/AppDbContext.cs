@@ -85,7 +85,7 @@ namespace DataWarehousePower.Data
                 e.Property(a => a.UserId).HasMaxLength(128);
                 e.Property(a => a.Username).HasMaxLength(128);
                 e.Property(a => a.ActionType).HasMaxLength(64);
-                e.Property(a => a.Description).HasMaxLength(1024);
+                e.Property(a => a.Description).HasColumnType("nvarchar(max)");
                 e.Property(a => a.EntityName).HasMaxLength(128);
                 e.Property(a => a.EntityId).HasMaxLength(256);
                 e.Property(a => a.CorrelationId).HasMaxLength(128);

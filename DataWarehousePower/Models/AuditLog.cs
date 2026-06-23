@@ -19,7 +19,6 @@ namespace DataWarehousePower.Models
         [MaxLength(64)]
         public string ActionType { get; set; } = string.Empty;
 
-        [MaxLength(1024)]
         public string Description { get; set; } = string.Empty;
 
         [MaxLength(128)]
