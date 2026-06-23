@@ -58,8 +58,17 @@
 
     <!-- ── Sidebar: report list ─────────────────────────────────── -->
     <div class="col-md-2 pe-0">
-        <div class="card shadow-sm h-100">
+        <div class="card shadow-sm h-100 d-flex flex-column">
             <div class="card-header fw-semibold small">Reports</div>
+            <div class="px-2 pt-2 pb-2 border-bottom">
+                <input id="report-sidebar-filter"
+                      type="text"
+                       class="form-control form-control-sm"
+                       maxlength="128"
+                       placeholder="Filter reports"
+                       autocomplete="off" />
+            </div>
+            <div class="flex-grow-1 overflow-auto">
             <ul class="list-group list-group-flush">
                 @foreach (var r in Model.AllReports)
                 {
@@ -69,7 +78,8 @@
                     ? Model.SchemaTemplate
                     : null;
 
-                    <li class="list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")">
+                    <li class="report-sidebar-item list-group-item list-group-item-action p-2 @(r.Id == Model.ReportId ? "active" : "")"
+                        data-report-name="@r.ReportName">
                         <div class="d-flex align-items-center gap-2">
                             <a href="@Url.Action("Index", "Report", new
                                              { id = r.Id })"
@@ -88,6 +98,8 @@
                     </li>
                 }
             </ul>
+            <div id="report-sidebar-empty" class="text-muted small px-2 py-2 d-none">No matching reports.</div>
+            </div>
         </div>
     </div>
 
@@ -434,6 +446,8 @@
         const clientCreateButton = document.getElementById('btn-client-create');
         const schemaTemplateError = document.getElementById('client-code-error');
         const schemaTemplateStatus = document.getElementById('client-code-status');
+        const reportSidebarFilter = document.getElementById('report-sidebar-filter');
+        const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
         const exportButton = document.getElementById('btn-export');
         const scheduleReportButton = document.getElementById('btn-schedule-report');
         const exportFormatSelect = document.getElementById('export-format');
@@ -1243,6 +1257,35 @@
                 link.setAttribute('href', targetUrl);
             }
         });
+
+        function filterSidebarReports() {
+            if (!reportSidebarFilter) {
+                return;
+            }
+
+            const query = reportSidebarFilter.value.trim().toLocaleLowerCase();
+            const reportItems = [...document.querySelectorAll('.report-sidebar-item')];
+            let visibleCount = 0;
+
+            reportItems.forEach(item => {
+                const reportName = (item.getAttribute('data-report-name') || '').toLocaleLowerCase();
+                const isVisible = !query || reportName.includes(query);
+                item.classList.toggle('d-none', !isVisible);
+                if (isVisible) {
+                    visibleCount += 1;
+                }
+            });
+
+            if (reportSidebarEmpty) {
+                reportSidebarEmpty.classList.toggle('d-none', visibleCount > 0);
+            }
+        }
+
+        if (reportSidebarFilter) {
+            reportSidebarFilter.value = '';
+            reportSidebarFilter.addEventListener('input', filterSidebarReports);
+            filterSidebarReports();
+        }
 
         syncSchemaTemplateUi(initialSchemaTemplate);
     </script>
