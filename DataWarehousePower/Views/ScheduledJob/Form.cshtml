@@ -240,9 +240,9 @@
                     <input asp-for="Parameters" type="hidden" id="scheduled-job-parameters" />
                     <label class="form-label">Parameters</label>
                     <div id="scheduled-parameters-container" class="border rounded p-3">
-                        <div id="scheduled-parameters-empty" class="text-muted small">No parameters for the selected report.</div>
+                        <div id="scheduled-parameters-empty" class="text-muted small">No parameters require input for the selected report.</div>
                     </div>
-                    <div class="form-text">These values are used when this scheduled job runs report export. Parameters with defaults are prefilled and can be overridden.</div>
+                    <div class="form-text">These values are used when this scheduled job runs report export. Only parameters without defaults are shown here.</div>
                     <span asp-validation-for="Parameters" class="text-danger"></span>
                 </div>
 
@@ -469,27 +469,66 @@
                 }
             }
 
+            function getSelectedReportParameters() {
+                if (!reportDefinitionSelect) {
+                    return [];
+                }
+
+                const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
+                return Number.isFinite(selectedReportId)
+                    ? (availableParametersByReportId[selectedReportId] || [])
+                    : [];
+            }
+
+            function getScheduledParameterState() {
+                const existingValues = new Map(
+                    parseScheduledJobParameters().map(item => [normalizeParameterName(item.name), item.value || ''])
+                );
+
+                return getSelectedReportParameters()
+                    .map(parameter => {
+                        const queryKey = normalizeParameterName(parameter.queryKey || parameter.QueryKey || '');
+                        if (!queryKey) {
+                            return null;
+                        }
+
+                        const name = (parameter.name || parameter.Name || '').toString().trim() || `@@${queryKey}`;
+                        const defaultValue = (parameter.defaultValue || parameter.DefaultValue || '').toString().trim();
+                        const value = existingValues.has(queryKey)
+                            ? (existingValues.get(queryKey) || '')
+                            : defaultValue;
+
+                        return {
+                            queryKey,
+                            name,
+                            defaultValue,
+                            value,
+                            isRequired: !!(parameter.isRequired || parameter.IsRequired)
+                        };
+                    })
+                    .filter(Boolean);
+            }
+
             function serializeScheduledJobParameters() {
                 if (!parametersHiddenInput || !scheduledParametersContainer) {
                     return;
                 }
 
-                const rows = [...scheduledParametersContainer.querySelectorAll('[data-scheduled-param-row]')];
-                const payload = rows
-                    .map(row => {
+                const visibleValuesByQueryKey = new Map(
+                    [...scheduledParametersContainer.querySelectorAll('[data-scheduled-param-row]')].map(row => {
                         const queryKey = normalizeParameterName(row.getAttribute('data-param-query-key') || '');
                         const input = row.querySelector('input[data-scheduled-param-value]');
-                        const value = (input?.value || '').trim();
-
-                        if (!queryKey) {
-                            return null;
-                        }
-
-                        return {
-                            Name: `@@${queryKey}`,
-                            Value: value || null
-                        };
+                        return [queryKey, (input?.value || '').trim()];
                     })
+                );
+
+                const payload = getScheduledParameterState()
+                    .map(parameter => ({
+                        Name: `@@${parameter.queryKey}`,
+                        Value: (visibleValuesByQueryKey.has(parameter.queryKey)
+                            ? visibleValuesByQueryKey.get(parameter.queryKey)
+                            : parameter.value) || null
+                    }))
                     .filter(Boolean);
 
                 parametersHiddenInput.value = payload.length ? JSON.stringify(payload) : '';
@@ -500,18 +539,13 @@
                     return;
                 }
 
-                const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
-                const reportParameters = Number.isFinite(selectedReportId)
-                    ? (availableParametersByReportId[selectedReportId] || [])
-                    : [];
-
-                const existingValues = new Map(
-                    parseScheduledJobParameters().map(item => [normalizeParameterName(item.name), item.value || ''])
-                );
+                const reportParameters = getScheduledParameterState();
+                const visibleParameters = reportParameters.filter(parameter => !parameter.defaultValue);
 
                 scheduledParametersContainer.querySelectorAll('[data-scheduled-param-row]').forEach(row => row.remove());
 
                 if (!Array.isArray(reportParameters) || reportParameters.length === 0) {
+                    scheduledParametersEmpty.textContent = 'No parameters for the selected report.';
                     scheduledParametersEmpty.style.display = 'block';
                     if (parametersHiddenInput) {
                         parametersHiddenInput.value = '';
@@ -519,29 +553,29 @@
                     return;
                 }
 
+                if (visibleParameters.length === 0) {
+                    scheduledParametersEmpty.textContent = 'All parameters for the selected report already have default values.';
+                    scheduledParametersEmpty.style.display = 'block';
+                    serializeScheduledJobParameters();
+                    return;
+                }
+
                 scheduledParametersEmpty.style.display = 'none';
 
-                reportParameters.forEach(parameter => {
-                    const queryKey = normalizeParameterName(parameter.queryKey || parameter.QueryKey || '');
-                    const name = (parameter.name || parameter.Name || '').toString().trim() || `@@${queryKey}`;
-                    const defaultValue = (parameter.defaultValue || parameter.DefaultValue || '').toString().trim();
-                    const value = existingValues.has(queryKey)
-                        ? (existingValues.get(queryKey) || '')
-                        : defaultValue;
-                    const isRequired = !!(parameter.isRequired || parameter.IsRequired);
-                    const labelText = isRequired ? `${name} *` : name;
-                    const placeholder = isRequired ? 'Required' : 'Optional';
+                visibleParameters.forEach(parameter => {
+                    const labelText = parameter.isRequired ? `${parameter.name} *` : parameter.name;
+                    const placeholder = parameter.isRequired ? 'Required' : 'Optional';
 
                     const row = document.createElement('div');
                     row.className = 'row g-2 align-items-center mb-2';
                     row.setAttribute('data-scheduled-param-row', 'true');
-                    row.setAttribute('data-param-query-key', queryKey);
+                    row.setAttribute('data-param-query-key', parameter.queryKey);
                     row.innerHTML = `
                         <div class="col-md-4">
                             <span class="bg-secondary-subtle text-secondary-emphasis border">${labelText}</span>
                         </div>
                         <div class="col-md-8">
-                            <input type="text" class="form-control form-control-sm" data-scheduled-param-value="true" placeholder="${placeholder}" value="${escapeHtmlAttribute(value)}" />
+                            <input type="text" class="form-control form-control-sm" data-scheduled-param-value="true" placeholder="${placeholder}" value="${escapeHtmlAttribute(parameter.value)}" />
                         </div>`;
 
                     scheduledParametersContainer.appendChild(row);

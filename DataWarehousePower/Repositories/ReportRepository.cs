@@ -30,6 +30,14 @@ namespace DataWarehousePower.Repositories
                 .ToList();
         }
 
+        public async Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId)
+        {
+            return await _context.ReportDefinitions
+                .AsNoTracking()
+                .Include(r => r.Columns)
+                .FirstOrDefaultAsync(r => r.Id == reportId && r.IsActive);
+        }
+
         public async Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId, string? userDepartment = null)
         {
             ReportDefinition? report = await _context.ReportDefinitions

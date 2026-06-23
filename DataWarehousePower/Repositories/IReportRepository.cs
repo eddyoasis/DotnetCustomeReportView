@@ -5,6 +5,7 @@ namespace DataWarehousePower.Repositories
     public interface IReportRepository
     {
         Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null);
+        Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId);
         Task<ReportDefinition?> GetReportWithColumnsAsync(int reportId, string? userDepartment = null);
 
         /// <summary>

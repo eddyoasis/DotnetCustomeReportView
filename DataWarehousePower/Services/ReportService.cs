@@ -48,7 +48,7 @@ namespace DataWarehousePower.Services
         {
             string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
             string? normalizedClientCode = NormalizeNullableClientCode(clientCode);
-            var report = await _reportRepo.GetReportWithColumnsAsync(reportId, userDepartment);
+            var report = await _reportRepo.GetReportWithColumnsAsync(reportId);
             if (report is null) return null;
 
             List<ReportRuntimeParameter> runtimeParameters = new();
