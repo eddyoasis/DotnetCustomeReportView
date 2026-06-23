@@ -24,6 +24,7 @@ namespace DataWarehousePower.Data
         public DbSet<UserColumnPreference> UserColumnPreferences { get; set; }
         public DbSet<AuditLog>             AuditLogs             { get; set; }
         public DbSet<ScheduledReportJob>   ScheduledReportJobs   { get; set; }
+        public DbSet<Department>           Departments           { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
             => SaveChangesAsync(acceptAllChangesOnSuccess, CancellationToken.None).GetAwaiter().GetResult();
