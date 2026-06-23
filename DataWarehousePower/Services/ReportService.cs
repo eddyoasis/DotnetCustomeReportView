@@ -235,6 +235,9 @@ namespace DataWarehousePower.Services
                         string displayLabel = hasSavedEntry && !string.IsNullOrWhiteSpace(savedEntry!.CustomName)
                             ? savedEntry.CustomName
                             : c.DefaultLabel;
+                        int order = hasSavedEntry
+                            ? Math.Max(1, savedEntry!.DisplayOrder)
+                            : c.Order;
 
                         return new ColumnDefinition
                         {
@@ -242,7 +245,7 @@ namespace DataWarehousePower.Services
                             DefaultLabel = c.DefaultLabel,
                             DisplayLabel = displayLabel,
                             IsVisible = isVisible,
-                            Order = c.Order
+                            Order = order
                         };
                     })
                     .ToList();

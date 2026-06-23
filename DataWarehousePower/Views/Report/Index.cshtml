@@ -450,6 +450,16 @@
         const exportConfirmButton = document.getElementById('btn-export-confirm');
         const exportPasswordModal = new bootstrap.Modal(exportPasswordModalElement);
         const autoSaveToggle = document.getElementById('auto-save-toggle');
+        const defaultColumnState = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.AvailableColumns
+                .OrderBy(column => column.Order)
+                .Select((column, index) => new
+                {
+                    key = column.Key,
+                    defaultLabel = column.DefaultLabel,
+                    order = column.Order > 0 ? column.Order : index + 1
+                })
+                .ToList()));
         let autoSaveTimer = null;
         const autoSaveStorageKey = `report:${reportId}:columnAutoSave`;
         let isAutoSaveEnabled = true;
@@ -720,6 +730,10 @@
         document.getElementById('btn-reset').addEventListener('click', async () => {
             const statusEl = document.getElementById('save-status');
             const activeSchemaTemplate = getActiveSchemaTemplate();
+            const defaultOrderByKey = defaultColumnState.reduce((acc, column) => {
+                acc[column.key] = column.order;
+                return acc;
+            }, {});
 
             const chips = [...sortable.querySelectorAll('li.chip')];
             chips.forEach(chip => {
@@ -729,14 +743,34 @@
                 chip.querySelector('.label-input').classList.remove('border', 'border-danger');
             });
 
-            // Restore original DB order (data-order attribute not needed — just re-sort by default label order)
-            // Easiest: reload the page after saving defaults
-            const defaultColumns = chips.map((chip, i) => ({
-                key: chip.dataset.key,
-                isVisible: true,
-                order: i + 1,
-                displayLabel: chip.dataset.defaultLabel
-            }));
+            const chipsByKey = chips.reduce((acc, chip) => {
+                acc[chip.dataset.key] = chip;
+                return acc;
+            }, {});
+
+            const sortedKeys = Object.keys(chipsByKey)
+                .sort((left, right) => {
+                    const leftOrder = defaultOrderByKey[left] ?? Number.MAX_SAFE_INTEGER;
+                    const rightOrder = defaultOrderByKey[right] ?? Number.MAX_SAFE_INTEGER;
+                    return leftOrder - rightOrder;
+                });
+
+            sortedKeys.forEach(key => {
+                const chip = chipsByKey[key];
+                if (chip) {
+                    sortable.appendChild(chip);
+                }
+            });
+
+            const defaultColumns = sortedKeys.map((key, index) => {
+                const chip = chipsByKey[key];
+                return {
+                    key,
+                    isVisible: true,
+                    order: defaultOrderByKey[key] ?? index + 1,
+                    displayLabel: chip?.dataset.defaultLabel || key
+                };
+            });
 
             statusEl.textContent = 'Resetting…';
             statusEl.className = 'small align-self-center ms-1 text-muted';
