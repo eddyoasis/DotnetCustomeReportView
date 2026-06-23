@@ -1,5 +1,7 @@
 using DataWarehousePower.Models;
+using DataWarehousePower.Data;
 using DataWarehousePower.Repositories;
+using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Text.Json;
 
@@ -8,10 +10,12 @@ namespace DataWarehousePower.Services
     public class AuditLogQueryService : IAuditLogQueryService
     {
         private readonly IAuditLogRepository _repository;
+        private readonly AppDbContext _context;
 
-        public AuditLogQueryService(IAuditLogRepository repository)
+        public AuditLogQueryService(IAuditLogRepository repository, AppDbContext context)
         {
             _repository = repository;
+            _context = context;
         }
 
         public async Task<AuditLogDetailViewModel?> GetDetailAsync(long id)
@@ -24,6 +28,15 @@ namespace DataWarehousePower.Services
 
             Dictionary<string, string?> oldValues = ParseJsonObject(auditLog.OldValues);
             Dictionary<string, string?> newValues = ParseJsonObject(auditLog.NewValues);
+            Dictionary<int, string> departmentLookup = await _context.Departments
+                .AsNoTracking()
+                .ToDictionaryAsync(department => department.Id, department => department.Name);
+            Dictionary<int, string> reportLookup = await _context.ReportDefinitions
+                .AsNoTracking()
+                .ToDictionaryAsync(report => report.Id, report => report.ReportName);
+
+            oldValues = EnrichDisplayValues(oldValues, departmentLookup, reportLookup);
+            newValues = EnrichDisplayValues(newValues, departmentLookup, reportLookup);
             List<string> changedColumns = ParseStringList(auditLog.ChangedColumns);
 
             List<string> comparisonFields = oldValues.Keys
@@ -201,6 +214,66 @@ namespace DataWarehousePower.Services
                 JsonValueKind.Undefined => null,
                 _ => value.ToString()
             };
+        }
+
+        private static Dictionary<string, string?> EnrichDisplayValues(
+            Dictionary<string, string?> values,
+            Dictionary<int, string> departmentLookup,
+            Dictionary<int, string> reportLookup)
+        {
+            Dictionary<string, string?> enriched = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (KeyValuePair<string, string?> pair in values)
+            {
+                string? transformed = pair.Key switch
+                {
+                    "Departments" => FormatDepartmentList(pair.Value, departmentLookup),
+                    "ReportDefinitionId" => FormatReportDefinition(pair.Value, reportLookup),
+                    _ => pair.Value
+                };
+
+                enriched[pair.Key] = transformed;
+            }
+
+            return enriched;
+        }
+
+        private static string? FormatDepartmentList(string? value, Dictionary<int, string> departmentLookup)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            List<string> formatted = new();
+            foreach (string token in value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(token, out int departmentId) && departmentLookup.TryGetValue(departmentId, out string? departmentName))
+                {
+                    formatted.Add($"{departmentId}({departmentName})");
+                }
+                else
+                {
+                    formatted.Add(token);
+                }
+            }
+
+            return string.Join(',', formatted);
+        }
+
+        private static string? FormatReportDefinition(string? value, Dictionary<int, string> reportLookup)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            if (int.TryParse(value, out int reportDefinitionId) && reportLookup.TryGetValue(reportDefinitionId, out string? reportName))
+            {
+                return $"{reportDefinitionId}({reportName})";
+            }
+
+            return value;
         }
     }
 }
