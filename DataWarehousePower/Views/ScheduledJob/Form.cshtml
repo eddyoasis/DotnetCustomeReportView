@@ -77,13 +77,14 @@
 
                 <div class="col-md-6">
                     <label asp-for="ExportLocation" class="form-label"></label>
-                    <select id="exportLocationBasePathSelect" class="form-select" required>
+                    <select id="exportLocationBasePathSelect" class="form-select">
                         <option value="">-- Select base path --</option>
                         @foreach (string exportLocationBasePath in Model.AvailableExportLocationBasePaths)
                         {
                             <option value="@exportLocationBasePath">@exportLocationBasePath</option>
                         }
                     </select>
+                    <div id="exportLocationBasePathError" class="text-danger small d-none">Please select a base path.</div>
                     <input id="exportLocationSubfolderInput"
                            type="text"
                            class="form-control mt-2"
@@ -491,6 +492,7 @@
                     return;
                 }
 
+                const exportLocationBasePathError = document.getElementById('exportLocationBasePathError');
                 const availableBasePaths = [...exportLocationBasePathSelect.options]
                     .map(option => option.value)
                     .filter(optionValue => optionValue);
@@ -500,8 +502,30 @@
                 exportLocationSubfolderInput.value = subfolder;
                 updateExportLocationValue();
 
-                exportLocationBasePathSelect.addEventListener('change', updateExportLocationValue);
+                exportLocationBasePathSelect.addEventListener('change', () => {
+                    updateExportLocationValue();
+                    if (exportLocationBasePathError) {
+                        const hasSelection = !!exportLocationBasePathSelect.value;
+                        exportLocationBasePathSelect.classList.toggle('is-invalid', !hasSelection);
+                        exportLocationBasePathError.classList.toggle('d-none', hasSelection);
+                    }
+                });
                 exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
+
+                const form = exportLocationBasePathSelect.closest('form');
+                if (form && availableBasePaths.length > 0) {
+                    form.addEventListener('submit', event => {
+                        if (!exportLocationBasePathSelect.value) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                            exportLocationBasePathSelect.classList.add('is-invalid');
+                            if (exportLocationBasePathError) {
+                                exportLocationBasePathError.classList.remove('d-none');
+                            }
+                            exportLocationBasePathSelect.focus();
+                        }
+                    }, true);
+                }
             }
 
             function updateClientCodeSelectOptions() {
