@@ -77,8 +77,20 @@
 
                 <div class="col-md-6">
                     <label asp-for="ExportLocation" class="form-label"></label>
-                    <input asp-for="ExportLocation" class="form-control" placeholder="Leave blank to use app root folder" />
-                    <div class="form-text">Use an absolute path or a path relative to the app root folder.</div>
+                    <select id="exportLocationBasePathSelect" class="form-select" required>
+                        <option value="">-- Select base path --</option>
+                        @foreach (string exportLocationBasePath in Model.AvailableExportLocationBasePaths)
+                        {
+                            <option value="@exportLocationBasePath">@exportLocationBasePath</option>
+                        }
+                    </select>
+                    <input id="exportLocationSubfolderInput"
+                           type="text"
+                           class="form-control mt-2"
+                           placeholder="Optional subfolder (example: NewFolder)"
+                           disabled />
+                    <input asp-for="ExportLocation" type="hidden" />
+                    <div class="form-text">Choose a base path first. Then you can type an optional subfolder (example result: C:\\SharedFolder\\NewFolder).</div>
                     <span asp-validation-for="ExportLocation" class="text-danger"></span>
                 </div>
 
@@ -331,6 +343,9 @@
             const dateToGroup = document.getElementById('dateToGroup');
             const dateFromInput = document.getElementById('DateFrom');
             const dateToInput = document.getElementById('DateTo');
+            const exportLocationHiddenInput = document.getElementById('ExportLocation');
+            const exportLocationBasePathSelect = document.getElementById('exportLocationBasePathSelect');
+            const exportLocationSubfolderInput = document.getElementById('exportLocationSubfolderInput');
             const clientCodeSelect = document.getElementById('scheduled-client-code-select');
             const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
@@ -415,6 +430,78 @@
                 if (dateToInput) {
                     dateToInput.disabled = !isCustom;
                 }
+            }
+
+            function normalizeWindowsPath(path) {
+                return (path || '').trim().replaceAll('/', '\\');
+            }
+
+            function ensureTrailingSlash(path) {
+                const normalizedPath = normalizeWindowsPath(path);
+                if (!normalizedPath) {
+                    return '';
+                }
+
+                return normalizedPath.endsWith('\\') ? normalizedPath : `${normalizedPath}\\`;
+            }
+
+            function trySplitExportLocation(fullPath, availableBasePaths) {
+                const normalizedFullPath = normalizeWindowsPath(fullPath);
+                if (!normalizedFullPath) {
+                    return { basePath: '', subfolder: '' };
+                }
+
+                const matchedBasePath = availableBasePaths
+                    .map(basePath => ensureTrailingSlash(basePath))
+                    .filter(basePath => normalizedFullPath.toLowerCase().startsWith(basePath.toLowerCase()))
+                    .sort((left, right) => right.length - left.length)[0];
+
+                if (!matchedBasePath) {
+                    return { basePath: '', subfolder: '' };
+                }
+
+                const subfolder = normalizedFullPath.slice(matchedBasePath.length).replace(/^\\+/, '');
+                return { basePath: matchedBasePath, subfolder };
+            }
+
+            function updateExportLocationValue() {
+                if (!exportLocationHiddenInput || !exportLocationBasePathSelect || !exportLocationSubfolderInput) {
+                    return;
+                }
+
+                const selectedBasePath = ensureTrailingSlash(exportLocationBasePathSelect.value);
+                exportLocationSubfolderInput.disabled = !selectedBasePath;
+
+                if (!selectedBasePath) {
+                    exportLocationSubfolderInput.value = '';
+                    exportLocationHiddenInput.value = '';
+                    return;
+                }
+
+                const normalizedSubfolder = normalizeWindowsPath(exportLocationSubfolderInput.value)
+                    .replace(/^\\+/, '');
+                exportLocationSubfolderInput.value = normalizedSubfolder;
+                exportLocationHiddenInput.value = normalizedSubfolder
+                    ? `${selectedBasePath}${normalizedSubfolder}`
+                    : selectedBasePath;
+            }
+
+            function initializeExportLocationFields() {
+                if (!exportLocationHiddenInput || !exportLocationBasePathSelect || !exportLocationSubfolderInput) {
+                    return;
+                }
+
+                const availableBasePaths = [...exportLocationBasePathSelect.options]
+                    .map(option => option.value)
+                    .filter(optionValue => optionValue);
+
+                const { basePath, subfolder } = trySplitExportLocation(exportLocationHiddenInput.value, availableBasePaths);
+                exportLocationBasePathSelect.value = basePath;
+                exportLocationSubfolderInput.value = subfolder;
+                updateExportLocationValue();
+
+                exportLocationBasePathSelect.addEventListener('change', updateExportLocationValue);
+                exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
             }
 
             function updateClientCodeSelectOptions() {
@@ -713,6 +800,7 @@
             renderScheduledParameterInputs();
             updatePasswordFields();
             updateDateFields();
+            initializeExportLocationFields();
         })();
     </script>
 }

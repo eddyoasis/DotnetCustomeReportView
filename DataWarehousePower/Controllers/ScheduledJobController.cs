@@ -3,6 +3,7 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace DataWarehousePower.Controllers;
 
@@ -10,8 +11,11 @@ namespace DataWarehousePower.Controllers;
 public sealed class ScheduledJobController(
     IScheduledReportJobService scheduledReportJobService,
     IColumnPreferenceService columnPreferenceService,
+    IConfiguration configuration,
     ILogger<ScheduledJobController> logger) : Controller
 {
+    private const string ExportLocationBasePathsSection = "ScheduledJob:ExportLocationBasePaths";
+
     public async Task<IActionResult> Index(ScheduledJobFilterViewModel? filter)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
@@ -62,6 +66,8 @@ public sealed class ScheduledJobController(
             viewModel.AvailableSchemaTemplates = reportSchemaTemplates;
         }
 
+        viewModel.AvailableExportLocationBasePaths = GetAvailableExportLocationBasePaths();
+
         return View("Form", viewModel);
     }
 
@@ -72,6 +78,7 @@ public sealed class ScheduledJobController(
             string userId = columnPreferenceService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
             ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
+            viewModel.AvailableExportLocationBasePaths = GetAvailableExportLocationBasePaths();
             return View("Form", viewModel);
         }
         catch (InvalidOperationException)
@@ -85,6 +92,8 @@ public sealed class ScheduledJobController(
     public async Task<IActionResult> Save(ScheduledJobFormViewModel form)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
+
+        ValidateExportLocation(form);
 
         if (!ModelState.IsValid)
         {
@@ -200,11 +209,66 @@ public sealed class ScheduledJobController(
         form.AvailableSchemaTemplates = lookupForm.AvailableSchemaTemplatesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
             ? reportClientCodes
             : [];
+        form.AvailableExportLocationBasePaths = GetAvailableExportLocationBasePaths();
 
         if (form.Id > 0 && string.IsNullOrWhiteSpace(form.ExistingPassword))
         {
             ScheduledJobFormViewModel editForm = await scheduledReportJobService.GetEditFormAsync(form.Id, userId, userDepartment);
             form.ExistingPassword = editForm.ExistingPassword;
         }
+    }
+
+    private List<string> GetAvailableExportLocationBasePaths()
+    {
+        List<string> configuredPaths = configuration
+            .GetSection(ExportLocationBasePathsSection)
+            .Get<List<string>>() ?? [];
+
+        return configuredPaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void ValidateExportLocation(ScheduledJobFormViewModel form)
+    {
+        List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
+        if (availableBasePaths.Count == 0)
+        {
+            return;
+        }
+
+        string normalizedExportLocation = NormalizeWindowsPath(form.ExportLocation);
+        if (string.IsNullOrWhiteSpace(normalizedExportLocation))
+        {
+            ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location base path.");
+            return;
+        }
+
+        bool isUnderConfiguredBasePath = availableBasePaths
+            .Select(NormalizeBasePath)
+            .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
+            .Any(basePath => normalizedExportLocation.StartsWith(basePath!, StringComparison.OrdinalIgnoreCase));
+
+        if (!isUnderConfiguredBasePath)
+        {
+            ModelState.AddModelError(nameof(form.ExportLocation), "Export location must start with one of the configured base paths.");
+        }
+    }
+
+    private static string NormalizeWindowsPath(string? path)
+        => (path ?? string.Empty).Trim().Replace('/', '\\');
+
+    private static string NormalizeBasePath(string? path)
+    {
+        string normalizedPath = NormalizeWindowsPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return string.Empty;
+        }
+
+        return normalizedPath.EndsWith('\\') ? normalizedPath : $"{normalizedPath}\\";
     }
 }
