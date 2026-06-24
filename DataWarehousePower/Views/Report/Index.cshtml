@@ -189,7 +189,7 @@
                                name="dateFrom"
                                type="date"
                                class="form-control form-control-sm"
-                               value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
+                               value="@((Model.FilterDateFrom ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
                     </div>
 
                     <div class="col-md-3">
@@ -198,7 +198,7 @@
                                name="dateTo"
                                type="date"
                                class="form-control form-control-sm"
-                               value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                               value="@((Model.FilterDateTo ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
                     </div>
 
                     <div class="col-md-2 d-flex gap-2">
