@@ -4,6 +4,7 @@ using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
 
 namespace DataWarehousePower.Controllers;
 
@@ -183,6 +184,55 @@ public sealed class ScheduledJobController(
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult OpenExportLocation([FromForm] string? exportLocation)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return BadRequest("Opening File Explorer is supported only on Windows hosts.");
+        }
+
+        string normalizedExportLocation = NormalizeWindowsPath(exportLocation);
+        if (string.IsNullOrWhiteSpace(normalizedExportLocation))
+        {
+            return BadRequest("Please select an export location first.");
+        }
+
+        List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
+        bool isUnderConfiguredBasePath = availableBasePaths
+            .Select(NormalizeBasePath)
+            .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
+            .Any(basePath => normalizedExportLocation.StartsWith(basePath!, StringComparison.OrdinalIgnoreCase));
+
+        if (!isUnderConfiguredBasePath)
+        {
+            return BadRequest("Export location must start with one of the configured base paths.");
+        }
+
+        if (!Directory.Exists(normalizedExportLocation))
+        {
+            return BadRequest("The export location folder does not exist.");
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{normalizedExportLocation}\"",
+                UseShellExecute = true
+            });
+
+            return Ok(new { opened = true });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to open export location in Explorer: {ExportLocation}", normalizedExportLocation);
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to open export location.");
+        }
     }
 
     private string ResolveAuditUsername()

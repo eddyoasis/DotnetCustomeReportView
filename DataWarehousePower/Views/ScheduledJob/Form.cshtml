@@ -90,6 +90,7 @@
                            class="form-control mt-2"
                            placeholder="Optional subfolder (example: NewFolder)"
                            disabled />
+                      <button id="openExportLocationButton" type="button" class="btn btn-outline-secondary btn-sm mt-2" disabled>Open</button>
                     <input asp-for="ExportLocation" type="hidden" />
                     <div class="form-text">Choose a base path first. Then you can type an optional subfolder (example result: C:\\SharedFolder\\NewFolder).</div>
                     <span asp-validation-for="ExportLocation" class="text-danger"></span>
@@ -347,6 +348,9 @@
             const exportLocationHiddenInput = document.getElementById('ExportLocation');
             const exportLocationBasePathSelect = document.getElementById('exportLocationBasePathSelect');
             const exportLocationSubfolderInput = document.getElementById('exportLocationSubfolderInput');
+            const openExportLocationButton = document.getElementById('openExportLocationButton');
+            const antiForgeryTokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const openExportLocationUrl = '@Url.Action("OpenExportLocation", "ScheduledJob")';
             const clientCodeSelect = document.getElementById('scheduled-client-code-select');
             const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
@@ -437,6 +441,14 @@
                 return (path || '').trim().replaceAll('/', '\\');
             }
 
+            function updateOpenExportLocationButtonState() {
+                if (!openExportLocationButton || !exportLocationHiddenInput) {
+                    return;
+                }
+
+                openExportLocationButton.disabled = !normalizeWindowsPath(exportLocationHiddenInput.value);
+            }
+
             function ensureTrailingSlash(path) {
                 const normalizedPath = normalizeWindowsPath(path);
                 if (!normalizedPath) {
@@ -476,6 +488,7 @@
                 if (!selectedBasePath) {
                     exportLocationSubfolderInput.value = '';
                     exportLocationHiddenInput.value = '';
+                    updateOpenExportLocationButtonState();
                     return;
                 }
 
@@ -485,6 +498,7 @@
                 exportLocationHiddenInput.value = normalizedSubfolder
                     ? `${selectedBasePath}${normalizedSubfolder}`
                     : selectedBasePath;
+                updateOpenExportLocationButtonState();
             }
 
             function initializeExportLocationFields() {
@@ -512,6 +526,40 @@
                 });
                 exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
 
+                if (openExportLocationButton) {
+                    openExportLocationButton.addEventListener('click', async () => {
+                        const targetPath = normalizeWindowsPath(exportLocationHiddenInput.value);
+                        const antiForgeryToken = (antiForgeryTokenInput?.value || '').trim();
+                        if (!targetPath || !antiForgeryToken) {
+                            return;
+                        }
+
+                        const formData = new URLSearchParams();
+                        formData.set('exportLocation', targetPath);
+                        formData.set('__RequestVerificationToken', antiForgeryToken);
+
+                        try {
+                            const response = await fetch(openExportLocationUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                                },
+                                body: formData.toString()
+                            });
+
+                            if (!response.ok) {
+                                const responseText = await response.text();
+                                throw new Error(responseText || 'Failed to open export location.');
+                            }
+                        } catch (error) {
+                            const message = error instanceof Error && error.message
+                                ? error.message
+                                : 'Failed to open export location.';
+                            alert(message);
+                        }
+                    });
+                }
+
                 const form = exportLocationBasePathSelect.closest('form');
                 if (form && availableBasePaths.length > 0) {
                     form.addEventListener('submit', event => {
@@ -526,6 +574,8 @@
                         }
                     }, true);
                 }
+
+                updateOpenExportLocationButtonState();
             }
 
             function updateClientCodeSelectOptions() {
