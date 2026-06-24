@@ -186,9 +186,9 @@
                             </td>
                             <td>
                                 <select name="Columns[@i].MappingParameter" class="form-select form-select-sm">
-                                    <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameter))">-- None --</option>
-                                    <option value="ClientCode" selected="@(Model.Columns[i].MappingParameter == "ClientCode")">ClientCode</option>
-                                    <option value="FilterDateFrom,FilterDateTo" selected="@(Model.Columns[i].MappingParameter == "FilterDateFrom,FilterDateTo")">FilterDateRange (From + To)</option>
+                                    <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameter) ? "selected" : null)">-- None --</option>
+                                    <option value="ClientCode" selected="@(Model.Columns[i].MappingParameter == "ClientCode" ? "selected" : null)">ClientCode</option>
+                                    <option value="FilterDateFrom,FilterDateTo" selected="@(Model.Columns[i].MappingParameter == "FilterDateFrom,FilterDateTo" ? "selected" : null)">FilterDateRange (From + To)</option>
                                 </select>
                             </td>
                             <td>
@@ -356,22 +356,35 @@
         }
 
         function validateRequiredMappingParameters() {
+            const selectedSourceTable = (document.getElementById('input-source-table')?.value || '').trim();
             const selectedSourceSP = (document.getElementById('input-source-sp')?.value || '').trim();
-            if (!selectedSourceSP) {
+            if (!selectedSourceTable && !selectedSourceSP) {
                 return { valid: true, message: '' };
             }
 
             const requiredValues = ['ClientCode', 'FilterDateFrom', 'FilterDateTo'];
-            const selects = getVisibleParameterMappingSelects();
-            const selectedValues = selects
-                .map(select => normalizeParameterName(select.value || ''))
-                .filter(Boolean);
+            const selectedValues = [];
+
+            if (selectedSourceTable) {
+                getVisibleMappingSelects().forEach(select => {
+                    splitMappingAliases(select.value || '').forEach(value => selectedValues.push(value));
+                });
+            }
+
+            if (selectedSourceSP) {
+                getVisibleParameterMappingSelects().forEach(select => {
+                    const value = normalizeMappingAlias(select.value || '');
+                    if (value) {
+                        selectedValues.push(value);
+                    }
+                });
+            }
 
             for (const requiredValue of requiredValues) {
                 if (!selectedValues.includes(requiredValue)) {
                     return {
                         valid: false,
-                        message: 'Please map ClientCode, FilterDateFrom, and FilterDateTo for the selected stored procedure before saving the report.'
+                        message: 'Please map ClientCode, FilterDateFrom, and FilterDateTo before saving the report.'
                     };
                 }
             }
@@ -538,6 +551,15 @@
             updateDropdownSelection(state, nextValue, false);
         }
 
+        function resetDropdownSelectionByInputId(inputId) {
+            const state = searchableDropdownStates.get(inputId);
+            if (!state) return;
+
+            updateDropdownSelection(state, '', false);
+            state.searchInput.value = '';
+            filterDropdownOptions(state);
+        }
+
         function toDefaultLabel(columnName) {
             return (columnName || '')
                 .replace(/_/g, ' ')
@@ -570,6 +592,34 @@
 
         function normalizeParameterName(name) {
             return (name || '').trim().replace(/^@@+/, '');
+        }
+
+        function normalizeMappingAlias(name) {
+            const normalized = normalizeParameterName(name || '');
+            if (!normalized) {
+                return '';
+            }
+
+            if (normalized.toLowerCase() === 'datefrom') {
+                return 'FilterDateFrom';
+            }
+
+            if (normalized.toLowerCase() === 'dateto') {
+                return 'FilterDateTo';
+            }
+
+            if (normalized.toLowerCase() === 'filterclientcode') {
+                return 'ClientCode';
+            }
+
+            return normalized;
+        }
+
+        function splitMappingAliases(value) {
+            return (value || '')
+                .split(/[,;|]/)
+                .map(token => normalizeMappingAlias(token))
+                .filter(Boolean);
         }
 
         function escapeHtmlAttribute(value) {
@@ -894,7 +944,7 @@
 
         tableInput.addEventListener('change', () => {
             if ((tableInput.value || '').trim()) {
-                spInput.value = '';
+                resetDropdownSelectionByInputId('input-source-sp');
                 loadSourceParameters();
                 autoGenerateColumnsFromSource();
             }
@@ -902,7 +952,7 @@
 
         spInput.addEventListener('change', () => {
             if ((spInput.value || '').trim()) {
-                tableInput.value = '';
+                resetDropdownSelectionByInputId('input-source-table');
                 autoGenerateColumnsFromSource();
             }
             loadSourceParameters();

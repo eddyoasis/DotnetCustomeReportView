@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using System.Text.Json;
 namespace DataWarehousePower.Controllers
 {
     /// <summary>
@@ -143,6 +144,17 @@ namespace DataWarehousePower.Controllers
             if (hasTable && hasSP)
             {
                 ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure — not both.");
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+
+            string? requiredMappingValidationError = ValidateRequiredMappingParameters(form, hasTable, hasSP);
+            if (!string.IsNullOrWhiteSpace(requiredMappingValidationError))
+            {
+                ModelState.AddModelError("", requiredMappingValidationError);
                 await PopulateSourceDatabaseOptionsAsync(form);
                 await PopulateSourceTableOptionsAsync(form);
                 await PopulateSourceSPOptionsAsync(form);
@@ -411,6 +423,93 @@ namespace DataWarehousePower.Controllers
             vm.Departments = vm.SelectedDepartmentIds.Count == 0
                 ? null
                 : string.Join(',', vm.SelectedDepartmentIds);
+        }
+
+        private static string? ValidateRequiredMappingParameters(ReportManageFormViewModel form, bool hasTable, bool hasSP)
+        {
+            HashSet<string> normalizedMappings = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (ReportColumnFormModel column in form.Columns.Where(column => !column.IsDeleted))
+            {
+                foreach (string mapping in SplitAndNormalizeMappings(column.MappingParameter))
+                {
+                    normalizedMappings.Add(mapping);
+                }
+            }
+
+            if (hasSP)
+            {
+                foreach (string mapping in ParseConfiguredParameterMappings(form.Parameters))
+                {
+                    normalizedMappings.Add(mapping);
+                }
+            }
+
+            bool hasClientCode = normalizedMappings.Contains("ClientCode");
+            bool hasDateFrom = normalizedMappings.Contains("FilterDateFrom");
+            bool hasDateTo = normalizedMappings.Contains("FilterDateTo");
+
+            if (!hasClientCode || !hasDateFrom || !hasDateTo)
+            {
+                return "Please map ClientCode, FilterDateFrom, and FilterDateTo before saving the report.";
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<string> SplitAndNormalizeMappings(string? rawMappings)
+        {
+            return (rawMappings ?? string.Empty)
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(NormalizeMappingAlias)
+                .Where(value => !string.IsNullOrWhiteSpace(value));
+        }
+
+        private static IEnumerable<string> ParseConfiguredParameterMappings(string? rawParametersJson)
+        {
+            if (string.IsNullOrWhiteSpace(rawParametersJson))
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            try
+            {
+                List<ReportParameterFormModel>? parsed = JsonSerializer.Deserialize<List<ReportParameterFormModel>>(rawParametersJson);
+                if (parsed is null || parsed.Count == 0)
+                {
+                    return Enumerable.Empty<string>();
+                }
+
+                return parsed
+                    .Select(parameter => NormalizeMappingAlias(parameter.MappingParameter))
+                    .Where(value => !string.IsNullOrWhiteSpace(value));
+            }
+            catch
+            {
+                return Enumerable.Empty<string>();
+            }
+        }
+
+        private static string NormalizeMappingAlias(string? mapping)
+        {
+            string normalized = (mapping ?? string.Empty).Trim().TrimStart('@');
+
+            if (normalized.Equals("DateFrom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "FilterDateFrom";
+            }
+
+            if (normalized.Equals("DateTo", StringComparison.OrdinalIgnoreCase))
+            {
+                return "FilterDateTo";
+            }
+
+            if (normalized.Equals("FilterClientCode", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ClientCode";
+            }
+
+            return normalized;
         }
 
         // POST /ReportManage/Delete/{id}
