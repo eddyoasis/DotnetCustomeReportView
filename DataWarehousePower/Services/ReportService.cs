@@ -12,8 +12,13 @@ namespace DataWarehousePower.Services
         {
             "ClientCode",
             "DateFrom",
-            "DateTo"
+            "DateTo",
+            "FilterDateFrom",
+            "FilterDateTo"
         };
+
+        private static readonly string[] _dateFromParameterAliases = ["DateFrom", "FilterDateFrom"];
+        private static readonly string[] _dateToParameterAliases = ["DateTo", "FilterDateTo"];
 
         private static readonly JsonSerializerOptions _jsonOpts =
             new() { PropertyNameCaseInsensitive = true };
@@ -442,13 +447,13 @@ namespace DataWarehousePower.Services
             }
 
             if (dateFrom.HasValue &&
-                columnsByParameter.TryGetValue("DateFrom", out List<string>? dateFromColumns))
+                TryGetMappedColumns(columnsByParameter, _dateFromParameterAliases, out List<string> dateFromColumns))
             {
                 filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateFromColumns, dateFrom.Value.Date, isLowerBound: true));
             }
 
             if (dateTo.HasValue &&
-                columnsByParameter.TryGetValue("DateTo", out List<string>? dateToColumns))
+                TryGetMappedColumns(columnsByParameter, _dateToParameterAliases, out List<string> dateToColumns))
             {
                 filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateToColumns, dateTo.Value.Date, isLowerBound: false));
             }
@@ -464,6 +469,28 @@ namespace DataWarehousePower.Services
             }
 
             return filteredRows.ToList();
+        }
+
+        private static bool TryGetMappedColumns(
+            IReadOnlyDictionary<string, List<string>> columnsByParameter,
+            IEnumerable<string> aliases,
+            out List<string> mappedColumns)
+        {
+            List<string> combinedColumns = new();
+
+            foreach (string alias in aliases)
+            {
+                if (columnsByParameter.TryGetValue(alias, out List<string>? aliasColumns))
+                {
+                    combinedColumns.AddRange(aliasColumns);
+                }
+            }
+
+            mappedColumns = combinedColumns
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return mappedColumns.Count > 0;
         }
 
         private static IEnumerable<string> GetMappingParameters(string? mappingParameter)

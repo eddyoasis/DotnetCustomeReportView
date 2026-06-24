@@ -377,6 +377,7 @@ namespace DataWarehousePower.Repositories
                         existingCol.PropertyName = col.PropertyName;
                         existingCol.DefaultLabel = col.DefaultLabel;
                         existingCol.DisplayOrder = col.DisplayOrder;
+                        existingCol.MappingParameter = col.MappingParameter;
                     }
                 }
             }
