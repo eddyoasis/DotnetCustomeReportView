@@ -97,6 +97,7 @@ namespace DataWarehousePower.Models
     {
         public string Name { get; set; } = string.Empty;
         public string? DefaultValue { get; set; }
+        public string? MappingParameter { get; set; }
     }
 
     public class DepartmentSelectionItem

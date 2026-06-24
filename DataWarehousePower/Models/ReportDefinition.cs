@@ -42,7 +42,7 @@ namespace DataWarehousePower.Models
 
         /// <summary>
         /// JSON configuration for source parameters, including optional default values.
-        /// Example: [{"Name":"@RegionCode","DefaultValue":"NA"}]
+        /// Example: [{"Name":"@RegionCode","DefaultValue":"NA","MappingParameter":"region"}]
         /// </summary>
         public string? Parameters { get; set; }
 

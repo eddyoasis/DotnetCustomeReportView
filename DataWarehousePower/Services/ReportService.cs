@@ -59,12 +59,20 @@ namespace DataWarehousePower.Services
 
             List<ReportRuntimeParameter> runtimeParameters = new();
             Dictionary<string, string> activeParameterValues = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string?> spParameterValues = new(StringComparer.OrdinalIgnoreCase);
             bool hasMissingRequiredParameters = false;
 
             if (!string.IsNullOrWhiteSpace(report.SourceSP))
             {
                 List<string> sourceParameterNames = await _reportRepo.GetStoredProcedureParameterNamesAsync(report.SourceSP);
                 List<ReportParameterFormModel> configuredParameters = DeserializeConfiguredParameters(report.Parameters);
+                spParameterValues = BuildStoredProcedureParameterValues(
+                    sourceParameterNames,
+                    configuredParameters,
+                    parameterValues,
+                    normalizedClientCode,
+                    dateFrom,
+                    dateTo);
 
                 runtimeParameters = BuildRuntimeParameters(sourceParameterNames, configuredParameters, parameterValues);
                 hasMissingRequiredParameters = runtimeParameters.Any(parameter =>
@@ -122,10 +130,7 @@ namespace DataWarehousePower.Services
                         normalizedClientCode,
                         dateFrom,
                         dateTo,
-                        runtimeParameters.ToDictionary(
-                            parameter => parameter.Name,
-                            parameter => parameter.Value,
-                            StringComparer.OrdinalIgnoreCase));
+                        spParameterValues);
                 }
             }
             else if (!string.IsNullOrWhiteSpace(report.SourceTable))
@@ -373,21 +378,22 @@ namespace DataWarehousePower.Services
             foreach (string sourceParameterName in sourceParameterNames)
             {
                 string normalizedName = NormalizeParameterName(sourceParameterName);
-                if (_reservedFilterParameters.Contains(normalizedName))
+                configuredByName.TryGetValue(normalizedName, out ReportParameterFormModel? configured);
+                string mappedQueryKey = NormalizeMappedParameterKey(configured?.MappingParameter, normalizedName);
+
+                if (_reservedFilterParameters.Contains(mappedQueryKey))
                 {
                     continue;
                 }
 
-                configuredByName.TryGetValue(normalizedName, out ReportParameterFormModel? configured);
-
                 string? defaultValue = configured?.DefaultValue?.Trim();
-                string? requestValue = ResolveRequestParameterValue(requestParameterValues, normalizedName);
+                string? requestValue = ResolveRequestParameterValue(requestParameterValues, mappedQueryKey);
                 string? effectiveValue = !string.IsNullOrWhiteSpace(requestValue) ? requestValue : defaultValue;
 
                 runtimeParameters.Add(new ReportRuntimeParameter
                 {
                     Name = "@" + normalizedName,
-                    QueryKey = normalizedName,
+                    QueryKey = mappedQueryKey,
                     DefaultValue = defaultValue,
                     Value = effectiveValue,
                     IsRequired = true
@@ -395,6 +401,74 @@ namespace DataWarehousePower.Services
             }
 
             return runtimeParameters;
+        }
+
+        private static Dictionary<string, string?> BuildStoredProcedureParameterValues(
+            IEnumerable<string> sourceParameterNames,
+            IEnumerable<ReportParameterFormModel> configuredParameters,
+            IReadOnlyDictionary<string, string?>? requestParameterValues,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            Dictionary<string, ReportParameterFormModel> configuredByName = configuredParameters
+                .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Name))
+                .GroupBy(parameter => NormalizeParameterName(parameter.Name), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            Dictionary<string, string?> result = new(StringComparer.OrdinalIgnoreCase);
+            foreach (string sourceParameterName in sourceParameterNames)
+            {
+                string normalizedName = NormalizeParameterName(sourceParameterName);
+                configuredByName.TryGetValue(normalizedName, out ReportParameterFormModel? configured);
+
+                string mappedQueryKey = NormalizeMappedParameterKey(configured?.MappingParameter, normalizedName);
+                string? value = ResolveMappedSystemFilterValue(mappedQueryKey, clientCode, dateFrom, dateTo);
+
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    value = ResolveRequestParameterValue(requestParameterValues, mappedQueryKey);
+                }
+
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    value = configured?.DefaultValue?.Trim();
+                }
+
+                result["@" + normalizedName] = value;
+            }
+
+            return result;
+        }
+
+        private static string NormalizeMappedParameterKey(string? mappingParameter, string fallback)
+        {
+            string normalized = NormalizeFilterParameterAlias(NormalizeParameterName(mappingParameter ?? string.Empty));
+            return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+        }
+
+        private static string? ResolveMappedSystemFilterValue(
+            string mappedQueryKey,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            if (mappedQueryKey.Equals("ClientCode", StringComparison.OrdinalIgnoreCase))
+            {
+                return clientCode;
+            }
+
+            if (mappedQueryKey.Equals("DateFrom", StringComparison.OrdinalIgnoreCase))
+            {
+                return dateFrom?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+
+            if (mappedQueryKey.Equals("DateTo", StringComparison.OrdinalIgnoreCase))
+            {
+                return dateTo?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+
+            return null;
         }
 
         private static List<ReportRuntimeParameter> BuildTableRuntimeParameters(
@@ -496,7 +570,29 @@ namespace DataWarehousePower.Services
         private static IEnumerable<string> GetMappingParameters(string? mappingParameter)
             => (mappingParameter ?? string.Empty)
                 .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(parameterName => NormalizeFilterParameterAlias(parameterName))
                 .Where(parameterName => !string.IsNullOrWhiteSpace(parameterName));
+
+        private static string NormalizeFilterParameterAlias(string parameterName)
+        {
+            string normalized = NormalizeParameterName(parameterName);
+            if (normalized.Equals("FilterDateFrom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "DateFrom";
+            }
+
+            if (normalized.Equals("FilterDateTo", StringComparison.OrdinalIgnoreCase))
+            {
+                return "DateTo";
+            }
+
+            if (normalized.Equals("FilterClientCode", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ClientCode";
+            }
+
+            return normalized;
+        }
 
         private static bool RowMatchesMappedValue(
             IReadOnlyDictionary<string, object?> row,

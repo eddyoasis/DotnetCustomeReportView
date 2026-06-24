@@ -95,7 +95,7 @@
                 <div id="source-parameters-list" class="border rounded p-2 bg-light-subtle">
                     <div id="source-parameters-empty" class="text-muted small">No required parameters detected for this source.</div>
                 </div>
-                <div class="form-text">Detected from selected source object. Set defaults here; if left blank, users will be prompted when opening the report.</div>
+                <div class="form-text">Detected from selected source object. Set defaults and optional mapping keys (e.g. ClientCode, DateFrom, DateTo). If left blank, users will be prompted when opening the report.</div>
             </div>
 
             <div class="col-md-12">
@@ -356,6 +356,11 @@ function refreshMappingParameterOptions() {
 }
 
 function validateRequiredMappingParameters() {
+    const selectedSourceTable = (document.getElementById('input-source-table')?.value || '').trim();
+    if (!selectedSourceTable) {
+        return { valid: true, message: '' };
+    }
+
     const requiredValues = ['ClientCode', 'FilterDateFrom,FilterDateTo'];
     const selects = getVisibleMappingSelects();
     const selectedValues = selects
@@ -591,7 +596,8 @@ function parseConfiguredParameters() {
         return parsed
             .map(item => ({
                 name: normalizeParameterName(item?.name || item?.Name || ''),
-                defaultValue: (item?.defaultValue || item?.DefaultValue || '').toString().trim()
+                defaultValue: (item?.defaultValue || item?.DefaultValue || '').toString().trim(),
+                mappingParameter: normalizeParameterName(item?.mappingParameter || item?.MappingParameter || '')
             }))
             .filter(item => item.name);
     } catch {
@@ -604,9 +610,17 @@ function serializeParametersFromUi() {
     const payload = rows
         .map(row => {
             const name = normalizeParameterName(row.getAttribute('data-param-name') || '');
-            const input = row.querySelector('input[data-param-default]');
-            const defaultValue = (input?.value || '').trim();
-            return name ? { Name: `@@${name}`, DefaultValue: defaultValue || null } : null;
+            const defaultInput = row.querySelector('input[data-param-default]');
+            const mappingInput = row.querySelector('input[data-param-mapping]');
+            const defaultValue = (defaultInput?.value || '').trim();
+            const mappingParameter = normalizeParameterName(mappingInput?.value || '');
+            return name
+                ? {
+                    Name: `@@${name}`,
+                    DefaultValue: defaultValue || null,
+                    MappingParameter: mappingParameter || null
+                }
+                : null;
         })
         .filter(Boolean);
 
@@ -617,7 +631,13 @@ function renderSourceParameters(parameterNames, existingDefaults) {
     sourceParametersList.querySelectorAll('[data-param-row]').forEach(item => item.remove());
 
     const defaultsByName = new Map(
-        existingDefaults.map(item => [normalizeParameterName(item.name), item.defaultValue || ''])
+        existingDefaults.map(item => [
+            normalizeParameterName(item.name),
+            {
+                defaultValue: item.defaultValue || '',
+                mappingParameter: normalizeParameterName(item.mappingParameter || '')
+            }
+        ])
     );
 
     const uniqueNames = [...new Set((parameterNames || []).map(name => normalizeParameterName(name)).filter(Boolean))];
@@ -635,13 +655,18 @@ function renderSourceParameters(parameterNames, existingDefaults) {
         row.setAttribute('data-param-row', 'true');
         row.setAttribute('data-param-name', name);
 
-        const defaultValue = defaultsByName.get(name) || '';
+        const configured = defaultsByName.get(name) || { defaultValue: '', mappingParameter: '' };
+        const defaultValue = configured.defaultValue;
+        const mappingParameter = configured.mappingParameter;
         row.innerHTML = `
             <div class="col-md-4">
                 <span class="bg-secondary-subtle text-secondary-emphasis border">@@${name}</span>
             </div>
-            <div class="col-md-8">
+            <div class="col-md-4">
                 <input type="text" class="form-control form-control-sm" data-param-default="true" value="${escapeHtmlAttribute(defaultValue)}" placeholder="Default value (optional)" />
+            </div>
+            <div class="col-md-4">
+                <input type="text" class="form-control form-control-sm" data-param-mapping="true" value="${escapeHtmlAttribute(mappingParameter)}" placeholder="Mapping key (e.g. ClientCode)" />
             </div>`;
 
         sourceParametersList.appendChild(row);
@@ -839,7 +864,7 @@ spInput.addEventListener('change', () => {
 });
 
 sourceParametersList.addEventListener('input', e => {
-    if (e.target instanceof HTMLInputElement && e.target.matches('[data-param-default]')) {
+    if (e.target instanceof HTMLInputElement && (e.target.matches('[data-param-default]') || e.target.matches('[data-param-mapping]'))) {
         serializeParametersFromUi();
     }
 });
