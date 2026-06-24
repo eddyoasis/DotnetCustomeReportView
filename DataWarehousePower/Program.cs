@@ -18,6 +18,8 @@ var builder = WebApplication.CreateBuilder(args);
 XmlConfigurator.Configure(new FileInfo(Path.Combine(AppContext.BaseDirectory, "log4net.config")));
 
 builder.Services.Configure<SmtpAppSetting>(builder.Configuration.GetSection("SmtpAppSettings"));
+builder.Services.Configure<ClientCodeLookupOptions>(
+    builder.Configuration.GetSection(ClientCodeLookupOptions.SectionName));
 
 // ── EF Core ───────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>

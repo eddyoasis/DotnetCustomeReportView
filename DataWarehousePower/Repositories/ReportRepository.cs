@@ -1,6 +1,8 @@
 using DataWarehousePower.Data;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Data;
 using System.Data.Common;
 
@@ -8,13 +10,13 @@ namespace DataWarehousePower.Repositories
 {
     public class ReportRepository : IReportRepository
     {
-        private const string ClientCodesByUserIdProcedureName = "usp_getClientCodesByUserId";
-
         private readonly AppDbContext _context;
+        private readonly ClientCodeLookupOptions _clientCodeLookupOptions;
 
-        public ReportRepository(AppDbContext context)
+        public ReportRepository(AppDbContext context, IOptionsSnapshot<ClientCodeLookupOptions> clientCodeLookupOptions)
         {
             _context = context;
+            _clientCodeLookupOptions = clientCodeLookupOptions.Value;
         }
 
         public async Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null)
@@ -150,13 +152,25 @@ namespace DataWarehousePower.Repositories
                 return new List<string>();
             }
 
+            string configuredSpName = (_clientCodeLookupOptions.StoredProcedureName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(configuredSpName))
+            {
+                return new List<string>();
+            }
+
+            string configuredParameterName = NormalizeParameterName(_clientCodeLookupOptions.UserIdParameterName, "@UserId");
+            string configuredResponseColumnName = (_clientCodeLookupOptions.ResponseColumnName ?? string.Empty).Trim();
+            configuredResponseColumnName = string.IsNullOrWhiteSpace(configuredResponseColumnName)
+                ? "ClientCode"
+                : configuredResponseColumnName;
+
             var conn = _context.Database.GetDbConnection();
             if (conn.State != ConnectionState.Open)
             {
                 await conn.OpenAsync();
             }
 
-            string? safeSp = await ValidateSpNameAsync(conn, ClientCodesByUserIdProcedureName);
+            string? safeSp = await ValidateSpNameAsync(conn, configuredSpName);
             if (string.IsNullOrWhiteSpace(safeSp))
             {
                 return new List<string>();
@@ -164,7 +178,7 @@ namespace DataWarehousePower.Repositories
 
             HashSet<string> parameterNames = await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp);
             Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase);
-            string? userIdParameterName = ResolveUserIdParameterName(parameterNames);
+            string? userIdParameterName = ResolveUserIdParameterName(parameterNames, configuredParameterName);
             if (!string.IsNullOrWhiteSpace(userIdParameterName))
             {
                 parameters[userIdParameterName] = userId.Trim();
@@ -177,7 +191,7 @@ namespace DataWarehousePower.Repositories
                 parameters);
 
             return rows
-                .Select(ExtractClientCodeValue)
+                .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -321,8 +335,18 @@ namespace DataWarehousePower.Repositories
             return false;
         }
 
-        private static string? ResolveUserIdParameterName(IEnumerable<string> parameterNames)
+        private static string? ResolveUserIdParameterName(
+            IEnumerable<string> parameterNames,
+            string configuredParameterName)
         {
+            string? configuredMatch = parameterNames.FirstOrDefault(name =>
+                name.Equals(configuredParameterName, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(configuredMatch))
+            {
+                return configuredMatch;
+            }
+
             string[] preferredNames = ["@UserId", "@userId", "@userid", "@UserID", "@userID"];
 
             foreach (string preferredName in preferredNames)
@@ -339,8 +363,16 @@ namespace DataWarehousePower.Repositories
             return parameterNames.FirstOrDefault();
         }
 
-        private static string? ExtractClientCodeValue(IReadOnlyDictionary<string, object?> row)
+        private static string? ExtractClientCodeValue(
+            IReadOnlyDictionary<string, object?> row,
+            string configuredColumnName)
         {
+            if (row.TryGetValue(configuredColumnName, out object? configuredColumnValue) && configuredColumnValue is not null)
+            {
+                string configuredValue = configuredColumnValue.ToString()?.Trim() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(configuredValue) ? null : configuredValue;
+            }
+
             if (row.TryGetValue("ClientCode", out object? clientCodeValue) && clientCodeValue is not null)
             {
                 string preferredValue = clientCodeValue.ToString()?.Trim() ?? string.Empty;
@@ -355,6 +387,17 @@ namespace DataWarehousePower.Repositories
 
             string normalizedValue = firstValue.ToString()?.Trim() ?? string.Empty;
             return string.IsNullOrWhiteSpace(normalizedValue) ? null : normalizedValue;
+        }
+
+        private static string NormalizeParameterName(string? parameterName, string fallback)
+        {
+            string normalized = (parameterName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return fallback;
+            }
+
+            return normalized.StartsWith("@", StringComparison.Ordinal) ? normalized : "@" + normalized;
         }
 
         private static void AddParam(System.Data.Common.DbCommand cmd, string name, object? value)
