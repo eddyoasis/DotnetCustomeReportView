@@ -194,6 +194,7 @@ public sealed class ScheduledJobController(
     {
         ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         form.AvailableReports = lookupForm.AvailableReports;
+        form.AvailableClientCodes = lookupForm.AvailableClientCodes;
         form.AvailableSchemaTemplatesByReportId = lookupForm.AvailableSchemaTemplatesByReportId;
         form.AvailableParametersByReportId = lookupForm.AvailableParametersByReportId;
         form.AvailableSchemaTemplates = lookupForm.AvailableSchemaTemplatesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)

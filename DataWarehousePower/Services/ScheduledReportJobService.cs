@@ -138,6 +138,7 @@ public sealed class ScheduledReportJobService(
     public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId, string? userDepartment = null)
     {
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
+        List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
             await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
@@ -156,6 +157,7 @@ public sealed class ScheduledReportJobService(
             CronExpression = "0 8 * * *",
             ExportLocation = null,
             AvailableReports = availableReports,
+            AvailableClientCodes = availableClientCodes,
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
             AvailableSchemaTemplates = [],
             AvailableParametersByReportId = availableParametersByReportId
@@ -168,6 +170,7 @@ public sealed class ScheduledReportJobService(
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
+        List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
             await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
@@ -191,6 +194,7 @@ public sealed class ScheduledReportJobService(
             ExistingPassword = dataProtectionService.Unprotect(entity.EncryptedPassword),
             IsActive = entity.IsActive,
             AvailableReports = availableReports,
+            AvailableClientCodes = BuildAvailableClientCodes(entity.ClientCode, availableClientCodes),
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
             AvailableParametersByReportId = availableParametersByReportId,
             AvailableSchemaTemplates = BuildAvailableSchemaTemplates(
@@ -369,6 +373,15 @@ public sealed class ScheduledReportJobService(
     private static List<string> BuildAvailableSchemaTemplates(string? currentSchemaTemplate, IEnumerable<string> savedSchemaTemplates)
         => savedSchemaTemplates
             .Append(currentSchemaTemplate ?? string.Empty)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static List<string> BuildAvailableClientCodes(string? currentClientCode, IEnumerable<string> clientCodes)
+        => clientCodes
+            .Append(currentClientCode ?? string.Empty)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)

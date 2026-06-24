@@ -241,7 +241,22 @@
 
                 <div class="col-md-6">
                     <label asp-for="ClientCode" class="form-label"></label>
-                    <input asp-for="ClientCode" class="form-control" />
+                    @{
+                        string selectedClientCode = (Model.ClientCode ?? string.Empty).Trim();
+                        bool hasSelectedClientCode = !string.IsNullOrWhiteSpace(selectedClientCode)
+                            && Model.AvailableClientCodes.Any(code => code.Equals(selectedClientCode, StringComparison.OrdinalIgnoreCase));
+                    }
+                    <select asp-for="ClientCode" class="form-select">
+                        <option value="">All client codes</option>
+                        @foreach (string availableClientCode in Model.AvailableClientCodes)
+                        {
+                            <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                        }
+                        @if (!hasSelectedClientCode && !string.IsNullOrWhiteSpace(selectedClientCode))
+                        {
+                            <option value="@selectedClientCode" selected="selected">@selectedClientCode</option>
+                        }
+                    </select>
                     <span asp-validation-for="ClientCode" class="text-danger"></span>
                 </div>
 

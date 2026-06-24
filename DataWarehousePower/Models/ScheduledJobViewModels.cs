@@ -137,6 +137,7 @@ public sealed class ScheduledJobFormViewModel
 
     public List<ReportDefinitionLookupItem> AvailableReports { get; set; } = [];
     public List<string> AvailableSchemaTemplates { get; set; } = [];
+    public List<string> AvailableClientCodes { get; set; } = [];
 
     public Dictionary<int, List<string>> AvailableSchemaTemplatesByReportId { get; set; } = [];
 
