@@ -28,6 +28,13 @@ namespace DataWarehousePower.Models
         [MaxLength(100)]
         public string DefaultLabel { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Optional filter parameter name used to map report filter input to this data column.
+        /// Multiple parameter names can be separated with commas.
+        /// </summary>
+        [MaxLength(200)]
+        public string? MappingParameter { get; set; }
+
         /// <summary>Default display order (1-based).</summary>
         public int DisplayOrder { get; set; } = 1;
     }

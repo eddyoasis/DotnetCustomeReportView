@@ -1,5 +1,6 @@
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
+using System.Globalization;
 using System.Text.Json;
 
 namespace DataWarehousePower.Services
@@ -71,6 +72,16 @@ namespace DataWarehousePower.Services
                         parameter => parameter.Value!,
                         StringComparer.OrdinalIgnoreCase);
             }
+            else if (!string.IsNullOrWhiteSpace(report.SourceTable))
+            {
+                runtimeParameters = BuildTableRuntimeParameters(report.Columns, parameterValues);
+                activeParameterValues = runtimeParameters
+                    .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Value))
+                    .ToDictionary(
+                        parameter => parameter.QueryKey,
+                        parameter => parameter.Value!,
+                        StringComparer.OrdinalIgnoreCase);
+            }
 
             // Build system column list from DB definition
             var systemColumns = report.Columns
@@ -119,6 +130,14 @@ namespace DataWarehousePower.Services
                     report.SourceTable,
                     columnNames,
                     report.SourceDatabase);
+
+                rows = ApplyMappedTableFilters(
+                    rows,
+                    report.Columns,
+                    normalizedClientCode,
+                    dateFrom,
+                    dateTo,
+                    activeParameterValues);
             }
             else
             {
@@ -371,6 +390,160 @@ namespace DataWarehousePower.Services
             }
 
             return runtimeParameters;
+        }
+
+        private static List<ReportRuntimeParameter> BuildTableRuntimeParameters(
+            IEnumerable<ReportColumn> reportColumns,
+            IReadOnlyDictionary<string, string?>? requestParameterValues)
+            => reportColumns
+                .SelectMany(column => GetMappingParameters(column.MappingParameter))
+                .Where(parameterName => !_reservedFilterParameters.Contains(parameterName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(parameterName => parameterName, StringComparer.OrdinalIgnoreCase)
+                .Select(parameterName => new ReportRuntimeParameter
+                {
+                    Name = parameterName,
+                    QueryKey = parameterName,
+                    Value = ResolveRequestParameterValue(requestParameterValues, parameterName),
+                    IsRequired = false
+                })
+                .ToList();
+
+        private static List<Dictionary<string, object?>> ApplyMappedTableFilters(
+            List<Dictionary<string, object?>> rows,
+            IEnumerable<ReportColumn> reportColumns,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo,
+            IReadOnlyDictionary<string, string> parameterValues)
+        {
+            Dictionary<string, List<string>> columnsByParameter = reportColumns
+                .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                .SelectMany(column => GetMappingParameters(column.MappingParameter)
+                    .Select(parameterName => new
+                    {
+                        ParameterName = parameterName,
+                        ColumnName = column.PropertyName
+                    }))
+                .GroupBy(item => item.ParameterName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(item => item.ColumnName)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<Dictionary<string, object?>> filteredRows = rows;
+
+            if (!string.IsNullOrWhiteSpace(clientCode) &&
+                columnsByParameter.TryGetValue("ClientCode", out List<string>? clientCodeColumns))
+            {
+                filteredRows = filteredRows.Where(row => RowMatchesMappedValue(row, clientCodeColumns, clientCode));
+            }
+
+            if (dateFrom.HasValue &&
+                columnsByParameter.TryGetValue("DateFrom", out List<string>? dateFromColumns))
+            {
+                filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateFromColumns, dateFrom.Value.Date, isLowerBound: true));
+            }
+
+            if (dateTo.HasValue &&
+                columnsByParameter.TryGetValue("DateTo", out List<string>? dateToColumns))
+            {
+                filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateToColumns, dateTo.Value.Date, isLowerBound: false));
+            }
+
+            foreach ((string parameterName, string parameterValue) in parameterValues)
+            {
+                if (!columnsByParameter.TryGetValue(parameterName, out List<string>? mappedColumns))
+                {
+                    continue;
+                }
+
+                filteredRows = filteredRows.Where(row => RowMatchesMappedValue(row, mappedColumns, parameterValue));
+            }
+
+            return filteredRows.ToList();
+        }
+
+        private static IEnumerable<string> GetMappingParameters(string? mappingParameter)
+            => (mappingParameter ?? string.Empty)
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(parameterName => !string.IsNullOrWhiteSpace(parameterName));
+
+        private static bool RowMatchesMappedValue(
+            IReadOnlyDictionary<string, object?> row,
+            IEnumerable<string> columnNames,
+            string expectedValue)
+        {
+            string normalizedExpectedValue = expectedValue.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedExpectedValue))
+            {
+                return true;
+            }
+
+            foreach (string columnName in columnNames)
+            {
+                if (!row.TryGetValue(columnName, out object? rawValue) || rawValue is null)
+                {
+                    continue;
+                }
+
+                string actualValue = Convert.ToString(rawValue, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
+                if (actualValue.Equals(normalizedExpectedValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RowMatchesMappedDate(
+            IReadOnlyDictionary<string, object?> row,
+            IEnumerable<string> columnNames,
+            DateTime boundary,
+            bool isLowerBound)
+        {
+            foreach (string columnName in columnNames)
+            {
+                if (!row.TryGetValue(columnName, out object? rawValue) || !TryConvertToDate(rawValue, out DateTime valueDate))
+                {
+                    continue;
+                }
+
+                if (isLowerBound ? valueDate.Date >= boundary : valueDate.Date <= boundary)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryConvertToDate(object? rawValue, out DateTime valueDate)
+        {
+            switch (rawValue)
+            {
+                case DateTime dateTime:
+                    valueDate = dateTime;
+                    return true;
+                case DateTimeOffset dateTimeOffset:
+                    valueDate = dateTimeOffset.DateTime;
+                    return true;
+                case DateOnly dateOnly:
+                    valueDate = dateOnly.ToDateTime(TimeOnly.MinValue);
+                    return true;
+                case null:
+                    valueDate = default;
+                    return false;
+                default:
+                    return DateTime.TryParse(
+                        Convert.ToString(rawValue, CultureInfo.InvariantCulture),
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AllowWhiteSpaces,
+                        out valueDate);
+            }
         }
 
         private static List<ReportParameterFormModel> DeserializeConfiguredParameters(string? json)

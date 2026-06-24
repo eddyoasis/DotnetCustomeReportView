@@ -159,7 +159,9 @@
                         <th style="width:36px;" class="text-center">#</th>
                         <th>Property Name <span class="text-muted small">(DB column)</span></th>
                         <th>Default Label <span class="text-muted small">(UI header)</span></th>
+                        <th>Mapping Parameter <span class="text-muted small">(optional filter key)</span></th>
                         <th style="width:110px;">Display Order</th>
+                        <th style="width:70px;"></th>
                         <th style="width:70px;"></th>
                     </tr>
                 </thead>
@@ -181,6 +183,12 @@
                                        value="@Model.Columns[i].DefaultLabel"
                                        class="form-control form-control-sm"
                                        placeholder="e.g. Sale Amount" required />
+                            </td>
+                            <td>
+                                <input name="Columns[@i].MappingParameter"
+                                       value="@Model.Columns[i].MappingParameter"
+                                       class="form-control form-control-sm"
+                                       placeholder="e.g. Region or DateFrom,DateTo" />
                             </td>
                             <td>
                                 <input name="Columns[@i].DisplayOrder"
@@ -236,6 +244,10 @@ function addColumnRow(seed) {
                    class="form-control form-control-sm" placeholder="e.g. Sale Amount" required />
         </td>
         <td>
+            <input name="Columns[${rowIndex}].MappingParameter"
+                   class="form-control form-control-sm" placeholder="e.g. Region or DateFrom,DateTo" />
+        </td>
+        <td>
             <input name="Columns[${rowIndex}].DisplayOrder"
                    type="number" min="1" max="999" value="${displayOrder}"
                    class="form-control form-control-sm" required />
@@ -250,8 +262,10 @@ function addColumnRow(seed) {
 
     const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
     const labelInput = tr.querySelector('input[name$=".DefaultLabel"]');
+    const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
     if (propertyInput && seed?.propertyName) propertyInput.value = seed.propertyName;
     if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
+    if (mappingInput && seed?.mappingParameter) mappingInput.value = seed.mappingParameter;
 
     rowIndex++;
     refreshRowNumbers();

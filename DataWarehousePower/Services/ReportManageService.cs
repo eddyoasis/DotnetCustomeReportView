@@ -111,6 +111,7 @@ namespace DataWarehousePower.Services
                     Id           = c.Id,
                     PropertyName = c.PropertyName,
                     DefaultLabel = c.DefaultLabel,
+                    MappingParameter = c.MappingParameter,
                     DisplayOrder = c.DisplayOrder
                 }).ToList()
             };
@@ -137,6 +138,7 @@ namespace DataWarehousePower.Services
                     Id           = c.Id,
                     PropertyName = c.PropertyName.Trim(),
                     DefaultLabel = c.DefaultLabel.Trim(),
+                    MappingParameter = string.IsNullOrWhiteSpace(c.MappingParameter) ? null : c.MappingParameter.Trim(),
                     DisplayOrder = c.DisplayOrder
                 })
                 .ToList();

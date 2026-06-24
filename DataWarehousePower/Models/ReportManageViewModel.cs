@@ -81,6 +81,10 @@ namespace DataWarehousePower.Models
         [Display(Name = "Default Label")]
         public string DefaultLabel { get; set; } = string.Empty;
 
+        [MaxLength(200)]
+        [Display(Name = "Mapping Parameter")]
+        public string? MappingParameter { get; set; }
+
         [Range(1, 999)]
         [Display(Name = "Display Order")]
         public int DisplayOrder { get; set; } = 1;
