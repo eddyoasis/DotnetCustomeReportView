@@ -189,12 +189,12 @@
         <div class="card mb-3 shadow-sm">
             <div class="card-header fw-semibold">Data Filters</div>
             <div class="card-body">
-                <form id="report-filter-form" method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
+                <form id="report-filter-form" method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-3 align-items-end">
                     <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
                     <input type="hidden" name="loadData" value="true" />
                     <input type="hidden" name="pageSize" value="@Model.PageSize" />
 
-                    <div class="col-md-4">
+                    <div class="col-md-4 d-flex flex-column gap-1">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
                         <select id="filter-client-code"
                                 name="clientCode"
@@ -206,10 +206,9 @@
                                 <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
                             }
                         </select>
-                        <div class="form-text">Client code is required before the report can load.</div>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-3 d-flex flex-column gap-1">
                         <label for="filter-date-from" class="form-label small fw-semibold">DateFrom</label>
                         <input id="filter-date-from"
                                name="dateFrom"
@@ -218,7 +217,7 @@
                                value="@((Model.FilterDateFrom ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-3 d-flex flex-column gap-1">
                         <label for="filter-date-to" class="form-label small fw-semibold">DateTo</label>
                         <input id="filter-date-to"
                                name="dateTo"
@@ -227,7 +226,7 @@
                                value="@((Model.FilterDateTo ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
                     </div>
 
-                    <div class="col-md-2 d-flex gap-2">
+                    <div class="col-md-2 d-flex gap-2 align-self-end">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                         <a class="btn btn-sm btn-outline-secondary w-100"
                               href="@BuildReportUrl(Model.ReportId, null, Model.PageSize, null, false)">Clear</a>
