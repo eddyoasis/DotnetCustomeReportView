@@ -100,6 +100,7 @@ public sealed class ScheduledJobFormViewModel
     public string? SchemaTemplate { get; set; }
 
     [MaxLength(128)]
+    [Required(ErrorMessage = "Client Code is required.")]
     [Display(Name = "Client Code")]
     public string? ClientCode { get; set; }
 

@@ -246,8 +246,8 @@
                         bool hasSelectedClientCode = !string.IsNullOrWhiteSpace(selectedClientCode)
                             && Model.AvailableClientCodes.Any(code => code.Equals(selectedClientCode, StringComparison.OrdinalIgnoreCase));
                     }
-                    <select asp-for="ClientCode" class="form-select">
-                        <option value="">All client codes</option>
+                    <select asp-for="ClientCode" class="form-select" required>
+                        <option value="">-- Select client code --</option>
                         @foreach (string availableClientCode in Model.AvailableClientCodes)
                         {
                             <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
@@ -260,7 +260,7 @@
                     <span asp-validation-for="ClientCode" class="text-danger"></span>
                 </div>
 
-                <div class="col-12">
+               @*  <div class="col-12">
                     <input asp-for="Parameters" type="hidden" id="scheduled-job-parameters" />
                     <label class="form-label">Parameters</label>
                     <div id="scheduled-parameters-container" class="border rounded p-3">
@@ -268,7 +268,7 @@
                     </div>
                     <div class="form-text">These values are used when this scheduled job runs report export. Only parameters without defaults are shown here.</div>
                     <span asp-validation-for="Parameters" class="text-danger"></span>
-                </div>
+                </div> *@
 
                 <div class="col-12">
                     <div class="form-check">
