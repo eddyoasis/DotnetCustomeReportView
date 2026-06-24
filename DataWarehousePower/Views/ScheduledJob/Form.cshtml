@@ -41,12 +41,21 @@
 
                 <div class="col-md-3">
                     <label asp-for="Formats" class="form-label"></label>
-                    <select asp-for="Formats" class="form-select text-uppercase" multiple size="3">
-                        <option value="csv">CSV</option>
-                        <option value="excel">EXCEL</option>
-                        <option value="pdf">PDF</option>
-                    </select>
-                    <div class="form-text">Hold Ctrl (or Cmd on Mac) to select multiple formats.</div>
+                    <div id="scheduled-formats" class="d-flex flex-column gap-1 text-uppercase">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="scheduled-format-csv" name="Formats" value="csv" checked="@Model.Formats.Contains("csv", StringComparer.OrdinalIgnoreCase)" />
+                            <label class="form-check-label" for="scheduled-format-csv">CSV</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="scheduled-format-excel" name="Formats" value="excel" checked="@Model.Formats.Contains("excel", StringComparer.OrdinalIgnoreCase)" />
+                            <label class="form-check-label" for="scheduled-format-excel">EXCEL</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="scheduled-format-pdf" name="Formats" value="pdf" checked="@Model.Formats.Contains("pdf", StringComparer.OrdinalIgnoreCase)" />
+                            <label class="form-check-label" for="scheduled-format-pdf">PDF</label>
+                        </div>
+                    </div>
+                    <div class="form-text">Select one or more formats.</div>
                     <span asp-validation-for="Formats" class="text-danger"></span>
                 </div>
 

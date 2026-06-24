@@ -244,13 +244,22 @@
             <div class="card-body">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
-                        <label for="export-format" class="form-label small fw-semibold">Formats</label>
-                        <select id="export-format" class="form-select form-select-sm" multiple size="3">
-                            <option value="csv">CSV</option>
-                            <option value="excel">Excel (.xlsx)</option>
-                            <option value="pdf">PDF</option>
-                        </select>
-                        <div class="form-text">Hold Ctrl (or Cmd on Mac) to select multiple formats.</div>
+                        <label class="form-label small fw-semibold" for="export-format-csv">Formats</label>
+                        <div id="export-format" class="d-flex flex-column gap-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="export-format-csv" value="csv" checked />
+                                <label class="form-check-label" for="export-format-csv">CSV</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="export-format-excel" value="excel" />
+                                <label class="form-check-label" for="export-format-excel">Excel (.xlsx)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="export-format-pdf" value="pdf" />
+                                <label class="form-check-label" for="export-format-pdf">PDF</label>
+                            </div>
+                        </div>
+                        <div class="form-text">Select one or more formats.</div>
                     </div>
                     <div class="col-md-8 d-flex gap-2">
                         <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
@@ -450,7 +459,7 @@
         const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
         const exportButton = document.getElementById('btn-export');
         const scheduleReportButton = document.getElementById('btn-schedule-report');
-        const exportFormatSelect = document.getElementById('export-format');
+        const exportFormatContainer = document.getElementById('export-format');
         const exportStatus = document.getElementById('export-status');
         const filterForm = document.getElementById('report-filter-form');
         const filterSchemaTemplateInput = document.getElementById('filter-schema-template');
@@ -1229,7 +1238,12 @@
         }
 
         function getSelectedExportFormats() {
-            return [...exportFormatSelect.selectedOptions].map(option => option.value);
+            if (!exportFormatContainer) {
+                return [];
+            }
+
+            return [...exportFormatContainer.querySelectorAll('input[type="checkbox"]:checked')]
+                .map(input => input.value);
         }
 
         function getRuntimeParameterValues() {
