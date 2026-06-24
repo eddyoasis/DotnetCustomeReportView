@@ -29,5 +29,6 @@ namespace DataWarehousePower.Repositories
             IReadOnlyDictionary<string, string?>? parameterValues = null);
 
         Task<List<string>> GetStoredProcedureParameterNamesAsync(string sourceSp);
+        Task<List<string>> GetClientCodesByUserIdAsync(string userId);
     }
 }

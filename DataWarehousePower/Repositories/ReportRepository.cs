@@ -8,6 +8,8 @@ namespace DataWarehousePower.Repositories
 {
     public class ReportRepository : IReportRepository
     {
+        private const string ClientCodesByUserIdProcedureName = "usp_getClientCodesByUserId";
+
         private readonly AppDbContext _context;
 
         public ReportRepository(AppDbContext context)
@@ -139,6 +141,48 @@ namespace DataWarehousePower.Repositories
                 return new();
 
             return (await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp)).ToList();
+        }
+
+        public async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new List<string>();
+            }
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string? safeSp = await ValidateSpNameAsync(conn, ClientCodesByUserIdProcedureName);
+            if (string.IsNullOrWhiteSpace(safeSp))
+            {
+                return new List<string>();
+            }
+
+            HashSet<string> parameterNames = await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp);
+            Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase);
+            string? userIdParameterName = ResolveUserIdParameterName(parameterNames);
+            if (!string.IsNullOrWhiteSpace(userIdParameterName))
+            {
+                parameters[userIdParameterName] = userId.Trim();
+            }
+
+            List<Dictionary<string, object?>> rows = await ExecuteReaderAsync(
+                conn,
+                $"[{safeSp}]",
+                CommandType.StoredProcedure,
+                parameters);
+
+            return rows
+                .Select(ExtractClientCodeValue)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         // ── Shared reader helper ──────────────────────────────────────────────
@@ -275,6 +319,42 @@ namespace DataWarehousePower.Repositories
             }
 
             return false;
+        }
+
+        private static string? ResolveUserIdParameterName(IEnumerable<string> parameterNames)
+        {
+            string[] preferredNames = ["@UserId", "@userId", "@userid", "@UserID", "@userID"];
+
+            foreach (string preferredName in preferredNames)
+            {
+                string? match = parameterNames.FirstOrDefault(name =>
+                    name.Equals(preferredName, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(match))
+                {
+                    return match;
+                }
+            }
+
+            return parameterNames.FirstOrDefault();
+        }
+
+        private static string? ExtractClientCodeValue(IReadOnlyDictionary<string, object?> row)
+        {
+            if (row.TryGetValue("ClientCode", out object? clientCodeValue) && clientCodeValue is not null)
+            {
+                string preferredValue = clientCodeValue.ToString()?.Trim() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(preferredValue) ? null : preferredValue;
+            }
+
+            object? firstValue = row.Values.FirstOrDefault(value => value is not null);
+            if (firstValue is null)
+            {
+                return null;
+            }
+
+            string normalizedValue = firstValue.ToString()?.Trim() ?? string.Empty;
+            return string.IsNullOrWhiteSpace(normalizedValue) ? null : normalizedValue;
         }
 
         private static void AddParam(System.Data.Common.DbCommand cmd, string name, object? value)

@@ -10,6 +10,7 @@ namespace DataWarehousePower.Models
         public string SchemaTemplate { get; set; } = string.Empty;
         public int? ActivePreferenceId { get; set; }
         public string ClientCode { get; set; } = string.Empty;
+        public List<string> AvailableClientCodes { get; set; } = new();
         public DateTime? FilterDateFrom { get; set; }
         public DateTime? FilterDateTo { get; set; }
         public List<ReportRuntimeParameter> RuntimeParameters { get; set; } = new();

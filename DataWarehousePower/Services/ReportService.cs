@@ -156,6 +156,9 @@ namespace DataWarehousePower.Services
 
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync(userDepartment);
+            List<string> availableClientCodes = BuildAvailableClientCodes(
+                normalizedClientCode,
+                await _reportRepo.GetClientCodesByUserIdAsync(userId));
             List<string> savedSchemaTemplates = await _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
             Dictionary<string, int> schemaTemplatePreferenceIds = await _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
             Dictionary<int, List<string>> reportSchemaTemplatesByReportId = await BuildReportSchemaTemplatesByReportIdAsync(userId, allReports);
@@ -171,6 +174,7 @@ namespace DataWarehousePower.Services
                 SchemaTemplate       = normalizedSchemaTemplate,
                 ActivePreferenceId = activePreferenceId,
                 ClientCode = normalizedClientCode ?? string.Empty,
+                AvailableClientCodes = availableClientCodes,
                 FilterDateFrom   = dateFrom,
                 FilterDateTo     = dateTo,
                 RuntimeParameters = runtimeParameters,
@@ -306,6 +310,17 @@ namespace DataWarehousePower.Services
             => rowClientCodes
                 .Concat(savedClientCodes)
                 .Append(currentClientCode)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        private static List<string> BuildAvailableClientCodes(
+            string? currentClientCode,
+            IEnumerable<string> clientCodesByUserId)
+            => clientCodesByUserId
+                .Append(currentClientCode ?? string.Empty)
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)

@@ -182,13 +182,15 @@
 
                     <div class="col-md-4">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
-                        <input id="filter-client-code"
-                               name="clientCode"
-                               type="text"
-                               class="form-control form-control-sm"
-                               maxlength="128"
-                               value="@Model.ClientCode"
-                               placeholder="Enter client code" />
+                        <select id="filter-client-code"
+                                name="clientCode"
+                                class="form-select form-select-sm">
+                            <option value="">All client codes</option>
+                            @foreach (var availableClientCode in Model.AvailableClientCodes)
+                            {
+                                <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                            }
+                        </select>
                     </div>
 
                     <div class="col-md-3">
