@@ -188,17 +188,19 @@ public sealed class ScheduledJobController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult OpenExportLocation([FromForm] string? exportLocation)
+    public IActionResult OpenExportLocation([FromForm] string? exportLocation, [FromForm] string? returnUrl)
     {
+        bool isAjaxRequest = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+
         if (!OperatingSystem.IsWindows())
         {
-            return BadRequest("Opening File Explorer is supported only on Windows hosts.");
+            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Opening File Explorer is supported only on Windows hosts.");
         }
 
         string normalizedExportLocation = NormalizeWindowsPath(exportLocation);
         if (string.IsNullOrWhiteSpace(normalizedExportLocation))
         {
-            return BadRequest("Please select an export location first.");
+            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Please select an export location first.");
         }
 
         List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
@@ -209,12 +211,12 @@ public sealed class ScheduledJobController(
 
         if (!isUnderConfiguredBasePath)
         {
-            return BadRequest("Export location must start with one of the configured base paths.");
+            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Export location must start with one of the configured base paths.");
         }
 
         if (!Directory.Exists(normalizedExportLocation))
         {
-            return BadRequest("The export location folder does not exist.");
+            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "The export location folder does not exist.");
         }
 
         try
@@ -226,13 +228,40 @@ public sealed class ScheduledJobController(
                 UseShellExecute = true
             });
 
-            return Ok(new { opened = true });
+            if (isAjaxRequest)
+            {
+                return Ok(new { opened = true });
+            }
+
+            TempData["Success"] = "Export location opened.";
+            return RedirectToLocalOrIndex(returnUrl);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to open export location in Explorer: {ExportLocation}", normalizedExportLocation);
-            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to open export location.");
+            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Failed to open export location.", StatusCodes.Status500InternalServerError);
         }
+    }
+
+    private IActionResult BuildOpenExportLocationErrorResponse(bool isAjaxRequest, string? returnUrl, string errorMessage, int statusCode = StatusCodes.Status400BadRequest)
+    {
+        if (isAjaxRequest)
+        {
+            return StatusCode(statusCode, errorMessage);
+        }
+
+        TempData["Error"] = errorMessage;
+        return RedirectToLocalOrIndex(returnUrl);
+    }
+
+    private IActionResult RedirectToLocalOrIndex(string? returnUrl)
+    {
+        if (Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl!);
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     private string ResolveAuditUsername()

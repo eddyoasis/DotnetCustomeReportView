@@ -246,7 +246,15 @@ else
                             }
                             else
                             {
-                                @job.ExportLocation
+                                <div class="d-flex flex-column gap-1">
+                                    <span>@job.ExportLocation</span>
+                                    <form asp-action="OpenExportLocation" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="exportLocation" value="@job.ExportLocation" />
+                                        <input type="hidden" name="returnUrl" value="@($"{Context.Request.Path}{Context.Request.QueryString}")" />
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Open</button>
+                                    </form>
+                                </div>
                             }
                         </td>
                         <td>@(string.IsNullOrWhiteSpace(job.SchemaTemplate) ? "-" : job.SchemaTemplate)</td>
