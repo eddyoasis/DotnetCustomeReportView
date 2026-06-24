@@ -6,7 +6,12 @@
         .Where(parameter => string.IsNullOrWhiteSpace(parameter.DefaultValue))
         .ToList();
 
-    string BuildReportUrl(int reportId, int? page = null, int? pageSize = null, string? overrideSchemaTemplate = null)
+    string BuildReportUrl(
+        int reportId,
+        int? page = null,
+        int? pageSize = null,
+        string? overrideSchemaTemplate = null,
+        bool includeFilters = true)
     {
         string baseUrl = Url.Action("Index", "Report", new { id = reportId }) ?? $"/Report/{reportId}";
 
@@ -17,26 +22,29 @@
             queryValues["schemaTemplate"] = schemaTemplate;
         }
 
-        if (!string.IsNullOrWhiteSpace(Model.ClientCode))
+        if (includeFilters)
         {
-            queryValues["clientCode"] = Model.ClientCode;
-        }
-
-        if (Model.FilterDateFrom.HasValue)
-        {
-            queryValues["dateFrom"] = Model.FilterDateFrom.Value.ToString("yyyy-MM-dd");
-        }
-
-        if (Model.FilterDateTo.HasValue)
-        {
-            queryValues["dateTo"] = Model.FilterDateTo.Value.ToString("yyyy-MM-dd");
-        }
-
-        foreach (var parameter in Model.RuntimeParameters)
-        {
-            if (!string.IsNullOrWhiteSpace(parameter.Value))
+            if (!string.IsNullOrWhiteSpace(Model.ClientCode))
             {
-                queryValues[parameter.QueryKey] = parameter.Value;
+                queryValues["clientCode"] = Model.ClientCode;
+            }
+
+            if (Model.FilterDateFrom.HasValue)
+            {
+                queryValues["dateFrom"] = Model.FilterDateFrom.Value.ToString("yyyy-MM-dd");
+            }
+
+            if (Model.FilterDateTo.HasValue)
+            {
+                queryValues["dateTo"] = Model.FilterDateTo.Value.ToString("yyyy-MM-dd");
+            }
+
+            foreach (var parameter in Model.RuntimeParameters)
+            {
+                if (!string.IsNullOrWhiteSpace(parameter.Value))
+                {
+                    queryValues[parameter.QueryKey] = parameter.Value;
+                }
             }
         }
 
@@ -204,7 +212,7 @@
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                         <a class="btn btn-sm btn-outline-secondary w-100"
-                           href="@BuildReportUrl(Model.ReportId, null, Model.PageSize)">Clear</a>
+                              href="@BuildReportUrl(Model.ReportId, null, Model.PageSize, null, false)">Clear</a>
                     </div>
 
                     @if (visibleRuntimeParameters.Count > 0)
