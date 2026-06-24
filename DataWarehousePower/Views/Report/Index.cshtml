@@ -11,7 +11,8 @@
         int? page = null,
         int? pageSize = null,
         string? overrideSchemaTemplate = null,
-        bool includeFilters = true)
+        bool includeFilters = true,
+        bool includeLoadData = false)
     {
         string baseUrl = Url.Action("Index", "Report", new { id = reportId }) ?? $"/Report/{reportId}";
 
@@ -46,6 +47,11 @@
                     queryValues[parameter.QueryKey] = parameter.Value;
                 }
             }
+        }
+
+        if (includeLoadData)
+        {
+            queryValues["loadData"] = "true";
         }
 
         if (page.HasValue)
@@ -173,24 +179,34 @@
             <strong>@(string.IsNullOrWhiteSpace(Model.SchemaTemplate) ? "Default" : Model.SchemaTemplate)</strong>
         </div>
 
+        @if (!Model.HasAppliedFilters)
+        {
+            <div class="alert alert-info border small py-2 px-3 mb-3">
+                Select a client code and click Apply to load report data.
+            </div>
+        }
+
         <div class="card mb-3 shadow-sm">
             <div class="card-header fw-semibold">Data Filters</div>
             <div class="card-body">
                 <form id="report-filter-form" method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="row g-2 align-items-end">
                     <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
+                    <input type="hidden" name="loadData" value="true" />
                     <input type="hidden" name="pageSize" value="@Model.PageSize" />
 
                     <div class="col-md-4">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
                         <select id="filter-client-code"
                                 name="clientCode"
-                                class="form-select form-select-sm">
-                            <option value="">All client codes</option>
+                                class="form-select form-select-sm"
+                                required>
+                            <option value="">Select a client code</option>
                             @foreach (var availableClientCode in Model.AvailableClientCodes)
                             {
                                 <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
                             }
                         </select>
+                        <div class="form-text">Client code is required before the report can load.</div>
                     </div>
 
                     <div class="col-md-3">
@@ -216,35 +232,6 @@
                         <a class="btn btn-sm btn-outline-secondary w-100"
                               href="@BuildReportUrl(Model.ReportId, null, Model.PageSize, null, false)">Clear</a>
                     </div>
-
-                    @* @if (visibleRuntimeParameters.Count > 0)
-                    {
-                        <div class="col-12"><hr class="my-2" /></div>
-
-                        @if (Model.HasMissingRequiredParameters)
-                        {
-                            <div class="col-12">
-                                <div class="alert alert-warning small mb-2 py-2">
-                                    This report requires parameter input before data can be loaded.
-                                </div>
-                            </div>
-                        }
-
-                        @foreach (var parameter in visibleRuntimeParameters)
-                        {
-                            <div class="col-md-4">
-                                <label class="form-label small fw-semibold" for="param-@parameter.QueryKey">@parameter.Name</label>
-                                <input id="param-@parameter.QueryKey"
-                                       name="@parameter.QueryKey"
-                                       data-runtime-param="true"
-                                       data-param-key="@parameter.QueryKey"
-                                       type="text"
-                                       class="form-control form-control-sm"
-                                       value="@parameter.Value"
-                                       placeholder="Required" />
-                            </div>
-                        }
-                    } *@
                 </form>
             </div>
         </div>
@@ -385,13 +372,21 @@
         <!-- ════════ DATA TABLE ════════ -->
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
             <div class="small text-muted">
-                Showing @Model.StartRow to @Model.EndRow of @Model.TotalRows records
+                @if (Model.HasAppliedFilters)
+                {
+                    <span>Showing @Model.StartRow to @Model.EndRow of @Model.TotalRows records</span>
+                }
+                else
+                {
+                    <span>No data loaded yet.</span>
+                }
             </div>
             <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2">
                 <input type="hidden" name="schemaTemplate" value="@Model.SchemaTemplate" />
                 <input type="hidden" name="clientCode" value="@Model.ClientCode" />
                 <input type="hidden" name="dateFrom" value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
                 <input type="hidden" name="dateTo" value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="loadData" value="@Model.HasAppliedFilters.ToString().ToLowerInvariant()" />
                 @foreach (var parameter in Model.RuntimeParameters)
                 {
                     <input type="hidden" name="@parameter.QueryKey" value="@parameter.Value" />
@@ -410,20 +405,34 @@
             <table class="table table-bordered table-hover align-middle" id="report-table">
                 <thead class="table-dark">
                     <tr id="table-header-row">
-                        @foreach (var col in Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order))
+                        @if (Model.HasAppliedFilters)
                         {
-                            <th data-key="@col.Key">@col.DisplayLabel</th>
+                            @foreach (var col in Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order))
+                            {
+                                <th data-key="@col.Key">@col.DisplayLabel</th>
+                            }
                         }
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    @foreach (var row in Model.Rows)
+                    @if (Model.HasAppliedFilters)
+                    {
+                        @foreach (var row in Model.Rows)
+                        {
+                            <tr>
+                                @foreach (var col in Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order))
+                                {
+                                    <td>@(row.ContainsKey(col.Key) ? row[col.Key]?.ToString() : "")</td>
+                                }
+                            </tr>
+                        }
+                    }
+                    else
                     {
                         <tr>
-                            @foreach (var col in Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order))
-                            {
-                                <td>@(row.ContainsKey(col.Key) ? row[col.Key]?.ToString() : "")</td>
-                            }
+                            <td colspan="@Math.Max(1, Model.DisplayColumns.Count(c => c.IsVisible))" class="text-muted text-center py-4">
+                                Select a client code and click Apply to view data.
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -436,10 +445,10 @@
             </div>
             <div class="btn-group" role="group" aria-label="Pagination">
                 <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
-                   href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize)"
+                         href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                    aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
                 <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
-                   href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize)"
+                         href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                    aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
             </div>
         </div>

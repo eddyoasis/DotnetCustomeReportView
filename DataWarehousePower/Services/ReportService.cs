@@ -50,7 +50,8 @@ namespace DataWarehousePower.Services
             string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
-            IReadOnlyDictionary<string, string?>? parameterValues = null)
+            IReadOnlyDictionary<string, string?>? parameterValues = null,
+            bool loadData = true)
         {
             string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
             string? normalizedClientCode = NormalizeNullableClientCode(clientCode);
@@ -113,9 +114,13 @@ namespace DataWarehousePower.Services
             (List<ColumnDefinition> displayColumns, int? activePreferenceId) =
                 await LoadPreferencesAsync(userId, reportId, normalizedSchemaTemplate, systemColumns);
 
-            // Fetch data — SP mode takes priority over table mode
+            // Fetch data — SP mode takes priority over table mode.
             List<Dictionary<string, object?>> rows;
-            if (!string.IsNullOrWhiteSpace(report.SourceSP))
+            if (!loadData)
+            {
+                rows = new List<Dictionary<string, object?>>();
+            }
+            else if (!string.IsNullOrWhiteSpace(report.SourceSP))
             {
                 if (hasMissingRequiredParameters)
                 {
@@ -174,6 +179,7 @@ namespace DataWarehousePower.Services
                 SchemaTemplate       = normalizedSchemaTemplate,
                 ActivePreferenceId = activePreferenceId,
                 ClientCode = normalizedClientCode ?? string.Empty,
+                HasAppliedFilters = loadData,
                 AvailableClientCodes = availableClientCodes,
                 FilterDateFrom   = dateFrom,
                 FilterDateTo     = dateTo,

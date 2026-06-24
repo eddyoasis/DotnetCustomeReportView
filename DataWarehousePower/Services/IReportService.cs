@@ -19,7 +19,8 @@ namespace DataWarehousePower.Services
             string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
-            IReadOnlyDictionary<string, string?>? parameterValues = null);
+            IReadOnlyDictionary<string, string?>? parameterValues = null,
+            bool loadData = true);
 
         /// <summary>
         /// Persists the user's column preferences for a specific report.

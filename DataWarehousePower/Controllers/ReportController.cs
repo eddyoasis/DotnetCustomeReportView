@@ -45,13 +45,15 @@ namespace DataWarehousePower.Controllers
             string? clientCode = null,
             DateTime? dateFrom = null,
             DateTime? dateTo = null,
+            bool loadData = false,
             int page = 1,
             int pageSize = 50)
         {
             var userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
             Dictionary<string, string?> runtimeParameters = ResolveRuntimeParameters(Request.Query);
-            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, schemaTemplate, clientCode, dateFrom, dateTo, runtimeParameters);
+            bool shouldLoadData = loadData && !string.IsNullOrWhiteSpace(clientCode);
+            var vm     = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, schemaTemplate, clientCode, dateFrom, dateTo, runtimeParameters, shouldLoadData);
 
             if (vm is null)
                 return NotFound($"Report with ID {id} was not found.");
@@ -62,7 +64,7 @@ namespace DataWarehousePower.Controllers
                 pageSize = 50;
             }
 
-            int totalRows = vm.Rows.Count;
+            int totalRows = vm.HasAppliedFilters ? vm.Rows.Count : 0;
             int totalPages = Math.Max(1, (int)Math.Ceiling(totalRows / (double)pageSize));
             page = Math.Clamp(page, 1, totalPages);
 
@@ -70,7 +72,9 @@ namespace DataWarehousePower.Controllers
             vm.PageSize = pageSize;
             vm.TotalPages = totalPages;
             vm.Page = page;
-            vm.Rows = vm.Rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            vm.Rows = vm.HasAppliedFilters
+                ? vm.Rows.Skip((page - 1) * pageSize).Take(pageSize).ToList()
+                : new List<Dictionary<string, object?>>();
 
             return View(vm);
         }
