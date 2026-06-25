@@ -102,12 +102,12 @@
                                style="font-size:.85rem;">
                                 @r.ReportName
                             </a>
-                            <a href="@Url.Action("Edit", "ReportManage", new { id = r.Id })"
+                            @* <a href="@Url.Action("Edit", "ReportManage", new { id = r.Id })"
                                class="btn btn-sm @(r.Id == Model.ReportId ? "btn-light text-primary" : "btn-outline-primary")"
                                title="Edit this report"
                                aria-label="Edit @r.ReportName">
                                 Edit
-                            </a>
+                            </a> *@
                         </div>
                     </li>
                 }
