@@ -111,6 +111,8 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Export Location")]
     public string? ExportLocation { get; set; }
 
+    public List<ExportLocationBasePathOptionViewModel> AvailableExportLocationBasePathOptions { get; set; } = [];
+
     public List<string> AvailableExportLocationBasePaths { get; set; } = [];
 
     [DataType(DataType.Date)]
@@ -145,6 +147,12 @@ public sealed class ScheduledJobFormViewModel
     public Dictionary<int, List<string>> AvailableSchemaTemplatesByReportId { get; set; } = [];
 
     public Dictionary<int, List<ScheduledJobParameterInputViewModel>> AvailableParametersByReportId { get; set; } = [];
+}
+
+public sealed class ExportLocationBasePathOptionViewModel
+{
+    public string Label { get; set; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
 }
 
 public sealed class ScheduledJobParameterInputViewModel

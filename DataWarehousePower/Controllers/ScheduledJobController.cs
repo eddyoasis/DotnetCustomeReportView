@@ -67,7 +67,10 @@ public sealed class ScheduledJobController(
             viewModel.AvailableSchemaTemplates = reportSchemaTemplates;
         }
 
-        viewModel.AvailableExportLocationBasePaths = GetAvailableExportLocationBasePaths();
+        viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
+        viewModel.AvailableExportLocationBasePaths = viewModel.AvailableExportLocationBasePathOptions
+            .Select(option => option.Path)
+            .ToList();
 
         return View("Form", viewModel);
     }
@@ -79,7 +82,10 @@ public sealed class ScheduledJobController(
             string userId = columnPreferenceService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
             ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
-            viewModel.AvailableExportLocationBasePaths = GetAvailableExportLocationBasePaths();
+            viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
+            viewModel.AvailableExportLocationBasePaths = viewModel.AvailableExportLocationBasePathOptions
+                .Select(option => option.Path)
+                .ToList();
             return View("Form", viewModel);
         }
         catch (InvalidOperationException)
@@ -296,7 +302,10 @@ public sealed class ScheduledJobController(
         form.AvailableSchemaTemplates = lookupForm.AvailableSchemaTemplatesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
             ? reportClientCodes
             : [];
-        form.AvailableExportLocationBasePaths = GetAvailableExportLocationBasePaths();
+        form.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
+        form.AvailableExportLocationBasePaths = form.AvailableExportLocationBasePathOptions
+            .Select(option => option.Path)
+            .ToList();
 
         if (form.Id > 0 && string.IsNullOrWhiteSpace(form.ExistingPassword))
         {
@@ -305,17 +314,42 @@ public sealed class ScheduledJobController(
         }
     }
 
+    private List<ExportLocationBasePathOptionViewModel> GetAvailableExportLocationBasePathOptions()
+    {
+        IConfigurationSection section = configuration.GetSection(ExportLocationBasePathsSection);
+        List<ExportLocationBasePathOptionViewModel> configuredOptions = section
+            .GetChildren()
+            .Select(child =>
+            {
+                string path = (child["Path"] ?? child.Value ?? string.Empty).Trim();
+                string label = (child["Label"] ?? string.Empty).Trim();
+
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    return null;
+                }
+
+                return new ExportLocationBasePathOptionViewModel
+                {
+                    Path = path,
+                    Label = string.IsNullOrWhiteSpace(label) ? path : label
+                };
+            })
+            .Where(option => option is not null)
+            .Select(option => option!)
+            .ToList();
+
+        return configuredOptions
+            .GroupBy(option => option.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(option => option.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private List<string> GetAvailableExportLocationBasePaths()
     {
-        List<string> configuredPaths = configuration
-            .GetSection(ExportLocationBasePathsSection)
-            .Get<List<string>>() ?? [];
-
-        return configuredPaths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Select(path => path.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+        return GetAvailableExportLocationBasePathOptions()
+            .Select(option => option.Path)
             .ToList();
     }
 
