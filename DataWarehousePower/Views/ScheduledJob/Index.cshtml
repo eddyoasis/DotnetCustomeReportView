@@ -292,12 +292,13 @@ else
                                 string exportLocationDisplay = BuildFriendlyExportLocationDisplay(job.ExportLocation);
                                 <div class="d-flex flex-column gap-1">
                                     <span>@exportLocationDisplay</span>
-                                    <form asp-action="OpenExportLocation" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="exportLocation" value="@job.ExportLocation" />
-                                        <input type="hidden" name="returnUrl" value="@($"{Context.Request.Path}{Context.Request.QueryString}")" />
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Open</button>
-                                    </form>
+                                    <a asp-action="OpenExportLocation"
+                                       asp-route-exportLocation="@job.ExportLocation"
+                                       class="btn btn-outline-secondary btn-sm d-inline-block"
+                                       target="_blank"
+                                       rel="noopener noreferrer">
+                                        Open
+                                    </a>
                                 </div>
                             }
                         </td>

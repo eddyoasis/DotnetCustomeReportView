@@ -3,7 +3,7 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Diagnostics;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace DataWarehousePower.Controllers;
 
@@ -15,6 +15,8 @@ public sealed class ScheduledJobController(
     ILogger<ScheduledJobController> logger) : Controller
 {
     private const string ExportLocationBasePathsSection = "ScheduledJob:ExportLocationBasePaths";
+    private const int DefaultBrowsePageSize = 20;
+    private static readonly FileExtensionContentTypeProvider ContentTypeProvider = new();
 
     public async Task<IActionResult> Index(ScheduledJobFilterViewModel? filter)
     {
@@ -192,29 +194,13 @@ public sealed class ScheduledJobController(
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public IActionResult OpenExportLocation([FromForm] string? exportLocation, [FromForm] string? returnUrl)
+    [HttpGet]
+    public IActionResult OpenExportLocation([FromQuery] string? exportLocation, [FromQuery] string? searchText = null, [FromQuery] string? selectedType = null, [FromQuery] string? sortBy = null, [FromQuery] string? sortDirection = null, [FromQuery] int page = 1)
     {
-        bool isAjaxRequest = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
-
-        if (!OperatingSystem.IsWindows())
-        {
-            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Opening File Explorer is supported only on Windows hosts.");
-        }
-
-        if (!Environment.UserInteractive)
-        {
-            return BuildOpenExportLocationErrorResponse(
-                isAjaxRequest,
-                returnUrl,
-                "This server session is non-interactive, so File Explorer cannot be opened from UAT.");
-        }
-
         string normalizedExportLocation = NormalizeWindowsPath(exportLocation);
         if (string.IsNullOrWhiteSpace(normalizedExportLocation))
         {
-            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Please select an export location first.");
+            return BadRequest("Please select an export location first.");
         }
 
         List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
@@ -225,57 +211,189 @@ public sealed class ScheduledJobController(
 
         if (!isUnderConfiguredBasePath)
         {
-            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Export location must start with one of the configured base paths.");
+            return BadRequest("Export location must start with one of the configured base paths.");
         }
 
         if (!Directory.Exists(normalizedExportLocation))
         {
-            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "The export location folder does not exist.");
+            return NotFound("The export location folder does not exist.");
         }
 
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "explorer.exe",
-                Arguments = $"\"{normalizedExportLocation}\"",
-                UseShellExecute = true
-            });
+        ScheduledJobExportLocationBrowserViewModel viewModel = BuildExportLocationBrowserViewModel(
+            normalizedExportLocation,
+            searchText,
+            selectedType,
+            sortBy,
+            sortDirection,
+            page);
 
-            if (isAjaxRequest)
-            {
-                return Ok(new { opened = true });
-            }
-
-            TempData["Success"] = "Export location opened on the application host.";
-            return RedirectToLocalOrIndex(returnUrl);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to open export location in Explorer: {ExportLocation}", normalizedExportLocation);
-            return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Failed to open export location.", StatusCodes.Status500InternalServerError);
-        }
+        return View("ExportLocation", viewModel);
     }
 
-    private IActionResult BuildOpenExportLocationErrorResponse(bool isAjaxRequest, string? returnUrl, string errorMessage, int statusCode = StatusCodes.Status400BadRequest)
+    [HttpGet]
+    public IActionResult DownloadExportLocationFile([FromQuery] string? exportLocation, [FromQuery] string? fileName)
     {
-        if (isAjaxRequest)
+        string normalizedExportLocation = NormalizeWindowsPath(exportLocation);
+        if (string.IsNullOrWhiteSpace(normalizedExportLocation))
         {
-            return StatusCode(statusCode, errorMessage);
+            return BadRequest("Please select an export location first.");
         }
 
-        TempData["Error"] = errorMessage;
-        return RedirectToLocalOrIndex(returnUrl);
+        string sanitizedFileName = Path.GetFileName(fileName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(sanitizedFileName) || !string.Equals(fileName, sanitizedFileName, StringComparison.Ordinal))
+        {
+            return BadRequest("Invalid file name.");
+        }
+
+        List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
+        bool isUnderConfiguredBasePath = availableBasePaths
+            .Select(NormalizeBasePath)
+            .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
+            .Any(basePath => normalizedExportLocation.StartsWith(basePath!, StringComparison.OrdinalIgnoreCase));
+
+        if (!isUnderConfiguredBasePath)
+        {
+            return BadRequest("Export location must start with one of the configured base paths.");
+        }
+
+        string filePath = Path.Combine(normalizedExportLocation, sanitizedFileName);
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound();
+        }
+
+        string contentType = ContentTypeProvider.TryGetContentType(sanitizedFileName, out string? resolvedContentType)
+            ? resolvedContentType
+            : "application/octet-stream";
+
+        FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        return File(fileStream, contentType, sanitizedFileName);
     }
 
-    private IActionResult RedirectToLocalOrIndex(string? returnUrl)
+    private ScheduledJobExportLocationBrowserViewModel BuildExportLocationBrowserViewModel(string exportLocation, string? searchText, string? selectedType, string? sortBy, string? sortDirection, int page)
     {
-        if (Url.IsLocalUrl(returnUrl))
+        string normalizedSearchText = (searchText ?? string.Empty).Trim();
+        string normalizedSelectedType = (selectedType ?? string.Empty).Trim();
+        string normalizedSortBy = NormalizeSortBy(sortBy);
+        string normalizedSortDirection = NormalizeSortDirection(sortDirection);
+
+        List<ReportFolderFileItemViewModel> allFiles = GetFiles(exportLocation);
+        IEnumerable<ReportFolderFileItemViewModel> filteredFiles = ApplyFilters(allFiles, normalizedSearchText, normalizedSelectedType);
+        List<string> availableTypes = filteredFiles
+            .Select(file => file.Type)
+            .Where(type => !string.IsNullOrWhiteSpace(type))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(type => type, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        List<ReportFolderFileItemViewModel> sortedFiles = ApplySort(filteredFiles, normalizedSortBy, normalizedSortDirection).ToList();
+
+        int sanitizedPage = page < 1 ? 1 : page;
+        int totalCount = sortedFiles.Count;
+        int totalPages = totalCount == 0 ? 1 : (int)Math.Ceiling(totalCount / (double)DefaultBrowsePageSize);
+        if (sanitizedPage > totalPages)
         {
-            return Redirect(returnUrl!);
+            sanitizedPage = totalPages;
         }
 
-        return RedirectToAction(nameof(Index));
+        List<ReportFolderFileItemViewModel> pagedFiles = sortedFiles
+            .Skip((sanitizedPage - 1) * DefaultBrowsePageSize)
+            .Take(DefaultBrowsePageSize)
+            .ToList();
+
+        return new ScheduledJobExportLocationBrowserViewModel
+        {
+            ExportLocation = exportLocation,
+            SearchText = normalizedSearchText,
+            SelectedType = normalizedSelectedType,
+            SortBy = normalizedSortBy,
+            SortDirection = normalizedSortDirection,
+            Files = pagedFiles,
+            Page = sanitizedPage,
+            PageSize = DefaultBrowsePageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            AvailableTypes = availableTypes
+        };
+    }
+
+    private static IEnumerable<ReportFolderFileItemViewModel> ApplyFilters(IEnumerable<ReportFolderFileItemViewModel> files, string searchText, string selectedType)
+    {
+        IEnumerable<ReportFolderFileItemViewModel> filtered = files;
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            filtered = filtered.Where(file => file.FileName.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedType))
+        {
+            filtered = filtered.Where(file => string.Equals(file.Type, selectedType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return filtered;
+    }
+
+    private static IEnumerable<ReportFolderFileItemViewModel> ApplySort(IEnumerable<ReportFolderFileItemViewModel> files, string sortBy, string sortDirection)
+    {
+        bool descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        return sortBy.ToLowerInvariant() switch
+        {
+            "name" => descending
+                ? files.OrderByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+            "type" => descending
+                ? files.OrderByDescending(file => file.Type, StringComparer.OrdinalIgnoreCase).ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.Type, StringComparer.OrdinalIgnoreCase).ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+            "size" => descending
+                ? files.OrderByDescending(file => file.SizeBytes).ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.SizeBytes).ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+            _ => descending
+                ? files.OrderByDescending(file => file.DateModified).ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.DateModified).ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+        };
+    }
+
+    private static List<ReportFolderFileItemViewModel> GetFiles(string exportLocation)
+    {
+        if (string.IsNullOrWhiteSpace(exportLocation) || !Directory.Exists(exportLocation))
+        {
+            return [];
+        }
+
+        return Directory
+            .EnumerateFiles(exportLocation)
+            .Select(path => new FileInfo(path))
+            .Select(fileInfo => new ReportFolderFileItemViewModel
+            {
+                FileName = fileInfo.Name,
+                Type = GetFileType(fileInfo),
+                SizeBytes = fileInfo.Length,
+                DateModified = fileInfo.LastWriteTime
+            })
+            .ToList();
+    }
+
+    private static string GetFileType(FileInfo fileInfo)
+    {
+        return string.IsNullOrWhiteSpace(fileInfo.Extension) ? "No extension" : fileInfo.Extension.TrimStart('.').ToUpperInvariant();
+    }
+
+    private static string NormalizeSortBy(string? sortBy)
+    {
+        return sortBy?.ToLowerInvariant() switch
+        {
+            "name" => "name",
+            "type" => "type",
+            "size" => "size",
+            _ => "date",
+        };
+    }
+
+    private static string NormalizeSortDirection(string? sortDirection)
+    {
+        return string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
     }
 
     private string ResolveAuditUsername()

@@ -1,0 +1,185 @@
+@model DataWarehousePower.Models.ScheduledJobExportLocationBrowserViewModel
+
+@{
+    ViewData["Title"] = "Export Location";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-9">
+        <h2 class="mb-3">Export Location Browser</h2>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Folder Path</label>
+                    <input type="text" class="form-control" value="@Model.ExportLocation" readonly />
+                </div>
+
+                <form asp-action="OpenExportLocation" method="get" class="d-grid gap-3" id="exportLocationFilterForm">
+                    <input type="hidden" name="exportLocation" value="@Model.ExportLocation" />
+                    <input type="hidden" name="page" value="1" />
+                    <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                    <input type="hidden" name="sortDirection" value="@Model.SortDirection" />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="searchText" class="form-label">Filter by file name</label>
+                            <input id="searchText"
+                                   name="searchText"
+                                   type="text"
+                                   class="form-control"
+                                   value="@Model.SearchText"
+                                   placeholder="Type part of a file name" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="selectedType" class="form-label">Filter by type</label>
+                            <select id="selectedType" name="selectedType" class="form-select">
+                                <option value="">All types</option>
+                                @foreach (var type in Model.AvailableTypes)
+                                {
+                                    <option value="@type" selected="@(string.Equals(type, Model.SelectedType, StringComparison.OrdinalIgnoreCase))">@type</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a asp-action="OpenExportLocation"
+                               asp-route-exportLocation="@Model.ExportLocation"
+                               class="btn btn-outline-secondary">
+                                Clear Filters
+                            </a>
+                        </div>
+                    </div>
+                </form>
+
+                <hr />
+
+                @if (!Model.Files.Any())
+                {
+                    <div class="alert alert-info mb-0" role="alert">No files found.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">
+                                        <a asp-action="OpenExportLocation"
+                                           asp-route-exportLocation="@Model.ExportLocation"
+                                           asp-route-searchText="@Model.SearchText"
+                                           asp-route-selectedType="@Model.SelectedType"
+                                           asp-route-sortBy="name"
+                                           asp-route-sortDirection="@(Model.SortBy == "name" && Model.SortDirection == "asc" ? "desc" : "asc")">
+                                            File Name
+                                        </a>
+                                    </th>
+                                    <th scope="col">
+                                        <a asp-action="OpenExportLocation"
+                                           asp-route-exportLocation="@Model.ExportLocation"
+                                           asp-route-searchText="@Model.SearchText"
+                                           asp-route-selectedType="@Model.SelectedType"
+                                           asp-route-sortBy="type"
+                                           asp-route-sortDirection="@(Model.SortBy == "type" && Model.SortDirection == "asc" ? "desc" : "asc")">
+                                            Type
+                                        </a>
+                                    </th>
+                                    <th scope="col">
+                                        <a asp-action="OpenExportLocation"
+                                           asp-route-exportLocation="@Model.ExportLocation"
+                                           asp-route-searchText="@Model.SearchText"
+                                           asp-route-selectedType="@Model.SelectedType"
+                                           asp-route-sortBy="size"
+                                           asp-route-sortDirection="@(Model.SortBy == "size" && Model.SortDirection == "asc" ? "desc" : "asc")">
+                                            Size
+                                        </a>
+                                    </th>
+                                    <th scope="col">
+                                        <a asp-action="OpenExportLocation"
+                                           asp-route-exportLocation="@Model.ExportLocation"
+                                           asp-route-searchText="@Model.SearchText"
+                                           asp-route-selectedType="@Model.SelectedType"
+                                           asp-route-sortBy="date"
+                                           asp-route-sortDirection="@(Model.SortBy == "date" && Model.SortDirection == "asc" ? "desc" : "asc")">
+                                            Date Modified
+                                        </a>
+                                    </th>
+                                    <th scope="col" class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var file in Model.Files)
+                                {
+                                    <tr>
+                                        <td>@file.FileName</td>
+                                        <td>@file.Type</td>
+                                        <td>@FormatFileSize(file.SizeBytes)</td>
+                                        <td>@file.DateModified.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                                        <td class="text-end">
+                                            <a asp-action="DownloadExportLocationFile"
+                                               asp-route-exportLocation="@Model.ExportLocation"
+                                               asp-route-fileName="@file.FileName"
+                                               class="btn btn-outline-primary btn-sm">
+                                                Download
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <span class="text-muted small">
+                            Showing page @Model.Page of @Model.TotalPages (@Model.TotalCount files)
+                        </span>
+                        <div class="btn-group" role="group" aria-label="Pagination">
+                            <a asp-action="OpenExportLocation"
+                               asp-route-exportLocation="@Model.ExportLocation"
+                               asp-route-searchText="@Model.SearchText"
+                               asp-route-selectedType="@Model.SelectedType"
+                               asp-route-sortBy="@Model.SortBy"
+                               asp-route-sortDirection="@Model.SortDirection"
+                               asp-route-page="@(Model.Page - 1)"
+                               class="btn btn-outline-secondary btn-sm @(Model.HasPreviousPage ? "" : "disabled")"
+                               aria-disabled="@(!Model.HasPreviousPage)">
+                                Previous
+                            </a>
+                            <a asp-action="OpenExportLocation"
+                               asp-route-exportLocation="@Model.ExportLocation"
+                               asp-route-searchText="@Model.SearchText"
+                               asp-route-selectedType="@Model.SelectedType"
+                               asp-route-sortBy="@Model.SortBy"
+                               asp-route-sortDirection="@Model.SortDirection"
+                               asp-route-page="@(Model.Page + 1)"
+                               class="btn btn-outline-secondary btn-sm @(Model.HasNextPage ? "" : "disabled")"
+                               aria-disabled="@(!Model.HasNextPage)">
+                                Next
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private static string FormatFileSize(long bytes)
+    {
+        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
+        double size = bytes;
+        int index = 0;
+
+        while (size >= 1024 && index < suffixes.Length - 1)
+        {
+            size /= 1024;
+            index++;
+        }
+
+        return index == 0 ? $"{bytes} {suffixes[index]}" : $"{size:0.##} {suffixes[index]}";
+    }
+}
