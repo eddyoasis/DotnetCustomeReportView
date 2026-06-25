@@ -349,7 +349,6 @@
             const exportLocationBasePathSelect = document.getElementById('exportLocationBasePathSelect');
             const exportLocationSubfolderInput = document.getElementById('exportLocationSubfolderInput');
             const openExportLocationButton = document.getElementById('openExportLocationButton');
-            const antiForgeryTokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
             const openExportLocationUrl = '@Url.Action("OpenExportLocation", "ScheduledJob")';
             const clientCodeSelect = document.getElementById('scheduled-client-code-select');
             const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
@@ -527,37 +526,14 @@
                 exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
 
                 if (openExportLocationButton) {
-                    openExportLocationButton.addEventListener('click', async () => {
+                    openExportLocationButton.addEventListener('click', () => {
                         const targetPath = normalizeWindowsPath(exportLocationHiddenInput.value);
-                        const antiForgeryToken = (antiForgeryTokenInput?.value || '').trim();
-                        if (!targetPath || !antiForgeryToken) {
+                        if (!targetPath) {
                             return;
                         }
 
-                        const formData = new URLSearchParams();
-                        formData.set('exportLocation', targetPath);
-                        formData.set('__RequestVerificationToken', antiForgeryToken);
-
-                        try {
-                            const response = await fetch(openExportLocationUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'X-Requested-With': 'XMLHttpRequest',
-                                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                                },
-                                body: formData.toString()
-                            });
-
-                            if (!response.ok) {
-                                const responseText = await response.text();
-                                throw new Error(responseText || 'Failed to open export location.');
-                            }
-                        } catch (error) {
-                            const message = error instanceof Error && error.message
-                                ? error.message
-                                : 'Failed to open export location.';
-                            alert(message);
-                        }
+                        const url = `${openExportLocationUrl}?exportLocation=${encodeURIComponent(targetPath)}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
                     });
                 }
 
