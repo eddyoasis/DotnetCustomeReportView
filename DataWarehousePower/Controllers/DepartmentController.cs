@@ -1,3 +1,4 @@
+using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
@@ -10,7 +11,7 @@ namespace DataWarehousePower.Controllers
     /// CRUD management for Departments.
     /// Route: /Department
     /// </summary>
-    [Authorize]
+    [Authorize(Policy = DepartmentAuthorizationPolicies.AdminAccess)]
     public class DepartmentController : Controller
     {
         private readonly IDepartmentService _service;

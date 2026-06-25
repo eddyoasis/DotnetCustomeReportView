@@ -3,12 +3,11 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System.Diagnostics;
 
 namespace DataWarehousePower.Controllers;
 
-[Authorize(Policy = DepartmentAuthorizationPolicies.ReportManageAccess)]
+[Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
 public sealed class ScheduledJobController(
     IScheduledReportJobService scheduledReportJobService,
     IColumnPreferenceService columnPreferenceService,

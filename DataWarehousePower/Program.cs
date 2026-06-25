@@ -128,6 +128,18 @@ authorizationBuilder.AddPolicy(
         .RequireAuthenticatedUser()
         .AddRequirements(new DepartmentAccessRequirement("Auditlog")));
 
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.JobDashboardAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("JobDashboard")));
+
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.AdminAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("Admin")));
+
 var app = builder.Build();
 const string ChallengeCookieName = "dw_auth_challenge";
 
