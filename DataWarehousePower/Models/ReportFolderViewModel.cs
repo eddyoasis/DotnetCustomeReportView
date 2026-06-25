@@ -6,6 +6,14 @@ public sealed class ReportFolderViewModel
 
     public string UserId { get; init; } = string.Empty;
 
+    public string SearchText { get; init; } = string.Empty;
+
+    public string SelectedType { get; init; } = string.Empty;
+
+    public string SortBy { get; init; } = "date";
+
+    public string SortDirection { get; init; } = "desc";
+
     public string VirtualDirectoryName { get; init; } = string.Empty;
 
     public string PhysicalBasePath { get; init; } = string.Empty;
@@ -27,11 +35,17 @@ public sealed class ReportFolderViewModel
     public bool HasPreviousPage => Page > 1;
 
     public bool HasNextPage => Page < TotalPages;
+
+    public IReadOnlyList<string> AvailableTypes { get; init; } = [];
 }
 
 public sealed class ReportFolderFileItemViewModel
 {
     public string FileName { get; init; } = string.Empty;
+
+    public string Type { get; init; } = string.Empty;
+
+    public long SizeBytes { get; init; }
 
     public DateTime DateModified { get; init; }
 }

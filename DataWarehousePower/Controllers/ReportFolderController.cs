@@ -4,6 +4,7 @@ using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using System.IO.Compression;
 
 namespace DataWarehousePower.Controllers;
 
@@ -19,9 +20,9 @@ public sealed class ReportFolderController(
     private static readonly FileExtensionContentTypeProvider ContentTypeProvider = new();
 
     [HttpGet]
-    public IActionResult Index(DateTime? selectedDate = null, int page = 1)
+    public IActionResult Index(DateTime? selectedDate = null, string? searchText = null, string? selectedType = null, string? sortBy = null, string? sortDirection = null, int page = 1)
     {
-        ReportFolderViewModel viewModel = BuildViewModel(selectedDate, page);
+        ReportFolderViewModel viewModel = BuildViewModel(selectedDate, searchText, selectedType, sortBy, sortDirection, page);
 
         if (string.IsNullOrWhiteSpace(viewModel.VirtualDirectoryName))
         {
@@ -83,7 +84,40 @@ public sealed class ReportFolderController(
         }
     }
 
-    private ReportFolderViewModel BuildViewModel(DateTime? selectedDate, int page)
+    [HttpGet]
+    public IActionResult DownloadAll(DateTime? selectedDate = null, string? searchText = null, string? selectedType = null, string? sortBy = null, string? sortDirection = null)
+    {
+        ReportFolderViewModel viewModel = BuildViewModel(selectedDate, searchText, selectedType, sortBy, sortDirection, 1);
+        if (string.IsNullOrWhiteSpace(viewModel.FolderPhysicalPath) || !Directory.Exists(viewModel.FolderPhysicalPath))
+        {
+            return NotFound();
+        }
+
+        string archiveFileName = $"report-files-{viewModel.SelectedDate:yyyy-MM-dd}.zip";
+        MemoryStream memoryStream = new();
+
+        using (ZipArchive archive = new(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (ReportFolderFileItemViewModel file in GetAllFiles(viewModel.FolderPhysicalPath, viewModel.SearchText, viewModel.SelectedType, viewModel.SortBy, viewModel.SortDirection))
+            {
+                string filePath = Path.Combine(viewModel.FolderPhysicalPath, file.FileName);
+                if (!System.IO.File.Exists(filePath))
+                {
+                    continue;
+                }
+
+                ZipArchiveEntry entry = archive.CreateEntry(file.FileName, CompressionLevel.Fastest);
+                using Stream entryStream = entry.Open();
+                using FileStream sourceStream = System.IO.File.OpenRead(filePath);
+                sourceStream.CopyTo(entryStream);
+            }
+        }
+
+        memoryStream.Position = 0;
+        return File(memoryStream, "application/zip", archiveFileName);
+    }
+
+    private ReportFolderViewModel BuildViewModel(DateTime? selectedDate, string? searchText, string? selectedType, string? sortBy, string? sortDirection, int page)
     {
         DateTime effectiveDate = (selectedDate ?? DateTime.Today).Date;
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
@@ -98,16 +132,30 @@ public sealed class ReportFolderController(
             ? string.Empty
             : BuildFolderUrl(virtualDirectoryName, userPathSegment, effectiveDate);
 
-        List<ReportFolderFileItemViewModel> files = GetFiles(folderPhysicalPath);
+        string normalizedSearchText = (searchText ?? string.Empty).Trim();
+        string normalizedSelectedType = (selectedType ?? string.Empty).Trim();
+        string normalizedSortBy = NormalizeSortBy(sortBy);
+        string normalizedSortDirection = NormalizeSortDirection(sortDirection);
+
+        List<ReportFolderFileItemViewModel> allFiles = GetFiles(folderPhysicalPath);
+        IEnumerable<ReportFolderFileItemViewModel> filteredFiles = ApplyFilters(allFiles, normalizedSearchText, normalizedSelectedType);
+        List<string> availableTypes = filteredFiles
+            .Select(file => file.Type)
+            .Where(type => !string.IsNullOrWhiteSpace(type))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(type => type, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        List<ReportFolderFileItemViewModel> sortedFiles = ApplySort(filteredFiles, normalizedSortBy, normalizedSortDirection).ToList();
         int sanitizedPage = page < 1 ? 1 : page;
-        int totalCount = files.Count;
+        int totalCount = sortedFiles.Count;
         int totalPages = totalCount == 0 ? 1 : (int)Math.Ceiling(totalCount / (double)DefaultPageSize);
         if (sanitizedPage > totalPages)
         {
             sanitizedPage = totalPages;
         }
 
-        List<ReportFolderFileItemViewModel> pagedFiles = files
+        List<ReportFolderFileItemViewModel> pagedFiles = sortedFiles
             .Skip((sanitizedPage - 1) * DefaultPageSize)
             .Take(DefaultPageSize)
             .ToList();
@@ -116,6 +164,10 @@ public sealed class ReportFolderController(
         {
             SelectedDate = effectiveDate,
             UserId = userId,
+            SearchText = normalizedSearchText,
+            SelectedType = normalizedSelectedType,
+            SortBy = normalizedSortBy,
+            SortDirection = normalizedSortDirection,
             VirtualDirectoryName = virtualDirectoryName,
             PhysicalBasePath = physicalBasePath,
             FolderPhysicalPath = folderPhysicalPath,
@@ -124,7 +176,46 @@ public sealed class ReportFolderController(
             Page = sanitizedPage,
             PageSize = DefaultPageSize,
             TotalCount = totalCount,
-            TotalPages = totalPages
+            TotalPages = totalPages,
+            AvailableTypes = availableTypes
+        };
+    }
+
+    private static IEnumerable<ReportFolderFileItemViewModel> ApplyFilters(IEnumerable<ReportFolderFileItemViewModel> files, string searchText, string selectedType)
+    {
+        IEnumerable<ReportFolderFileItemViewModel> filtered = files;
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            filtered = filtered.Where(file => file.FileName.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedType))
+        {
+            filtered = filtered.Where(file => string.Equals(file.Type, selectedType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return filtered;
+    }
+
+    private static IEnumerable<ReportFolderFileItemViewModel> ApplySort(IEnumerable<ReportFolderFileItemViewModel> files, string sortBy, string sortDirection)
+    {
+        bool descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        return sortBy.ToLowerInvariant() switch
+        {
+            "name" => descending
+                ? files.OrderByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+            "type" => descending
+                ? files.OrderByDescending(file => file.Type, StringComparer.OrdinalIgnoreCase).ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.Type, StringComparer.OrdinalIgnoreCase).ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+            "size" => descending
+                ? files.OrderByDescending(file => file.SizeBytes).ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.SizeBytes).ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
+            _ => descending
+                ? files.OrderByDescending(file => file.DateModified).ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.DateModified).ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase),
         };
     }
 
@@ -175,9 +266,37 @@ public sealed class ReportFolderController(
             .Select(fileInfo => new ReportFolderFileItemViewModel
             {
                 FileName = fileInfo.Name,
+                Type = GetFileType(fileInfo),
+                SizeBytes = fileInfo.Length,
                 DateModified = fileInfo.LastWriteTime
             })
             .ToList();
+    }
+
+    private static IEnumerable<ReportFolderFileItemViewModel> GetAllFiles(string folderPhysicalPath, string searchText, string selectedType, string sortBy, string sortDirection)
+    {
+        return ApplySort(ApplyFilters(GetFiles(folderPhysicalPath), searchText, selectedType), sortBy, sortDirection);
+    }
+
+    private static string GetFileType(FileInfo fileInfo)
+    {
+        return string.IsNullOrWhiteSpace(fileInfo.Extension) ? "No extension" : fileInfo.Extension.TrimStart('.').ToUpperInvariant();
+    }
+
+    private static string NormalizeSortBy(string? sortBy)
+    {
+        return sortBy?.ToLowerInvariant() switch
+        {
+            "name" => "name",
+            "type" => "type",
+            "size" => "size",
+            _ => "date",
+        };
+    }
+
+    private static string NormalizeSortDirection(string? sortDirection)
+    {
+        return string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
     }
 
     private static string SanitizePathSegment(string rawValue)
