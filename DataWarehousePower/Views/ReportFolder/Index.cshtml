@@ -1,0 +1,52 @@
+@model DataWarehousePower.Models.ReportFolderViewModel
+
+@{
+    ViewData["Title"] = "Report Folder";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h2 class="mb-3">Report Folder</h2>
+
+        @if (TempData["Success"] is string successMessage)
+        {
+            <div class="alert alert-success" role="alert">@successMessage</div>
+        }
+
+        @if (TempData["Error"] is string errorMessage)
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form asp-action="Open" method="post" class="d-grid gap-3">
+                    @Html.AntiForgeryToken()
+
+                    <div>
+                        <label for="selectedDate" class="form-label">Date</label>
+                        <input id="selectedDate"
+                               name="selectedDate"
+                               type="date"
+                               class="form-control"
+                               value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">User ID</label>
+                        <input type="text" class="form-control" value="@Model.UserId" readonly />
+                    </div>
+
+                    <div hidden>
+                        <label class="form-label">Final Path</label>
+                        <input type="text" class="form-control" value="@Model.FinalPath" readonly />
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Open</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
