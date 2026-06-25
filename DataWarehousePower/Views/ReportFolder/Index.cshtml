@@ -30,6 +30,7 @@
                         <input id="selectedDate"
                                name="selectedDate"
                                type="date"
+                               lang="en-GB"
                                class="form-control"
                                onchange="document.getElementById('reportFolderFilterForm').submit();"
                                value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
@@ -63,7 +64,14 @@
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a asp-action="Index"
+                               asp-route-selectedDate="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                               class="btn btn-outline-secondary">
+                                Clear Filters
+                            </a>
+                        </div>
                         <a asp-action="DownloadAll"
                            asp-route-selectedDate="@Model.SelectedDate.ToString("yyyy-MM-dd")"
                            asp-route-searchText="@Model.SearchText"
@@ -139,7 +147,7 @@
                                         <td>@file.FileName</td>
                                         <td>@file.Type</td>
                                         <td>@FormatFileSize(file.SizeBytes)</td>
-                                        <td>@file.DateModified.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        <td>@file.DateModified.ToString("dd/MM/yyyy HH:mm:ss")</td>
                                         <td class="text-end">
                                             <a asp-action="Download"
                                                asp-route-selectedDate="@Model.SelectedDate.ToString("yyyy-MM-dd")"
