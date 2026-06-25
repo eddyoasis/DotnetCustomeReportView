@@ -197,6 +197,14 @@ public sealed class ScheduledJobController(
             return BuildOpenExportLocationErrorResponse(isAjaxRequest, returnUrl, "Opening File Explorer is supported only on Windows hosts.");
         }
 
+        if (!Environment.UserInteractive)
+        {
+            return BuildOpenExportLocationErrorResponse(
+                isAjaxRequest,
+                returnUrl,
+                "This server session is non-interactive, so File Explorer cannot be opened from UAT.");
+        }
+
         string normalizedExportLocation = NormalizeWindowsPath(exportLocation);
         if (string.IsNullOrWhiteSpace(normalizedExportLocation))
         {
@@ -233,7 +241,7 @@ public sealed class ScheduledJobController(
                 return Ok(new { opened = true });
             }
 
-            TempData["Success"] = "Export location opened.";
+            TempData["Success"] = "Export location opened on the application host.";
             return RedirectToLocalOrIndex(returnUrl);
         }
         catch (Exception ex)
@@ -338,7 +346,24 @@ public sealed class ScheduledJobController(
     }
 
     private static string NormalizeWindowsPath(string? path)
-        => (path ?? string.Empty).Trim().Replace('/', '\\');
+    {
+        string normalizedPath = (path ?? string.Empty).Trim().Replace('/', '\\');
+
+        // Normalize duplicate separators for local drive paths like C:\\temp\\folder.
+        if (normalizedPath.Length >= 3 && char.IsLetter(normalizedPath[0]) && normalizedPath[1] == ':')
+        {
+            string root = normalizedPath[..2];
+            string tail = normalizedPath[2..];
+            while (tail.Contains("\\\\", StringComparison.Ordinal))
+            {
+                tail = tail.Replace("\\\\", "\\", StringComparison.Ordinal);
+            }
+
+            normalizedPath = root + tail;
+        }
+
+        return normalizedPath;
+    }
 
     private static string NormalizeBasePath(string? path)
     {
