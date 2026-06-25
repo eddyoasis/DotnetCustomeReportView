@@ -6,7 +6,7 @@ public sealed class ReportFolderViewModel
 
     public string UserId { get; init; } = string.Empty;
 
-    public string BasePath { get; init; } = string.Empty;
+    public string VirtualDirectoryName { get; init; } = string.Empty;
 
-    public string FinalPath { get; init; } = string.Empty;
+    public string FolderUrl { get; init; } = string.Empty;
 }

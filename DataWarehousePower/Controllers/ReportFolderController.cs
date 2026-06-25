@@ -3,7 +3,6 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Diagnostics;
 
 namespace DataWarehousePower.Controllers;
 
@@ -13,16 +12,16 @@ public sealed class ReportFolderController(
     IColumnPreferenceService columnPreferenceService,
     ILogger<ReportFolderController> logger) : Controller
 {
-    private const string SaveReportFolderPathSettingKey = "SaveReportFolderPath";
+    private const string IisVirtualDirectoryReportFolderNameSettingKey = "IISVirtualDirectoryReportFoldername";
 
     [HttpGet]
     public IActionResult Index(DateTime? selectedDate = null)
     {
         ReportFolderViewModel viewModel = BuildViewModel(selectedDate);
 
-        if (string.IsNullOrWhiteSpace(viewModel.BasePath))
+        if (string.IsNullOrWhiteSpace(viewModel.VirtualDirectoryName))
         {
-            TempData["Error"] = $"Configuration '{SaveReportFolderPathSettingKey}' is missing.";
+            TempData["Error"] = $"Configuration '{IisVirtualDirectoryReportFolderNameSettingKey}' is missing.";
         }
 
         return View(viewModel);
@@ -34,33 +33,20 @@ public sealed class ReportFolderController(
     {
         ReportFolderViewModel viewModel = BuildViewModel(selectedDate);
 
-        if (string.IsNullOrWhiteSpace(viewModel.BasePath))
+        if (string.IsNullOrWhiteSpace(viewModel.VirtualDirectoryName))
         {
-            TempData["Error"] = $"Configuration '{SaveReportFolderPathSettingKey}' is missing.";
+            TempData["Error"] = $"Configuration '{IisVirtualDirectoryReportFolderNameSettingKey}' is missing.";
             return RedirectToAction(nameof(Index), new { selectedDate = viewModel.SelectedDate.ToString("yyyy-MM-dd") });
         }
 
         try
         {
-            if (!Directory.Exists(viewModel.FinalPath))
-            {
-                TempData["Error"] = "The report folder does not exist.";
-                return RedirectToAction(nameof(Index), new { selectedDate = viewModel.SelectedDate.ToString("yyyy-MM-dd") });
-            }
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "explorer.exe",
-                Arguments = $"\"{viewModel.FinalPath}\"",
-                UseShellExecute = true
-            });
-
-            TempData["Success"] = "Folder opened on the application host.";
+            return Redirect(viewModel.FolderUrl);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to open report folder in Explorer: {FolderPath}", viewModel.FinalPath);
-            TempData["Error"] = "Failed to open report folder.";
+            logger.LogError(ex, "Failed to redirect to report folder URL: {FolderUrl}", viewModel.FolderUrl);
+            TempData["Error"] = "Failed to open report folder URL.";
         }
 
         return RedirectToAction(nameof(Index), new { selectedDate = viewModel.SelectedDate.ToString("yyyy-MM-dd") });
@@ -70,43 +56,50 @@ public sealed class ReportFolderController(
     {
         DateTime effectiveDate = (selectedDate ?? DateTime.Today).Date;
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
-        string userFolder = SanitizePathSegment(userId);
-        string basePath = NormalizeBasePath(configuration[SaveReportFolderPathSettingKey]);
+        string userPathSegment = SanitizeUrlPathSegment(userId);
+        string virtualDirectoryName = NormalizeVirtualDirectoryName(configuration[IisVirtualDirectoryReportFolderNameSettingKey]);
 
-        string finalPath = string.IsNullOrWhiteSpace(basePath)
+        string folderUrl = string.IsNullOrWhiteSpace(virtualDirectoryName)
             ? string.Empty
-            : Path.Combine(basePath, userFolder, effectiveDate.ToString("yyyy-MM-dd"));
+            : BuildFolderUrl(virtualDirectoryName, userPathSegment, effectiveDate);
 
         return new ReportFolderViewModel
         {
             SelectedDate = effectiveDate,
             UserId = userId,
-            BasePath = basePath,
-            FinalPath = finalPath
+            VirtualDirectoryName = virtualDirectoryName,
+            FolderUrl = folderUrl
         };
     }
 
-    private static string NormalizeBasePath(string? configuredPath)
+    private string BuildFolderUrl(string virtualDirectoryName, string userPathSegment, DateTime selectedDate)
     {
-        if (string.IsNullOrWhiteSpace(configuredPath))
+        string baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+        string relativePath = $"{virtualDirectoryName}/{Uri.EscapeDataString(userPathSegment)}/{selectedDate:yyyy-MM-dd}";
+        return $"{baseUrl}/{relativePath}";
+    }
+
+    private static string NormalizeVirtualDirectoryName(string? configuredName)
+    {
+        if (string.IsNullOrWhiteSpace(configuredName))
         {
             return string.Empty;
         }
 
-        return configuredPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return configuredName.Trim().Trim('/');
     }
 
-    private static string SanitizePathSegment(string rawValue)
+    private static string SanitizeUrlPathSegment(string rawValue)
     {
         if (string.IsNullOrWhiteSpace(rawValue))
         {
             return "anonymous";
         }
 
-        char[] invalidChars = Path.GetInvalidFileNameChars();
+        const string allowedChars = "-_.";
         string sanitized = new(rawValue
             .Trim()
-            .Select(character => invalidChars.Contains(character) ? '_' : character)
+            .Select(character => char.IsLetterOrDigit(character) || allowedChars.Contains(character) ? character : '_')
             .ToArray());
 
         return string.IsNullOrWhiteSpace(sanitized) ? "anonymous" : sanitized;
