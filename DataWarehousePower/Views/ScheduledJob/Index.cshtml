@@ -1,6 +1,49 @@
 @model DataWarehousePower.Models.ScheduledJobListViewModel
 @{
     ViewData["Title"] = "Scheduled Jobs";
+
+    string NormalizeWindowsPath(string? path)
+        => (path ?? string.Empty).Trim().Replace('/', '\\');
+
+    string EnsureTrailingSlash(string? path)
+    {
+        string normalizedPath = NormalizeWindowsPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return string.Empty;
+        }
+
+        return normalizedPath.EndsWith('\\') ? normalizedPath : $"{normalizedPath}\\";
+    }
+
+    string BuildFriendlyExportLocationDisplay(string? fullPath)
+    {
+        string normalizedFullPath = NormalizeWindowsPath(fullPath);
+        if (string.IsNullOrWhiteSpace(normalizedFullPath))
+        {
+            return string.Empty;
+        }
+
+        ExportLocationBasePathOptionViewModel? matchedBasePathOption = Model.AvailableExportLocationBasePathOptions
+            .Select(option => new ExportLocationBasePathOptionViewModel
+            {
+                Label = option.Label,
+                Path = EnsureTrailingSlash(option.Path)
+            })
+            .Where(option => !string.IsNullOrWhiteSpace(option.Path))
+            .OrderByDescending(option => option.Path.Length)
+            .FirstOrDefault(option => normalizedFullPath.StartsWith(option.Path, StringComparison.OrdinalIgnoreCase));
+
+        if (matchedBasePathOption is null)
+        {
+            return normalizedFullPath;
+        }
+
+        string subfolder = normalizedFullPath[matchedBasePathOption.Path.Length..].TrimStart('\\');
+        return string.IsNullOrWhiteSpace(subfolder)
+            ? matchedBasePathOption.Label
+            : $"{matchedBasePathOption.Label}\\{subfolder}";
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -246,8 +289,9 @@ else
                             }
                             else
                             {
+                                string exportLocationDisplay = BuildFriendlyExportLocationDisplay(job.ExportLocation);
                                 <div class="d-flex flex-column gap-1">
-                                    <span>@job.ExportLocation</span>
+                                    <span>@exportLocationDisplay</span>
                                     <form asp-action="OpenExportLocation" method="post" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="exportLocation" value="@job.ExportLocation" />

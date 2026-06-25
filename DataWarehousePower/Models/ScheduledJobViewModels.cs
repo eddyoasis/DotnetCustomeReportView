@@ -40,6 +40,7 @@ public sealed class ScheduledJobListViewModel
     public List<string> AvailableJobActions { get; set; } = [];
     public List<string> AvailableSchemaTemplates { get; set; } = [];
     public List<string> AvailableClientCodes { get; set; } = [];
+    public List<ExportLocationBasePathOptionViewModel> AvailableExportLocationBasePathOptions { get; set; } = [];
 }
 
 public sealed class ScheduledJobFormViewModel

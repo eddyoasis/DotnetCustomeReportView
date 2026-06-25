@@ -21,6 +21,7 @@ public sealed class ScheduledJobController(
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         ScheduledJobListViewModel viewModel = await scheduledReportJobService.GetListViewModelAsync(userId, filter);
+        viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
         return View(viewModel);
     }
 
