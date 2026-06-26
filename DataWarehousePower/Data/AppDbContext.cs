@@ -1,4 +1,5 @@
 using DataWarehousePower.Models;
+using DataWarehousePower.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -104,7 +105,7 @@ namespace DataWarehousePower.Data
                 e.Property(a => a.Referrer).HasMaxLength(1024);
                 e.Property(a => a.Protocol).HasMaxLength(16);
                 e.Property(a => a.SessionId).HasMaxLength(128);
-                e.HasIndex(a => a.TimestampUtc);
+                e.HasIndex(a => a.CreatedAt);
                 e.HasIndex(a => a.UserId);
             });
 
@@ -182,7 +183,7 @@ namespace DataWarehousePower.Data
 
             string userId = ResolveCurrentUserId();
             string? correlationId = _httpContextAccessor?.HttpContext?.TraceIdentifier;
-            DateTime timestampUtc = DateTime.UtcNow;
+            DateTime createdAt = DateTimeHelper.GetCurrentLocalTime();
             HttpContext? httpContext = _httpContextAccessor?.HttpContext;
             string? ipAddress = ResolveIpAddress(httpContext);
             string? host = ResolveHost(httpContext);
@@ -225,7 +226,7 @@ namespace DataWarehousePower.Data
                     Protocol = protocol,
                     StatusCode = statusCode,
                     SessionId = sessionId,
-                    TimestampUtc = timestampUtc,
+                    CreatedAt = createdAt,
                     ActionType = entry.State switch
                     {
                         EntityState.Added => "Create",
@@ -359,7 +360,7 @@ namespace DataWarehousePower.Data
                     Protocol      = first.Protocol,
                     StatusCode    = first.StatusCode,
                     SessionId     = first.SessionId,
-                    TimestampUtc  = first.TimestampUtc,
+                    CreatedAt     = first.CreatedAt,
                     ActionType    = actionType,
                     EntityName    = first.EntityName,
                     ResourceLabel = resourceLabel,
@@ -471,7 +472,7 @@ namespace DataWarehousePower.Data
             Dictionary<string, object?> keyValues,
             Dictionary<string, object?> newValues,
             Dictionary<string, object?> oldValues,
-            DateTime timestampUtc)
+            DateTime createdAt)
         {
             string? preferredEntityLabel = ResolvePreferredEntityLabel(entityName, actionType, newValues, oldValues);
             string resourceLabel = keyValues.Count > 0
@@ -514,10 +515,10 @@ namespace DataWarehousePower.Data
                     ? $" Changes: {string.Join("; ", changes)}."
                     : string.Empty;
 
-                return $"{username} updated {entityName} ({resourceLabel}) at {timestampUtc:yyyy-MM-dd HH:mm:ss} UTC.{changeSummary}";
+                return $"{username} updated {entityName} ({resourceLabel}) at {createdAt:yyyy-MM-dd HH:mm:ss}.{changeSummary}";
             }
 
-            return $"{username} {actionLabel} {entityName} ({resourceLabel}) at {timestampUtc:yyyy-MM-dd HH:mm:ss} UTC.";
+            return $"{username} {actionLabel} {entityName} ({resourceLabel}) at {createdAt:yyyy-MM-dd HH:mm:ss}.";
         }
 
         private static string? ResolvePreferredEntityLabel(
@@ -823,7 +824,7 @@ namespace DataWarehousePower.Data
             public string? Protocol { get; set; }
             public int? StatusCode { get; set; }
             public string? SessionId { get; set; }
-            public DateTime TimestampUtc { get; set; }
+            public DateTime CreatedAt { get; set; }
             public Dictionary<string, object?> KeyValues { get; } = new();
             public Dictionary<string, object?> OldValues { get; } = new();
             public Dictionary<string, object?> NewValues { get; } = new();
@@ -839,7 +840,7 @@ namespace DataWarehousePower.Data
                     Username = Username,
                     ActionType = ActionType,
                     Description = string.IsNullOrWhiteSpace(Description)
-                        ? BuildDescription(Username, ActionType, EntityName, ResourceLabel, KeyValues, NewValues, OldValues, TimestampUtc)
+                        ? BuildDescription(Username, ActionType, EntityName, ResourceLabel, KeyValues, NewValues, OldValues, CreatedAt)
                         : Description,
                     EntityName = EntityName,
                     EntityId = KeyValues.Count == 0 ? null : JsonSerializer.Serialize(KeyValues),
@@ -857,7 +858,7 @@ namespace DataWarehousePower.Data
                     Protocol = Protocol,
                     StatusCode = StatusCode,
                     SessionId = SessionId,
-                    TimestampUtc = TimestampUtc
+                    CreatedAt = CreatedAt
                 };
             }
         }

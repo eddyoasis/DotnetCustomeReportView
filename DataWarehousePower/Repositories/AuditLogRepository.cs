@@ -56,13 +56,13 @@ namespace DataWarehousePower.Repositories
             if (filter.DateFromUtc.HasValue)
             {
                 DateTime start = filter.DateFromUtc.Value.Date;
-                query = query.Where(a => a.TimestampUtc >= start);
+                query = query.Where(a => a.CreatedAt >= start);
             }
 
             if (filter.DateToUtc.HasValue)
             {
                 DateTime endExclusive = filter.DateToUtc.Value.Date.AddDays(1);
-                query = query.Where(a => a.TimestampUtc < endExclusive);
+                query = query.Where(a => a.CreatedAt < endExclusive);
             }
 
             if (!string.IsNullOrWhiteSpace(filter.Search))
@@ -89,7 +89,7 @@ namespace DataWarehousePower.Repositories
             int skip = (pageNumber - 1) * pageSize;
 
             List<AuditLog> logs = await query
-                .OrderByDescending(a => a.TimestampUtc)
+                .OrderByDescending(a => a.CreatedAt)
                 .ThenByDescending(a => a.Id)
                 .Skip(skip)
                 .Take(pageSize)

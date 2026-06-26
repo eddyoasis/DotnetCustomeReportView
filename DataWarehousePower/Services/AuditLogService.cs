@@ -1,4 +1,5 @@
 using DataWarehousePower.Data;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
@@ -61,7 +62,7 @@ namespace DataWarehousePower.Services
                 StatusCode = statusCode ?? requestContext.StatusCode,
                 SessionId = requestContext.SessionId,
                 DurationMs = durationMs,
-                TimestampUtc = DateTime.UtcNow
+                CreatedAt = DateTimeHelper.GetCurrentLocalTime()
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -111,7 +112,7 @@ namespace DataWarehousePower.Services
                 Protocol = requestContext.Protocol,
                 StatusCode = requestContext.StatusCode,
                 SessionId = requestContext.SessionId,
-                TimestampUtc = DateTime.UtcNow
+                CreatedAt = DateTimeHelper.GetCurrentLocalTime()
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -169,7 +170,7 @@ namespace DataWarehousePower.Services
                 Protocol = requestContext.Protocol,
                 StatusCode = requestContext.StatusCode,
                 SessionId = requestContext.SessionId,
-                TimestampUtc = DateTime.UtcNow
+                CreatedAt = DateTimeHelper.GetCurrentLocalTime()
             };
 
             _context.AuditLogs.Add(auditLog);

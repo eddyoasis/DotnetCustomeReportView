@@ -17,7 +17,7 @@ namespace DataWarehousePower.Models
     public class AuditLogListItemViewModel
     {
         public long Id { get; set; }
-        public DateTime TimestampUtc { get; set; }
+        public DateTime CreatedAt { get; set; }
         public string UserId { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string ActionType { get; set; } = string.Empty;
@@ -58,7 +58,7 @@ namespace DataWarehousePower.Models
     public class AuditLogDetailViewModel
     {
         public long Id { get; set; }
-        public DateTime TimestampUtc { get; set; }
+        public DateTime CreatedAt { get; set; }
         public string UserId { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string ActionType { get; set; } = string.Empty;

@@ -61,7 +61,7 @@ namespace DataWarehousePower.Services
             return new AuditLogDetailViewModel
             {
                 Id = auditLog.Id,
-                TimestampUtc = auditLog.TimestampUtc,
+                CreatedAt = auditLog.CreatedAt,
                 UserId = auditLog.UserId,
                 Username = string.IsNullOrWhiteSpace(auditLog.Username) ? auditLog.UserId : auditLog.Username,
                 ActionType = auditLog.ActionType,
@@ -104,7 +104,7 @@ namespace DataWarehousePower.Services
                 Items = logs.Select(a => new AuditLogListItemViewModel
                 {
                     Id = a.Id,
-                    TimestampUtc = a.TimestampUtc,
+                    CreatedAt = a.CreatedAt,
                     UserId = a.UserId,
                     Username = string.IsNullOrWhiteSpace(a.Username) ? a.UserId : a.Username,
                     ActionType = a.ActionType,

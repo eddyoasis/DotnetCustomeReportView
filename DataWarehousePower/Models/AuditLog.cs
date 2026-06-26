@@ -66,6 +66,7 @@ namespace DataWarehousePower.Models
 
         public long? DurationMs { get; set; }
 
-        public DateTime TimestampUtc { get; set; }
+        [Column("TimestampUtc")]
+        public DateTime CreatedAt { get; set; }
     }
 }

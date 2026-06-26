@@ -1,4 +1,5 @@
 using DataWarehousePower.Data;
+using DataWarehousePower.Helper;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -15,16 +16,16 @@ public sealed class AuditLogCleanupJob(
     {
         HangfireOptions settings = options.Value;
         int retentionDays = Math.Max(1, settings.AuditLogRetentionDays);
-        DateTime cutoffUtc = DateTime.UtcNow.AddDays(-retentionDays);
+        DateTime cutoffLocal = DateTimeHelper.GetCurrentLocalTime().AddDays(-retentionDays);
 
         int deletedCount = await dbContext.AuditLogs
-            .Where(log => log.TimestampUtc < cutoffUtc)
+            .Where(log => log.CreatedAt < cutoffLocal)
             .ExecuteDeleteAsync();
 
         logger.LogInformation(
-            "Hangfire audit log cleanup deleted {DeletedCount} rows older than {CutoffUtc} with retention {RetentionDays} days.",
+            "Hangfire audit log cleanup deleted {DeletedCount} rows older than {CutoffLocal} with retention {RetentionDays} days.",
             deletedCount,
-            cutoffUtc,
+            cutoffLocal,
             retentionDays);
     }
 }
