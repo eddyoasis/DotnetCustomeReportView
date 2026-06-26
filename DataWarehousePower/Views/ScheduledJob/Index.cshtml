@@ -292,13 +292,6 @@ else
                                 string exportLocationDisplay = BuildFriendlyExportLocationDisplay(job.ExportLocation);
                                 <div class="d-flex flex-column gap-1">
                                     <span>@exportLocationDisplay</span>
-                                    <a asp-action="OpenExportLocation"
-                                       asp-route-exportLocation="@job.ExportLocation"
-                                       class="btn btn-outline-secondary btn-sm d-inline-block"
-                                       target="_blank"
-                                       rel="noopener noreferrer">
-                                        Open
-                                    </a>
                                 </div>
                             }
                         </td>

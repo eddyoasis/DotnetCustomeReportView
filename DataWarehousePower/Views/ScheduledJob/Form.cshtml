@@ -522,7 +522,6 @@
                 }
 
                 const normalizedSubfolder = normalizeWindowsFolderName(exportLocationSubfolderInput.value);
-                exportLocationSubfolderInput.value = normalizedSubfolder;
                 if (exportLocationSubfolderHiddenInput) {
                     exportLocationSubfolderHiddenInput.value = normalizedSubfolder;
                 }
@@ -534,6 +533,7 @@
                 if (exportLocationSubfolderError) {
                     exportLocationSubfolderError.classList.toggle('d-none', !!normalizedSubfolder);
                 }
+                exportLocationSubfolderInput.classList.toggle('is-invalid', !normalizedSubfolder);
 
                 if (exportToLocalFolderHint) {
                     exportToLocalFolderHint.textContent = normalizedSubfolder
@@ -558,23 +558,27 @@
                 const { basePath, subfolder } = trySplitExportLocation(exportLocationHiddenInput.value, availableBasePaths);
                 exportLocationBasePathSelect.value = basePath;
                 const initialSubfolder = normalizeWindowsFolderName((exportLocationSubfolderHiddenInput?.value || '').trim()) || subfolder;
+                let initialSubfolderOptionValue = '';
                 if (initialSubfolder) {
                     const existingOption = [...exportLocationSubfolderInput.options]
-                        .some(option => option.value.localeCompare(initialSubfolder, undefined, { sensitivity: 'accent' }) === 0);
+                        .find(option => normalizeWindowsFolderName(option.value).localeCompare(initialSubfolder, undefined, { sensitivity: 'accent' }) === 0);
 
-                    if (!existingOption) {
+                    if (existingOption) {
+                        initialSubfolderOptionValue = existingOption.value;
+                    } else {
                         const option = document.createElement('option');
                         option.value = initialSubfolder;
                         option.textContent = initialSubfolder;
                         exportLocationSubfolderInput.appendChild(option);
+                        initialSubfolderOptionValue = option.value;
                     }
                 }
 
-                exportLocationSubfolderInput.value = initialSubfolder;
+                exportLocationSubfolderInput.value = initialSubfolderOptionValue;
                 if (exportLocationSubfolderHiddenInput) {
                     exportLocationSubfolderHiddenInput.value = initialSubfolder;
                 }
-                lastConfirmedExportLocationSubfolder = initialSubfolder;
+                lastConfirmedExportLocationSubfolder = initialSubfolderOptionValue;
                 updateExportLocationValue();
 
                 exportLocationBasePathSelect.addEventListener('change', () => {
@@ -585,7 +589,7 @@
                         exportLocationBasePathError.classList.toggle('d-none', hasSelection);
                     }
                     if (exportLocationSubfolderError) {
-                        const hasSelection = !!exportLocationSubfolderInput.value;
+                        const hasSelection = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
                         exportLocationSubfolderInput.classList.toggle('is-invalid', !hasSelection);
                         exportLocationSubfolderError.classList.toggle('d-none', hasSelection);
                     }
@@ -598,6 +602,7 @@
                         return;
                     }
 
+                    const selectedOptionValue = exportLocationSubfolderInput.value;
                     const selectedValue = normalizeWindowsFolderName(exportLocationSubfolderInput.value);
                     if (!selectedValue) {
                         lastConfirmedExportLocationSubfolder = '';
@@ -613,7 +618,7 @@
                         return;
                     }
 
-                    lastConfirmedExportLocationSubfolder = selectedValue;
+                    lastConfirmedExportLocationSubfolder = selectedOptionValue;
                     updateExportLocationValue();
                 });
 
@@ -639,7 +644,7 @@
                 if (form && availableBasePaths.length > 0) {
                     form.addEventListener('submit', event => {
                         const hasBasePath = !!exportLocationBasePathSelect.value;
-                        const hasSubfolder = !!exportLocationSubfolderInput.value;
+                        const hasSubfolder = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
                         const isValid = hasBasePath && hasSubfolder;
 
                         if (!isValid) {
