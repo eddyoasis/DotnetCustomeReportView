@@ -1,4 +1,5 @@
 using DataWarehousePower.Authorization;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -93,7 +94,7 @@ public sealed class ReportFolderController(
             return NotFound();
         }
 
-        string archiveFileName = $"report-files-{viewModel.SelectedDate:yyyy-MM-dd}.zip";
+        string archiveFileName = $"report-files-{viewModel.SelectedDate:yyyy-MM-dd}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
         MemoryStream memoryStream = new();
 
         using (ZipArchive archive = new(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
