@@ -85,14 +85,17 @@
                         }
                     </select>
                     <div id="exportLocationBasePathError" class="text-danger small d-none">Please select a base path.</div>
-                    <input id="exportLocationSubfolderInput"
-                           type="text"
-                           class="form-control mt-2"
-                           placeholder="Optional subfolder (example: NewFolder)"
-                           disabled />
+                    <select id="exportLocationSubfolderInput" class="form-select mt-2" required disabled>
+                        <option value="">-- Select subfolder --</option>
+                        @foreach (string exportLocationSubfolder in Model.AvailableClientCodeFolders)
+                        {
+                            <option value="@exportLocationSubfolder">@exportLocationSubfolder</option>
+                        }
+                    </select>
+                    <div id="exportLocationSubfolderError" class="text-danger small d-none">Please select a subfolder.</div>
                       <button id="openExportLocationButton" type="button" class="btn btn-outline-secondary btn-sm mt-2" disabled>Open</button>
                     <input asp-for="ExportLocation" type="hidden" />
-                    <div class="form-text">Choose a base path first. Then you can type an optional subfolder (example result: C:\\SharedFolder\\NewFolder).</div>
+                    <div class="form-text">Choose a base path first, then select a required subfolder from the lookup list.</div>
                     <span asp-validation-for="ExportLocation" class="text-danger"></span>
                 </div>
 
@@ -440,6 +443,10 @@
                 return (path || '').trim().replaceAll('/', '\\');
             }
 
+            function normalizeWindowsFolderName(path) {
+                return normalizeWindowsPath(path).replace(/^\\+/, '').replace(/\\+$/, '');
+            }
+
             function updateOpenExportLocationButtonState() {
                 if (!openExportLocationButton || !exportLocationHiddenInput) {
                     return;
@@ -482,21 +489,29 @@
                 }
 
                 const selectedBasePath = ensureTrailingSlash(exportLocationBasePathSelect.value);
+                const exportLocationSubfolderError = document.getElementById('exportLocationSubfolderError');
                 exportLocationSubfolderInput.disabled = !selectedBasePath;
 
                 if (!selectedBasePath) {
                     exportLocationSubfolderInput.value = '';
                     exportLocationHiddenInput.value = '';
+                    if (exportLocationSubfolderError) {
+                        exportLocationSubfolderError.classList.add('d-none');
+                    }
                     updateOpenExportLocationButtonState();
                     return;
                 }
 
-                const normalizedSubfolder = normalizeWindowsPath(exportLocationSubfolderInput.value)
-                    .replace(/^\\+/, '');
+                const normalizedSubfolder = normalizeWindowsFolderName(exportLocationSubfolderInput.value);
                 exportLocationSubfolderInput.value = normalizedSubfolder;
                 exportLocationHiddenInput.value = normalizedSubfolder
                     ? `${selectedBasePath}${normalizedSubfolder}`
-                    : selectedBasePath;
+                    : '';
+
+                if (exportLocationSubfolderError) {
+                    exportLocationSubfolderError.classList.toggle('d-none', !!normalizedSubfolder);
+                }
+
                 updateOpenExportLocationButtonState();
             }
 
@@ -506,12 +521,25 @@
                 }
 
                 const exportLocationBasePathError = document.getElementById('exportLocationBasePathError');
+                const exportLocationSubfolderError = document.getElementById('exportLocationSubfolderError');
                 const availableBasePaths = [...exportLocationBasePathSelect.options]
                     .map(option => option.value)
                     .filter(optionValue => optionValue);
 
                 const { basePath, subfolder } = trySplitExportLocation(exportLocationHiddenInput.value, availableBasePaths);
                 exportLocationBasePathSelect.value = basePath;
+                if (subfolder) {
+                    const existingOption = [...exportLocationSubfolderInput.options]
+                        .some(option => option.value.localeCompare(subfolder, undefined, { sensitivity: 'accent' }) === 0);
+
+                    if (!existingOption) {
+                        const option = document.createElement('option');
+                        option.value = subfolder;
+                        option.textContent = subfolder;
+                        exportLocationSubfolderInput.appendChild(option);
+                    }
+                }
+
                 exportLocationSubfolderInput.value = subfolder;
                 updateExportLocationValue();
 
@@ -522,8 +550,14 @@
                         exportLocationBasePathSelect.classList.toggle('is-invalid', !hasSelection);
                         exportLocationBasePathError.classList.toggle('d-none', hasSelection);
                     }
+                    if (exportLocationSubfolderError) {
+                        const hasSelection = !!exportLocationSubfolderInput.value;
+                        exportLocationSubfolderInput.classList.toggle('is-invalid', !hasSelection);
+                        exportLocationSubfolderError.classList.toggle('d-none', hasSelection);
+                    }
                 });
                 exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
+                exportLocationSubfolderInput.addEventListener('change', updateExportLocationValue);
 
                 if (openExportLocationButton) {
                     openExportLocationButton.addEventListener('click', () => {
@@ -540,12 +574,19 @@
                 const form = exportLocationBasePathSelect.closest('form');
                 if (form && availableBasePaths.length > 0) {
                     form.addEventListener('submit', event => {
-                        if (!exportLocationBasePathSelect.value) {
+                        const hasBasePath = !!exportLocationBasePathSelect.value;
+                        const hasSubfolder = !!exportLocationSubfolderInput.value;
+
+                        if (!hasBasePath || !hasSubfolder) {
                             event.preventDefault();
                             event.stopImmediatePropagation();
-                            exportLocationBasePathSelect.classList.add('is-invalid');
+                            exportLocationBasePathSelect.classList.toggle('is-invalid', !hasBasePath);
+                            exportLocationSubfolderInput.classList.toggle('is-invalid', !hasSubfolder);
                             if (exportLocationBasePathError) {
-                                exportLocationBasePathError.classList.remove('d-none');
+                                exportLocationBasePathError.classList.toggle('d-none', hasBasePath);
+                            }
+                            if (exportLocationSubfolderError) {
+                                exportLocationSubfolderError.classList.toggle('d-none', hasSubfolder);
                             }
                             exportLocationBasePathSelect.focus();
                         }

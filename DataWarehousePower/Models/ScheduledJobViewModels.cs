@@ -116,6 +116,8 @@ public sealed class ScheduledJobFormViewModel
 
     public List<string> AvailableExportLocationBasePaths { get; set; } = [];
 
+    public List<string> AvailableClientCodeFolders { get; set; } = [];
+
     [DataType(DataType.Date)]
     [Display(Name = "Date From")]
     public DateTime? DateFrom { get; set; }

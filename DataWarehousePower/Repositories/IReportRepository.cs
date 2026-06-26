@@ -30,5 +30,6 @@ namespace DataWarehousePower.Repositories
 
         Task<List<string>> GetStoredProcedureParameterNamesAsync(string sourceSp);
         Task<List<string>> GetClientCodesByUserIdAsync(string userId);
+        Task<List<string>> GetClientCodeFoldersByUserIdAsync(string userId);
     }
 }

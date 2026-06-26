@@ -415,6 +415,7 @@ public sealed class ScheduledJobController(
         ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         form.AvailableReports = lookupForm.AvailableReports;
         form.AvailableClientCodes = lookupForm.AvailableClientCodes;
+        form.AvailableClientCodeFolders = lookupForm.AvailableClientCodeFolders;
         form.AvailableSchemaTemplatesByReportId = lookupForm.AvailableSchemaTemplatesByReportId;
         form.AvailableParametersByReportId = lookupForm.AvailableParametersByReportId;
         form.AvailableSchemaTemplates = lookupForm.AvailableSchemaTemplatesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
@@ -483,6 +484,15 @@ public sealed class ScheduledJobController(
         if (string.IsNullOrWhiteSpace(normalizedExportLocation))
         {
             ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location base path.");
+            return;
+        }
+
+        if (availableBasePaths
+            .Select(NormalizeBasePath)
+            .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
+            .Any(basePath => string.Equals(normalizedExportLocation, basePath!, StringComparison.OrdinalIgnoreCase)))
+        {
+            ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location subfolder.");
             return;
         }
 

@@ -20,6 +20,8 @@ XmlConfigurator.Configure(new FileInfo(Path.Combine(AppContext.BaseDirectory, "l
 builder.Services.Configure<SmtpAppSetting>(builder.Configuration.GetSection("SmtpAppSettings"));
 builder.Services.Configure<ClientCodeLookupOptions>(
     builder.Configuration.GetSection(ClientCodeLookupOptions.SectionName));
+builder.Services.Configure<ClientCodeFolderLookupOptions>(
+    builder.Configuration.GetSection(ClientCodeFolderLookupOptions.SectionName));
 
 // ── EF Core ───────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>

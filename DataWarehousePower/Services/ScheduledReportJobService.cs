@@ -139,6 +139,7 @@ public sealed class ScheduledReportJobService(
     {
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
         List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
+        List<string> availableClientCodeFolders = await reportRepository.GetClientCodeFoldersByUserIdAsync(userId);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
             await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
@@ -158,6 +159,7 @@ public sealed class ScheduledReportJobService(
             ExportLocation = null,
             AvailableReports = availableReports,
             AvailableClientCodes = availableClientCodes,
+            AvailableClientCodeFolders = availableClientCodeFolders,
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
             AvailableSchemaTemplates = [],
             AvailableParametersByReportId = availableParametersByReportId
@@ -171,6 +173,7 @@ public sealed class ScheduledReportJobService(
 
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
         List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
+        List<string> availableClientCodeFolders = await reportRepository.GetClientCodeFoldersByUserIdAsync(userId);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
             await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
@@ -195,6 +198,7 @@ public sealed class ScheduledReportJobService(
             IsActive = entity.IsActive,
             AvailableReports = availableReports,
             AvailableClientCodes = BuildAvailableClientCodes(entity.ClientCode, availableClientCodes),
+            AvailableClientCodeFolders = availableClientCodeFolders,
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
             AvailableParametersByReportId = availableParametersByReportId,
             AvailableSchemaTemplates = BuildAvailableSchemaTemplates(

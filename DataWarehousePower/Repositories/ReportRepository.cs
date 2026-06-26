@@ -12,11 +12,16 @@ namespace DataWarehousePower.Repositories
     {
         private readonly AppDbContext _context;
         private readonly ClientCodeLookupOptions _clientCodeLookupOptions;
+        private readonly ClientCodeFolderLookupOptions _clientCodeFolderLookupOptions;
 
-        public ReportRepository(AppDbContext context, IOptionsSnapshot<ClientCodeLookupOptions> clientCodeLookupOptions)
+        public ReportRepository(
+            AppDbContext context,
+            IOptionsSnapshot<ClientCodeLookupOptions> clientCodeLookupOptions,
+            IOptionsSnapshot<ClientCodeFolderLookupOptions> clientCodeFolderLookupOptions)
         {
             _context = context;
             _clientCodeLookupOptions = clientCodeLookupOptions.Value;
+            _clientCodeFolderLookupOptions = clientCodeFolderLookupOptions.Value;
         }
 
         public async Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null)
@@ -162,6 +167,60 @@ namespace DataWarehousePower.Repositories
             string configuredResponseColumnName = (_clientCodeLookupOptions.ResponseColumnName ?? string.Empty).Trim();
             configuredResponseColumnName = string.IsNullOrWhiteSpace(configuredResponseColumnName)
                 ? "ClientCode"
+                : configuredResponseColumnName;
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string? safeSp = await ValidateSpNameAsync(conn, configuredSpName);
+            if (string.IsNullOrWhiteSpace(safeSp))
+            {
+                return new List<string>();
+            }
+
+            HashSet<string> parameterNames = await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp);
+            Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase);
+            string? userIdParameterName = ResolveUserIdParameterName(parameterNames, configuredParameterName);
+            if (!string.IsNullOrWhiteSpace(userIdParameterName))
+            {
+                parameters[userIdParameterName] = userId.Trim();
+            }
+
+            List<Dictionary<string, object?>> rows = await ExecuteReaderAsync(
+                conn,
+                $"[{safeSp}]",
+                CommandType.StoredProcedure,
+                parameters);
+
+            return rows
+                .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        public async Task<List<string>> GetClientCodeFoldersByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new List<string>();
+            }
+
+            string configuredSpName = (_clientCodeFolderLookupOptions.StoredProcedureName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(configuredSpName))
+            {
+                return new List<string>();
+            }
+
+            string configuredParameterName = NormalizeParameterName(_clientCodeFolderLookupOptions.UserIdParameterName, "@UserId");
+            string configuredResponseColumnName = (_clientCodeFolderLookupOptions.ResponseColumnName ?? string.Empty).Trim();
+            configuredResponseColumnName = string.IsNullOrWhiteSpace(configuredResponseColumnName)
+                ? "ClientCodeFolder"
                 : configuredResponseColumnName;
 
             var conn = _context.Database.GetDbConnection();
