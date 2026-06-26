@@ -17,6 +17,7 @@ public sealed class ScheduledJobListItemViewModel
     public string JobAction { get; set; } = ScheduledJobActions.ExportFile;
     public string? RecipientEmail { get; set; }
     public string? ExportLocation { get; set; }
+    public bool ExportToLocalFolder { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedUtc { get; set; }
 }
@@ -111,6 +112,13 @@ public sealed class ScheduledJobFormViewModel
     [MaxLength(512)]
     [Display(Name = "Export Location")]
     public string? ExportLocation { get; set; }
+
+    [MaxLength(256)]
+    [Display(Name = "Export Subfolder")]
+    public string? ExportLocationSubfolder { get; set; }
+
+    [Display(Name = "Export to Local Folder")]
+    public bool ExportToLocalFolder { get; set; }
 
     public List<ExportLocationBasePathOptionViewModel> AvailableExportLocationBasePathOptions { get; set; } = [];
 

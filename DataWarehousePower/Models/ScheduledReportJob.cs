@@ -45,6 +45,8 @@ public class ScheduledReportJob
     [MaxLength(512)]
     public string? ExportLocation { get; set; }
 
+    public bool ExportToLocalFolder { get; set; }
+
     public DateTime? DateFrom { get; set; }
 
     public DateTime? DateTo { get; set; }

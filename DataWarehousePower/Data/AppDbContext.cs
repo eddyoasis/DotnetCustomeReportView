@@ -141,6 +141,7 @@ namespace DataWarehousePower.Data
                 e.Property(job => job.ClientCode).HasMaxLength(128);
                 e.Property(job => job.Parameters).HasColumnType("nvarchar(max)");
                 e.Property(job => job.ExportLocation).HasMaxLength(512);
+                e.Property(job => job.ExportToLocalFolder).HasDefaultValue(false);
                 e.Property(job => job.IsCustom).HasDefaultValue(true);
                 e.Property(job => job.EncryptedPassword).HasMaxLength(512);
                 e.Property(job => job.CreatedByUserId).HasMaxLength(128);

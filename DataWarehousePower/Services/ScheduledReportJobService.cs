@@ -52,6 +52,7 @@ public sealed class ScheduledReportJobService(
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
             ExportLocation = entity.ExportLocation,
+            ExportToLocalFolder = entity.ExportToLocalFolder,
             SchemaTemplate = entity.SchemaTemplate,
             ClientCode = entity.ClientCode,
             CronExpression = entity.CronExpression,
@@ -157,6 +158,7 @@ public sealed class ScheduledReportJobService(
             EveryMinutes = 5,
             CronExpression = "0 8 * * *",
             ExportLocation = null,
+            ExportToLocalFolder = false,
             AvailableReports = availableReports,
             AvailableClientCodes = availableClientCodes,
             AvailableClientCodeFolders = availableClientCodeFolders,
@@ -187,6 +189,8 @@ public sealed class ScheduledReportJobService(
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
             ExportLocation = entity.ExportLocation,
+            ExportLocationSubfolder = ExtractExportLocationSubfolder(entity.ExportLocation),
+            ExportToLocalFolder = entity.ExportToLocalFolder,
             CronExpression = entity.CronExpression,
             SchemaTemplate = entity.SchemaTemplate,
             ClientCode = entity.ClientCode,
@@ -232,6 +236,7 @@ public sealed class ScheduledReportJobService(
             ClientCode = NormalizeNullable(form.ClientCode),
             Parameters = normalizedParameters,
             ExportLocation = NormalizeNullable(form.ExportLocation),
+            ExportToLocalFolder = form.ExportToLocalFolder,
             DateFrom = form.IsCustom ? form.DateFrom?.Date : null,
             DateTo = form.IsCustom ? form.DateTo?.Date : null,
             IsCustom = form.IsCustom,
@@ -272,6 +277,7 @@ public sealed class ScheduledReportJobService(
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.Parameters = normalizedParameters;
         entity.ExportLocation = NormalizeNullable(form.ExportLocation);
+        entity.ExportToLocalFolder = form.ExportToLocalFolder;
         entity.DateFrom = form.IsCustom ? form.DateFrom?.Date : null;
         entity.DateTo = form.IsCustom ? form.DateTo?.Date : null;
         entity.IsCustom = form.IsCustom;
@@ -650,6 +656,18 @@ public sealed class ScheduledReportJobService(
     {
         string normalized = value?.Trim() ?? string.Empty;
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static string? ExtractExportLocationSubfolder(string? exportLocation)
+    {
+        string normalized = (exportLocation ?? string.Empty).Trim().TrimEnd('\\', '/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        string? subfolder = Path.GetFileName(normalized);
+        return string.IsNullOrWhiteSpace(subfolder) ? null : subfolder;
     }
 
     private static string NormalizeJobAction(string? value)

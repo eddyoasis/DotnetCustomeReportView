@@ -11,8 +11,11 @@ public sealed class ScheduledReportExecutionService(
     IReportExportService reportExportService,
     IScheduledReportEmailService scheduledReportEmailService,
     IHangfireDataProtectionService dataProtectionService,
+    IConfiguration configuration,
     ILogger<ScheduledReportExecutionService> logger) : IScheduledReportExecutionService
 {
+    private const string LocalExportBasePathSection = "ScheduledJob:LocalExportBasePath";
+
     public async Task ExecuteAsync(int scheduledJobId)
     {
         ScheduledReportJob? job = await scheduledJobRepository.GetByIdAsync(scheduledJobId);
@@ -66,18 +69,27 @@ public sealed class ScheduledReportExecutionService(
             password,
             zipSubFileName);
 
-        string baseDirectory = ResolveExportDirectory(job.ExportLocation);
-        Directory.CreateDirectory(baseDirectory);
+        string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
+        string? localDirectory = ResolveLocalExportDirectory(job, configuration);
+        List<string> targetDirectories = [primaryDirectory];
 
-        
-        string fullPath = Path.Combine(baseDirectory, fileName);
+        if (!string.IsNullOrWhiteSpace(localDirectory) &&
+            !targetDirectories.Contains(localDirectory, StringComparer.OrdinalIgnoreCase))
+        {
+            targetDirectories.Add(localDirectory);
+        }
 
-        await File.WriteAllBytesAsync(fullPath, zipBytes);
+        foreach (string targetDirectory in targetDirectories)
+        {
+            Directory.CreateDirectory(targetDirectory);
+            string fullPath = Path.Combine(targetDirectory, fileName);
+            await File.WriteAllBytesAsync(fullPath, zipBytes);
 
-        logger.LogInformation(
-            "Scheduled export job {ScheduledJobId} produced file {ExportFilePath}.",
-            scheduledJobId,
-            fullPath);
+            logger.LogInformation(
+                "Scheduled export job {ScheduledJobId} produced file {ExportFilePath}.",
+                scheduledJobId,
+                fullPath);
+        }
 
         string jobAction = (job.JobAction ?? string.Empty).Trim().ToLowerInvariant();
         if (jobAction == ScheduledJobActions.ExportFileAndEmailToUser)
@@ -115,6 +127,46 @@ public sealed class ScheduledReportExecutionService(
         }
 
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, normalizedExportLocation));
+    }
+
+    private static string? ResolveLocalExportDirectory(ScheduledReportJob job, IConfiguration configuration)
+    {
+        if (!job.ExportToLocalFolder)
+        {
+            return null;
+        }
+
+        string subfolder = ExtractExportSubfolder(job.ExportLocation);
+        if (string.IsNullOrWhiteSpace(subfolder))
+        {
+            return null;
+        }
+
+        string configuredBasePath = configuration[LocalExportBasePathSection] ?? "%temp%";
+        string expandedBasePath = Environment.ExpandEnvironmentVariables(configuredBasePath).Trim();
+        if (string.IsNullOrWhiteSpace(expandedBasePath))
+        {
+            expandedBasePath = Path.GetTempPath();
+        }
+
+        if (!Path.IsPathRooted(expandedBasePath))
+        {
+            expandedBasePath = Path.GetFullPath(Path.Combine(Path.GetTempPath(), expandedBasePath));
+        }
+
+        return Path.Combine(expandedBasePath, subfolder);
+    }
+
+    private static string ExtractExportSubfolder(string? exportLocation)
+    {
+        string normalizedExportLocation = (exportLocation ?? string.Empty).Trim().TrimEnd('\\', '/');
+        if (string.IsNullOrWhiteSpace(normalizedExportLocation))
+        {
+            return string.Empty;
+        }
+
+        string? folderName = Path.GetFileName(normalizedExportLocation);
+        return folderName?.Trim() ?? string.Empty;
     }
 
     private static (DateTime? DateFrom, DateTime? DateTo) ResolveEffectiveDateRange(ScheduledReportJob job)
