@@ -1,5 +1,7 @@
 using DataWarehousePower.Data;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataWarehousePower.Repositories
@@ -26,10 +28,20 @@ namespace DataWarehousePower.Repositories
             return department;
         }
 
-        public async Task UpdateAsync(Department department)
+        public async Task UpdateAsync(Department departmentReq)
         {
-            _context.Departments.Update(department);
-            await _context.SaveChangesAsync();
+            //_context.Departments.Update(department);
+            //await _context.SaveChangesAsync();
+
+            var department = await _context.Departments.FirstOrDefaultAsync(d => d.Id == departmentReq.Id);
+            if (department != null)
+            {
+                department.Description = departmentReq.Description;
+                department.IsActive = departmentReq.IsActive;
+                department.ModifiedBy = departmentReq.ModifiedBy;
+                department.ModifiedAt = DateTimeHelper.GetCurrentLocalTime();
+                await _context.SaveChangesAsync();
+            }
         }
 
         public async Task DeleteAsync(int id)
@@ -48,7 +60,7 @@ namespace DataWarehousePower.Repositories
             if (department != null)
             {
                 department.IsActive = !department.IsActive;
-                department.ModifiedAt = DateTime.Now;
+                department.ModifiedAt = DateTimeHelper.GetCurrentLocalTime();
                 await _context.SaveChangesAsync();
             }
         }
