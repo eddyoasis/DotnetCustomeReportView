@@ -22,6 +22,8 @@ builder.Services.Configure<ClientCodeLookupOptions>(
     builder.Configuration.GetSection(ClientCodeLookupOptions.SectionName));
 builder.Services.Configure<ClientCodeFolderLookupOptions>(
     builder.Configuration.GetSection(ClientCodeFolderLookupOptions.SectionName));
+builder.Services.Configure<RequestAuditLoggingOptions>(
+    builder.Configuration.GetSection(RequestAuditLoggingOptions.SectionName));
 
 // ── EF Core ───────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -173,11 +175,30 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseSession();
+static bool IsInteractiveBrowserNavigation(HttpRequest request)
+{
+    if (!HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method))
+    {
+        return false;
+    }
+
+    // Keep API/AJAX responses as raw status codes instead of redirecting to HTML pages.
+    if (string.Equals(request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    string acceptHeader = request.Headers.Accept.ToString();
+    return !string.IsNullOrWhiteSpace(acceptHeader) &&
+           acceptHeader.Contains("text/html", StringComparison.OrdinalIgnoreCase);
+}
+
 app.UseStatusCodePages(async context =>
 {
     var request = context.HttpContext.Request;
     var response = context.HttpContext.Response;
     var user = context.HttpContext.User;
+    bool isInteractiveNavigation = IsInteractiveBrowserNavigation(request);
 
     // Clear stale marker once authentication succeeds.
     if (user?.Identity?.IsAuthenticated == true && request.Cookies.ContainsKey(ChallengeCookieName))
@@ -187,12 +208,21 @@ app.UseStatusCodePages(async context =>
 
     if (response.StatusCode == StatusCodes.Status403Forbidden)
     {
-        response.Redirect("/Home/NoPermission");
+        if (isInteractiveNavigation)
+        {
+            response.Redirect("/Home/NoPermission");
+        }
+
         return;
     }
 
     if (response.StatusCode == StatusCodes.Status401Unauthorized)
     {
+        if (!isInteractiveNavigation)
+        {
+            return;
+        }
+
         bool hasAuthorizationHeader = request.Headers.ContainsKey("Authorization");
         bool hasChallengeMarker = request.Cookies.ContainsKey(ChallengeCookieName);
 
@@ -234,6 +264,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseMiddleware<UserDisplayNameSessionMiddleware>();
+app.UseMiddleware<RequestAuditLoggingMiddleware>();
 app.UseAuthorization();
 
 HangfireOptions hangfireOptions = app.Services.GetRequiredService<IOptions<HangfireOptions>>().Value;

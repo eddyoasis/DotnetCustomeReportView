@@ -2,6 +2,20 @@ namespace DataWarehousePower.Services
 {
     public interface IAuditLogService
     {
+        Task LogRequestAsync(
+            string actionType,
+            string userId,
+            string username,
+            string correlationId,
+            string entityName,
+            string? entityId,
+            string? entityLabel,
+            object? metadata,
+            string? detail,
+            long durationMs,
+            int? statusCode,
+            CancellationToken cancellationToken = default);
+
         Task LogActionAsync(
             string actionType,
             string userId,

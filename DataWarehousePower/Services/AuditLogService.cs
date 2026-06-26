@@ -17,6 +17,57 @@ namespace DataWarehousePower.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
+        public async Task LogRequestAsync(
+            string actionType,
+            string userId,
+            string username,
+            string correlationId,
+            string entityName,
+            string? entityId,
+            string? entityLabel,
+            object? metadata,
+            string? detail,
+            long durationMs,
+            int? statusCode,
+            CancellationToken cancellationToken = default)
+        {
+            object metadataPayload = new
+            {
+                Detail = detail,
+                Data = metadata
+            };
+
+            string description = BuildDescription(username, actionType, entityName, entityId, entityLabel, detail);
+            RequestAuditContext requestContext = ResolveRequestContext();
+
+            AuditLog auditLog = new()
+            {
+                UserId = userId,
+                Username = username,
+                ActionType = actionType,
+                Description = description,
+                EntityName = entityName,
+                EntityId = entityId,
+                Metadata = JsonSerializer.Serialize(metadataPayload),
+                CorrelationId = correlationId,
+                IpAddress = requestContext.IpAddress,
+                Host = requestContext.Host,
+                RequestMethod = requestContext.RequestMethod,
+                RequestPath = requestContext.RequestPath,
+                QueryString = requestContext.QueryString,
+                UserAgent = requestContext.UserAgent,
+                Referrer = requestContext.Referrer,
+                Protocol = requestContext.Protocol,
+                StatusCode = statusCode ?? requestContext.StatusCode,
+                SessionId = requestContext.SessionId,
+                DurationMs = durationMs,
+                TimestampUtc = DateTime.UtcNow
+            };
+
+            _context.AuditLogs.Add(auditLog);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task LogActionAsync(
             string actionType,
             string userId,
