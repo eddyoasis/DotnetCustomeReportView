@@ -363,6 +363,8 @@
             const scheduledParametersContainer = document.getElementById('scheduled-parameters-container');
             const scheduledParametersEmpty = document.getElementById('scheduled-parameters-empty');
             const availableParametersByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableParametersByReportId));
+            let suppressExportLocationSubfolderConfirm = false;
+            let lastConfirmedExportLocationSubfolder = (exportLocationSubfolderInput?.value || '').trim();
 
             if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !customDaysGroup || !cronGroup) {
                 return;
@@ -541,6 +543,7 @@
                 }
 
                 exportLocationSubfolderInput.value = subfolder;
+                lastConfirmedExportLocationSubfolder = subfolder;
                 updateExportLocationValue();
 
                 exportLocationBasePathSelect.addEventListener('change', () => {
@@ -557,7 +560,31 @@
                     }
                 });
                 exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
-                exportLocationSubfolderInput.addEventListener('change', updateExportLocationValue);
+                exportLocationSubfolderInput.addEventListener('change', () => {
+                    if (suppressExportLocationSubfolderConfirm) {
+                        suppressExportLocationSubfolderConfirm = false;
+                        updateExportLocationValue();
+                        return;
+                    }
+
+                    const selectedValue = normalizeWindowsFolderName(exportLocationSubfolderInput.value);
+                    if (!selectedValue) {
+                        lastConfirmedExportLocationSubfolder = '';
+                        updateExportLocationValue();
+                        return;
+                    }
+
+                    const confirmed = window.confirm(`Confirm select export subfolder "${selectedValue}"?`);
+                    if (!confirmed) {
+                        suppressExportLocationSubfolderConfirm = true;
+                        exportLocationSubfolderInput.value = lastConfirmedExportLocationSubfolder;
+                        updateExportLocationValue();
+                        return;
+                    }
+
+                    lastConfirmedExportLocationSubfolder = selectedValue;
+                    updateExportLocationValue();
+                });
 
                 if (openExportLocationButton) {
                     openExportLocationButton.addEventListener('click', () => {
