@@ -1,6 +1,8 @@
 @model AuditLogListViewModel
 @{
     ViewData["Title"] = "Audit Logs";
+    string dateFromValue = (Model.Filter.DateFromUtc ?? DateTime.Today).ToString("yyyy-MM-dd");
+    string dateToValue = (Model.Filter.DateToUtc ?? DateTime.Today).ToString("yyyy-MM-dd");
     string BuildPageLink(int page)
     {
         var routeValues = new Dictionary<string, string?>
@@ -10,8 +12,8 @@
             ["entityName"] = Model.Filter.EntityName,
             ["ipAddress"] = Model.Filter.IpAddress,
             ["host"] = Model.Filter.Host,
-            ["dateFromUtc"] = Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd"),
-            ["dateToUtc"] = Model.Filter.DateToUtc?.ToString("yyyy-MM-dd"),
+            ["dateFromUtc"] = (Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd")),
+            ["dateToUtc"] = (Model.Filter.DateToUtc?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd")),
             ["search"] = Model.Filter.Search,
             ["pageNumber"] = page.ToString(),
             ["pageSize"] = Model.PageSize.ToString()
@@ -30,7 +32,12 @@
     <span class="badge bg-secondary">Total: @Model.TotalCount</span>
 </div>
 
-<form method="get" asp-controller="AuditLog" asp-action="Index" class="card card-body shadow-sm mb-3">
+@if (ViewData["DateRangeValidationMessage"] is string dateRangeValidationMessage)
+{
+    <div class="alert alert-warning py-2" role="alert">@dateRangeValidationMessage</div>
+}
+
+<form id="auditLogFilterForm" method="get" asp-controller="AuditLog" asp-action="Index" class="card card-body shadow-sm mb-3">
     <div class="row g-2">
         <div class="col-md-3">
             <label class="form-label">User</label>
@@ -75,12 +82,12 @@
             <input class="form-control" type="text" name="host" value="@Model.Filter.Host" placeholder="contains host" />
         </div>
         <div class="col-md-3">
-            <label class="form-label">Date From (UTC)</label>
-            <input class="form-control" type="date" name="dateFromUtc" value="@Model.Filter.DateFromUtc?.ToString("yyyy-MM-dd")" />
+            <label class="form-label">Date From</label>
+            <input id="dateFromUtc" class="form-control" type="date" name="dateFromUtc" value="@dateFromValue" />
         </div>
         <div class="col-md-3">
-            <label class="form-label">Date To (UTC)</label>
-            <input class="form-control" type="date" name="dateToUtc" value="@Model.Filter.DateToUtc?.ToString("yyyy-MM-dd")" />
+            <label class="form-label">Date To</label>
+            <input id="dateToUtc" class="form-control" type="date" name="dateToUtc" value="@dateToValue" />
         </div>
         <div class="col-md-2">
             <label class="form-label">Page Size</label>
@@ -98,6 +105,66 @@
     </div>
 </form>
 
+<script>
+    (() => {
+        const form = document.getElementById("auditLogFilterForm");
+        const dateFromInput = document.getElementById("dateFromUtc");
+        const dateToInput = document.getElementById("dateToUtc");
+        if (!form || !dateFromInput || !dateToInput) {
+            return;
+        }
+
+        const parseIsoDate = (value) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                return null;
+            }
+
+            const date = new Date(`${value}T00:00:00`);
+            return Number.isNaN(date.getTime()) ? null : date;
+        };
+
+        const validateDateRange = () => {
+            const fromDate = parseIsoDate(dateFromInput.value);
+            const toDate = parseIsoDate(dateToInput.value);
+
+            dateFromInput.setCustomValidity("");
+            dateToInput.setCustomValidity("");
+            dateFromInput.max = "";
+            dateToInput.min = "";
+
+            if (!fromDate || !toDate) {
+                if (dateFromInput.value) {
+                    dateToInput.min = dateFromInput.value;
+                }
+                if (dateToInput.value) {
+                    dateFromInput.max = dateToInput.value;
+                }
+                return true;
+            }
+
+            dateToInput.min = dateFromInput.value;
+            dateFromInput.max = dateToInput.value;
+
+            if (toDate < fromDate) {
+                dateToInput.setCustomValidity("Date To must be greater than or equal to Date From.");
+                return false;
+            }
+
+            return true;
+        };
+
+        dateFromInput.addEventListener("input", validateDateRange);
+        dateToInput.addEventListener("input", validateDateRange);
+
+        form.addEventListener("submit", (event) => {
+            if (!validateDateRange()) {
+                event.preventDefault();
+                dateToInput.reportValidity();
+            }
+        });
+    })();
+</script>
+
 @if (!Model.Items.Any())
 {
     <div class="alert alert-info">No audit logs found for the selected filters.</div>
@@ -113,8 +180,7 @@ else
                     <th style="width: 220px;">Description</th>
                     <th style="width: 180px;">Request</th>
                     <th style="width: 160px;">Username</th>
-                    <th style="width: 170px;">Timestamp (UTC)</th>
-                    @* <th style="width: 120px;">Entity Id</th> *@
+                    <th style="width: 170px;">Timestamp</th>
                     <th style="width: 110px;">Details</th>
                 </tr>
             </thead>
@@ -135,7 +201,6 @@ else
                             <div class="text-muted small">@row.UserId</div>
                         </td>
                         <td>@row.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                        @* <td><span class="text-break">@row.EntityId</span></td> *@
                         <td>
                             <a class="btn btn-sm btn-outline-primary"
                                asp-controller="AuditLog"

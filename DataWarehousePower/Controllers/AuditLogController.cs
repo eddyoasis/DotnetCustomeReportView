@@ -1,4 +1,5 @@
 using DataWarehousePower.Authorization;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -28,6 +29,16 @@ namespace DataWarehousePower.Controllers
             int pageNumber = 1,
             int pageSize = 25)
         {
+            DateTime today = DateTimeHelper.GetCurrentLocalTime().Date;
+            dateFromUtc ??= today;
+            dateToUtc ??= today;
+
+            if (dateToUtc < dateFromUtc)
+            {
+                dateToUtc = dateFromUtc;
+                ViewData["DateRangeValidationMessage"] = "Date To cannot be earlier than Date From. Date To was adjusted to match Date From.";
+            }
+
             AuditLogFilterViewModel filter = new()
             {
                 UserId = userId,
