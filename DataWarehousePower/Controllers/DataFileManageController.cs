@@ -1,0 +1,650 @@
+using DataWarehousePower.Authorization;
+using DataWarehousePower.Models;
+using DataWarehousePower.Services;
+using Microsoft.Data.SqlClient;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+
+namespace DataWarehousePower.Controllers
+{
+    /// <summary>
+    /// CRUD management for DataFileDefinitions and their DataFileColumns.
+    /// Route: /DataFileManage
+    /// </summary>
+    [Authorize(Policy = DepartmentAuthorizationPolicies.ReportManageAccess)]
+    public class DataFileManageController : Controller
+    {
+        private readonly IDataFileManageService _service;
+        private readonly IDepartmentService _departmentService;
+        private readonly IColumnPreferenceService _prefService;
+        private readonly IAuditLogService _auditLogService;
+        private readonly ILogger<DataFileManageController> _logger;
+
+        public DataFileManageController(
+            IDataFileManageService service,
+            IDepartmentService departmentService,
+            IColumnPreferenceService prefService,
+            IAuditLogService auditLogService,
+            ILogger<DataFileManageController> logger)
+        {
+            _service = service;
+            _departmentService = departmentService;
+            _prefService = prefService;
+            _auditLogService = auditLogService;
+            _logger = logger;
+        }
+
+        // GET /DataFileManage
+        public async Task<IActionResult> Index(string? search, bool? isActive)
+        {
+            var filter = new DataFileManageFilterViewModel
+            {
+                Search = search,
+                IsActive = isActive
+            };
+
+            var vm = await _service.GetListViewModelAsync(filter);
+            ViewData["DepartmentLookup"] = (await _departmentService.GetAllAsync())
+                .GroupBy(department => department.Id)
+                .ToDictionary(group => group.Key, group => group.First().Name);
+            return View(vm);
+        }
+
+        // GET /DataFileManage/Create
+        public async Task<IActionResult> Create()
+        {
+            var vm = new DataFileManageFormViewModel
+            {
+                Columns = new List<DataFileColumnFormModel>
+                {
+                    new() { PropertyName = "", DefaultLabel = "", DisplayOrder = 1 }
+                }
+            };
+
+            await PopulateSourceDatabaseOptionsAsync(vm);
+            await PopulateSourceTableOptionsAsync(vm);
+            await PopulateSourceSPOptionsAsync(vm);
+            await PopulateDepartmentOptionsAsync(vm);
+            return View("Form", vm);
+        }
+
+        // GET /DataFileManage/Edit/{id}
+        public async Task<IActionResult> Edit(int id)
+        {
+            try
+            {
+                var vm = await _service.GetFormViewModelAsync(id);
+                await PopulateSourceDatabaseOptionsAsync(vm);
+                await PopulateSourceTableOptionsAsync(vm);
+                await PopulateSourceSPOptionsAsync(vm);
+                await PopulateDepartmentOptionsAsync(vm);
+                return View("Form", vm);
+            }
+            catch (InvalidOperationException)
+            {
+                return NotFound();
+            }
+        }
+
+        // POST /DataFileManage/Save (handles both Create and Edit)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Save(DataFileManageFormViewModel form)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string username = ResolveAuditUsername();
+            string correlationId = HttpContext.TraceIdentifier;
+
+            for (int i = 0; i < form.Columns.Count; i++)
+            {
+                if (form.Columns[i].IsDeleted)
+                {
+                    ModelState.Remove($"Columns[{i}].PropertyName");
+                    ModelState.Remove($"Columns[{i}].DefaultLabel");
+                }
+            }
+
+            await NormalizeDepartmentSelectionsAsync(form);
+
+            if (!ModelState.IsValid)
+            {
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+
+            if (!form.Columns.Any(column => !column.IsDeleted))
+            {
+                ModelState.AddModelError("", "At least one column is required.");
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+
+            bool hasTable = !string.IsNullOrWhiteSpace(form.SourceTable);
+            bool hasSP = !string.IsNullOrWhiteSpace(form.SourceSP);
+
+            if (!hasTable && !hasSP)
+            {
+                ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure.");
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+            if (hasTable && hasSP)
+            {
+                ModelState.AddModelError("", "Provide either a Source Table or a Source Stored Procedure - not both.");
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+
+            string? requiredMappingValidationError = ValidateRequiredMappingParameters(form, hasTable, hasSP);
+            if (!string.IsNullOrWhiteSpace(requiredMappingValidationError))
+            {
+                ModelState.AddModelError("", requiredMappingValidationError);
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+
+            try
+            {
+                if (form.Id == 0)
+                {
+                    DataFileDefinition created = await _service.CreateDataFileAsync(form);
+                    await _auditLogService.LogActionAsync(
+                        actionType: "DataFileManageCreateSucceeded",
+                        userId: userId,
+                        username: username,
+                        correlationId: correlationId,
+                        entityName: "DataFileDefinition",
+                        entityId: created.Id.ToString(),
+                        entityLabel: created.DataFileName,
+                        oldValues: null,
+                        newValues: new
+                        {
+                            created.Id,
+                            created.DataFileName,
+                            created.SourceDatabase,
+                            created.SourceTable,
+                            created.SourceSP,
+                            created.Parameters,
+                            created.IsActive,
+                            created.Departments
+                        },
+                        detail: "Data file definition created.");
+                }
+                else
+                {
+                    DataFileManageFormViewModel? existing = null;
+                    try
+                    {
+                        existing = await _service.GetFormViewModelAsync(form.Id);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        existing = null;
+                    }
+
+                    await _service.UpdateDataFileAsync(form);
+                    await _auditLogService.LogActionAsync(
+                        actionType: "DataFileManageUpdateSucceeded",
+                        userId: userId,
+                        username: username,
+                        correlationId: correlationId,
+                        entityName: "DataFileDefinition",
+                        entityId: form.Id.ToString(),
+                        entityLabel: form.DataFileName,
+                        oldValues: existing is null ? null : new
+                        {
+                            existing.Id,
+                            existing.DataFileName,
+                            existing.SourceDatabase,
+                            existing.SourceTable,
+                            existing.SourceSP,
+                            existing.Parameters,
+                            existing.IsActive,
+                            existing.Departments
+                        },
+                        newValues: new
+                        {
+                            form.Id,
+                            form.DataFileName,
+                            form.SourceDatabase,
+                            form.SourceTable,
+                            form.SourceSP,
+                            form.Parameters,
+                            form.IsActive,
+                            form.Departments
+                        },
+                        detail: "Data file definition updated.");
+                }
+
+                TempData["Success"] = form.Id == 0
+                    ? $"Data file \"{form.DataFileName}\" created successfully."
+                    : $"Data file \"{form.DataFileName}\" updated successfully.";
+
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save data file definition");
+                await _auditLogService.LogActionAsync(
+                    actionType: form.Id == 0 ? "DataFileManageCreateFailed" : "DataFileManageUpdateFailed",
+                    userId: userId,
+                    username: username,
+                    correlationId: correlationId,
+                    entityName: "DataFileDefinition",
+                    entityId: form.Id == 0 ? null : form.Id.ToString(),
+                    entityLabel: form.DataFileName,
+                    oldValues: null,
+                    newValues: new
+                    {
+                        form.Id,
+                        form.DataFileName,
+                        form.SourceDatabase,
+                        form.SourceTable,
+                        form.SourceSP,
+                        form.Parameters,
+                        form.IsActive,
+                        form.Departments
+                    },
+                    detail: ex.Message);
+                ModelState.AddModelError("", "An error occurred while saving. Please try again.");
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SourceObjects(string? sourceDatabase)
+        {
+            try
+            {
+                var items = await _service.GetSourceTableOptionsAsync(sourceDatabase);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229)
+            {
+                _logger.LogWarning(ex, "Metadata access denied for source database {SourceDatabase}", sourceDatabase);
+                return Json(Array.Empty<string>());
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SourceProcedures(string? sourceDatabase)
+        {
+            try
+            {
+                var items = await _service.GetSourceStoredProcedureOptionsAsync(sourceDatabase);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229)
+            {
+                _logger.LogWarning(ex, "Stored procedure metadata access denied for source database {SourceDatabase}", sourceDatabase);
+                return Json(Array.Empty<string>());
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SourceColumns(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            try
+            {
+                var items = await _service.GetSourceColumnsAsync(sourceDatabase, sourceTable, sourceSP);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Column metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    sourceDatabase, sourceTable, sourceSP);
+                return Json(Array.Empty<string>());
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SourceParameters(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            try
+            {
+                var items = await _service.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Parameter metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    sourceDatabase, sourceTable, sourceSP);
+                return Json(Array.Empty<string>());
+            }
+        }
+
+        private async Task PopulateSourceDatabaseOptionsAsync(DataFileManageFormViewModel vm)
+        {
+            vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
+        }
+
+        private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm)
+        {
+            vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
+        }
+
+        private async Task PopulateSourceSPOptionsAsync(DataFileManageFormViewModel vm)
+        {
+            vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(vm.SourceDatabase);
+        }
+
+        private async Task PopulateDepartmentOptionsAsync(DataFileManageFormViewModel vm)
+        {
+            List<Department> activeDepartments = (await _departmentService.GetAllAsync())
+                .Where(department => department.IsActive)
+                .OrderBy(department => department.Name)
+                .ToList();
+
+            vm.ActiveDepartmentOptions = activeDepartments
+                .Select(department => new DepartmentSelectionItem
+                {
+                    Id = department.Id,
+                    Name = department.Name
+                })
+                .ToList();
+
+            if (vm.SelectedDepartmentIds.Count > 0)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(vm.Departments))
+            {
+                return;
+            }
+
+            var selectedIds = new HashSet<int>();
+            var departmentsByName = activeDepartments
+                .GroupBy(department => department.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First().Id, StringComparer.OrdinalIgnoreCase);
+
+            foreach (string token in vm.Departments.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (int.TryParse(token, out int departmentId))
+                {
+                    if (activeDepartments.Any(department => department.Id == departmentId))
+                    {
+                        selectedIds.Add(departmentId);
+                    }
+                    continue;
+                }
+
+                if (departmentsByName.TryGetValue(token, out int mappedId))
+                {
+                    selectedIds.Add(mappedId);
+                }
+            }
+
+            vm.SelectedDepartmentIds = selectedIds.OrderBy(id => id).ToList();
+        }
+
+        private async Task NormalizeDepartmentSelectionsAsync(DataFileManageFormViewModel vm)
+        {
+            HashSet<int> activeDepartmentIds = (await _departmentService.GetAllAsync())
+                .Where(department => department.IsActive)
+                .Select(department => department.Id)
+                .ToHashSet();
+
+            vm.SelectedDepartmentIds = vm.SelectedDepartmentIds
+                .Where(id => activeDepartmentIds.Contains(id))
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+
+            vm.Departments = vm.SelectedDepartmentIds.Count == 0
+                ? null
+                : string.Join(',', vm.SelectedDepartmentIds);
+        }
+
+        private static string? ValidateRequiredMappingParameters(DataFileManageFormViewModel form, bool hasTable, bool hasSP)
+        {
+            HashSet<string> normalizedMappings = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DataFileColumnFormModel column in form.Columns.Where(column => !column.IsDeleted))
+            {
+                foreach (string mapping in SplitAndNormalizeMappings(column.MappingParameter))
+                {
+                    normalizedMappings.Add(mapping);
+                }
+            }
+
+            if (hasSP)
+            {
+                foreach (string mapping in ParseConfiguredParameterMappings(form.Parameters))
+                {
+                    normalizedMappings.Add(mapping);
+                }
+            }
+
+            bool hasClientCode = normalizedMappings.Contains("ClientCode");
+            bool hasDateFrom = normalizedMappings.Contains("FilterDateFrom");
+            bool hasDateTo = normalizedMappings.Contains("FilterDateTo");
+
+            if (!hasClientCode || !hasDateFrom || !hasDateTo)
+            {
+                return "Please map ClientCode, FilterDateFrom, and FilterDateTo before saving the data file.";
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<string> SplitAndNormalizeMappings(string? rawMappings)
+        {
+            return (rawMappings ?? string.Empty)
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(NormalizeMappingAlias)
+                .Where(value => !string.IsNullOrWhiteSpace(value));
+        }
+
+        private static IEnumerable<string> ParseConfiguredParameterMappings(string? rawParametersJson)
+        {
+            if (string.IsNullOrWhiteSpace(rawParametersJson))
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            try
+            {
+                List<ReportParameterFormModel>? parsed = JsonSerializer.Deserialize<List<ReportParameterFormModel>>(rawParametersJson);
+                if (parsed is null || parsed.Count == 0)
+                {
+                    return Enumerable.Empty<string>();
+                }
+
+                return parsed
+                    .Select(parameter => NormalizeMappingAlias(parameter.MappingParameter))
+                    .Where(value => !string.IsNullOrWhiteSpace(value));
+            }
+            catch
+            {
+                return Enumerable.Empty<string>();
+            }
+        }
+
+        private static string NormalizeMappingAlias(string? mapping)
+        {
+            string normalized = (mapping ?? string.Empty).Trim().TrimStart('@');
+
+            if (normalized.Equals("DateFrom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "FilterDateFrom";
+            }
+
+            if (normalized.Equals("DateTo", StringComparison.OrdinalIgnoreCase))
+            {
+                return "FilterDateTo";
+            }
+
+            if (normalized.Equals("FilterClientCode", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ClientCode";
+            }
+
+            return normalized;
+        }
+
+        // POST /DataFileManage/Delete/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string username = ResolveAuditUsername();
+            string correlationId = HttpContext.TraceIdentifier;
+            DataFileManageFormViewModel? existing = null;
+
+            try
+            {
+                existing = await _service.GetFormViewModelAsync(id);
+            }
+            catch (InvalidOperationException)
+            {
+                existing = null;
+            }
+
+            try
+            {
+                await _service.DeleteAsync(id);
+                await _auditLogService.LogActionAsync(
+                    actionType: "DataFileManageDeleteSucceeded",
+                    userId: userId,
+                    username: username,
+                    correlationId: correlationId,
+                    entityName: "DataFileDefinition",
+                    entityId: id.ToString(),
+                    entityLabel: existing?.DataFileName,
+                    oldValues: existing is null ? null : new
+                    {
+                        existing.Id,
+                        existing.DataFileName,
+                        existing.SourceDatabase,
+                        existing.SourceTable,
+                        existing.SourceSP,
+                        existing.Parameters,
+                        existing.IsActive,
+                        existing.Departments
+                    },
+                    newValues: null,
+                    detail: "Data file definition deleted.");
+                TempData["Success"] = "Data file definition deleted successfully.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete data file definition {DataFileDefinitionId}", id);
+                await _auditLogService.LogActionAsync(
+                    actionType: "DataFileManageDeleteFailed",
+                    userId: userId,
+                    username: username,
+                    correlationId: correlationId,
+                    entityName: "DataFileDefinition",
+                    entityId: id.ToString(),
+                    entityLabel: existing?.DataFileName,
+                    oldValues: existing is null ? null : new
+                    {
+                        existing.Id,
+                        existing.DataFileName,
+                        existing.SourceDatabase,
+                        existing.SourceTable,
+                        existing.SourceSP,
+                        existing.Parameters,
+                        existing.IsActive,
+                        existing.Departments
+                    },
+                    newValues: null,
+                    detail: ex.Message);
+                TempData["Error"] = "Failed to delete the data file definition.";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        // POST /DataFileManage/ToggleActive/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleActive(int id)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string username = ResolveAuditUsername();
+            string correlationId = HttpContext.TraceIdentifier;
+            DataFileManageFormViewModel? existing = null;
+
+            try
+            {
+                existing = await _service.GetFormViewModelAsync(id);
+            }
+            catch (InvalidOperationException)
+            {
+                existing = null;
+            }
+
+            try
+            {
+                await _service.ToggleActiveAsync(id);
+
+                bool? newIsActive = existing is null ? null : !existing.IsActive;
+                await _auditLogService.LogActionAsync(
+                    actionType: "DataFileManageToggleActiveSucceeded",
+                    userId: userId,
+                    username: username,
+                    correlationId: correlationId,
+                    entityName: "DataFileDefinition",
+                    entityId: id.ToString(),
+                    entityLabel: existing?.DataFileName,
+                    oldValues: existing is null ? null : new { existing.Id, existing.IsActive },
+                    newValues: newIsActive is null ? null : new { Id = id, IsActive = newIsActive.Value },
+                    detail: "Data file definition active status toggled.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to toggle active status for data file definition {DataFileDefinitionId}", id);
+                await _auditLogService.LogActionAsync(
+                    actionType: "DataFileManageToggleActiveFailed",
+                    userId: userId,
+                    username: username,
+                    correlationId: correlationId,
+                    entityName: "DataFileDefinition",
+                    entityId: id.ToString(),
+                    entityLabel: existing?.DataFileName,
+                    oldValues: existing is null ? null : new { existing.Id, existing.IsActive },
+                    newValues: null,
+                    detail: ex.Message);
+                TempData["Error"] = "Failed to update data file definition status.";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        private string ResolveAuditUsername()
+        {
+            string? displayName = HttpContext.Session.GetString("UserDisplayName");
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                return displayName.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Anonymous" : User.Identity!.Name!.Trim();
+        }
+    }
+}

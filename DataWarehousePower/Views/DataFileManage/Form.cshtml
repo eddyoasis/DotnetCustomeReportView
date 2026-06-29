@@ -1,0 +1,910 @@
+@model DataWarehousePower.Models.DataFileManageFormViewModel
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] = isEdit ? $"Edit Data File - {Model.DataFileName}" : "New Data File";
+}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm"><- Back</a>
+    <h4 class="mb-0">@(isEdit ? "Edit Data File" : "New Data File")</h4>
+</div>
+
+<form asp-action="Save" method="post" id="data-file-form">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div asp-validation-summary="All" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">Data File Details</div>
+        <div class="card-body row g-3">
+
+            <div class="col-md-6">
+                <label asp-for="DataFileName" class="form-label"></label>
+                <input asp-for="DataFileName" class="form-control" placeholder="e.g. Sales Data File" />
+                <span asp-validation-for="DataFileName" class="text-danger small"></span>
+            </div>
+
+            <div class="col-md-3">
+                <label asp-for="SourceDatabase" class="form-label"></label>
+                <div class="dropdown searchable-source-dropdown" id="source-database-dropdown" data-bs-auto-close="outside">
+                    <input asp-for="SourceDatabase" type="hidden" class="source-input" id="input-source-database" />
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-database">
+                        -- Select database --
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-database">
+                        <input type="text" class="form-control form-control-sm mb-2 dropdown-search" id="search-source-database" placeholder="Search database..." autocomplete="off" />
+                        <div class="dropdown-options" id="options-source-database" style="max-height:220px; overflow:auto;">
+                            <button type="button" class="dropdown-item dropdown-option" data-value="">-- Select database --</button>
+                            @foreach (var databaseName in Model.SourceDatabaseOptions)
+                            {
+                                <button type="button" class="dropdown-item dropdown-option" data-value="@databaseName">@databaseName</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="form-text">Loaded from the connected SQL Server database list.</div>
+            </div>
+
+            <div class="col-md-3">
+                <label asp-for="SourceTable" class="form-label"></label>
+                <div class="dropdown searchable-source-dropdown" id="source-table-dropdown" data-bs-auto-close="outside">
+                    <input asp-for="SourceTable" type="hidden" class="source-input" id="input-source-table" />
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-table">
+                        -- Select table or view --
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-table">
+                        <input type="text" class="form-control form-control-sm mb-2 dropdown-search" id="search-source-table" placeholder="Search table or view..." autocomplete="off" />
+                        <div class="dropdown-options" id="options-source-table" style="max-height:220px; overflow:auto;">
+                            <button type="button" class="dropdown-item dropdown-option" data-value="">-- Select table or view --</button>
+                            @foreach (var sourceObjectName in Model.SourceTableOptions)
+                            {
+                                <button type="button" class="dropdown-item dropdown-option" data-value="@sourceObjectName">@sourceObjectName</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="form-text">Loaded from the selected source database tables and views.</div>
+            </div>
+
+            <div class="col-md-3">
+                <label asp-for="SourceSP" class="form-label"></label>
+                <div class="dropdown searchable-source-dropdown" id="source-sp-dropdown" data-bs-auto-close="outside">
+                    <input asp-for="SourceSP" type="hidden" class="source-input" id="input-source-sp" />
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-sp">
+                        -- Select stored procedure --
+                    </button>
+                    <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-sp">
+                        <input type="text" class="form-control form-control-sm mb-2 dropdown-search" id="search-source-sp" placeholder="Search stored procedure..." autocomplete="off" />
+                        <div class="dropdown-options" id="options-source-sp" style="max-height:220px; overflow:auto;">
+                            <button type="button" class="dropdown-item dropdown-option" data-value="">-- Select stored procedure --</button>
+                            @foreach (var sourceProcedureName in Model.SourceSPOptions)
+                            {
+                                <button type="button" class="dropdown-item dropdown-option" data-value="@sourceProcedureName">@sourceProcedureName</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="form-text">Loaded from the selected source database stored procedures.</div>
+            </div>
+
+            <div class="col-md-12">
+                <input asp-for="Parameters" type="hidden" id="input-parameters" />
+                <label class="form-label">Parameters</label>
+                <div id="source-parameters-list" class="border rounded p-2 bg-light-subtle">
+                    <div id="source-parameters-empty" class="text-muted small">No required parameters detected for this source.</div>
+                </div>
+                <div class="form-text">Detected from selected source object. Set defaults and optional mapping keys (ClientCode, FilterDateFrom, FilterDateTo).</div>
+            </div>
+
+            <div class="col-md-12">
+                <div class="form-check form-switch">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" role="switch" id="chk-active" />
+                    <label class="form-check-label" for="chk-active">
+                        Active <span class="text-muted small">(inactive data files are hidden from lists)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-md-12">
+                <label asp-for="Departments" class="form-label"></label>
+                <input asp-for="Departments" type="hidden" />
+
+                @if (Model.ActiveDepartmentOptions.Any())
+                {
+                    <div class="row row-cols-1 row-cols-md-3 g-2">
+                        @foreach (var department in Model.ActiveDepartmentOptions)
+                        {
+                            var isChecked = Model.SelectedDepartmentIds.Contains(department.Id);
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           name="SelectedDepartmentIds"
+                                           id="dept-@department.Id"
+                                           value="@department.Id"
+                                    @(isChecked ? "checked" : null) />
+                                    <label class="form-check-label" for="dept-@department.Id">@department.Name</label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted small">No active departments available.</div>
+                }
+
+                <div class="form-text">Select departments allowed to view this data file. Leave all unchecked to allow all departments.</div>
+                <span asp-validation-for="Departments" class="text-danger small"></span>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>Columns</span>
+            <div class="d-flex gap-2">
+                <button type="button" id="btn-auto-cols" class="btn btn-outline-secondary btn-sm">Auto Generate</button>
+                <button type="button" id="btn-add-col" class="btn btn-outline-primary btn-sm">+ Add Column</button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-bordered mb-0" id="columns-table">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:36px;" class="text-center">#</th>
+                        <th>Property Name <span class="text-muted small">(DB column)</span></th>
+                        <th>Default Label <span class="text-muted small">(UI header)</span></th>
+                        <th>Mapping Parameter <span class="text-muted small">(optional filter key)</span></th>
+                        <th style="width:110px;">Display Order</th>
+                        <th style="width:70px;"></th>
+                        <th style="width:70px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="columns-body">
+                    @for (int i = 0; i < Model.Columns.Count; i++)
+                    {
+                        <tr class="col-row" data-index="@i">
+                            <td class="text-center text-muted small row-num align-middle">@(i + 1)</td>
+                            <td>
+                                <input type="hidden" name="Columns[@i].Id" value="@Model.Columns[i].Id" />
+                                <input type="hidden" name="Columns[@i].IsDeleted" value="false" class="is-deleted-input" />
+                                <input name="Columns[@i].PropertyName"
+                                       value="@Model.Columns[i].PropertyName"
+                                       class="form-control form-control-sm"
+                                       placeholder="e.g. SaleAmount" required />
+                            </td>
+                            <td>
+                                <input name="Columns[@i].DefaultLabel"
+                                       value="@Model.Columns[i].DefaultLabel"
+                                       class="form-control form-control-sm"
+                                       placeholder="e.g. Sale Amount" required />
+                            </td>
+                            <td>
+                                <select name="Columns[@i].MappingParameter" class="form-select form-select-sm">
+                                    <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameter) ? "selected" : null)">-- None --</option>
+                                    <option value="ClientCode" selected="@(Model.Columns[i].MappingParameter == "ClientCode" ? "selected" : null)">ClientCode</option>
+                                    <option value="FilterDateFrom,FilterDateTo" selected="@(Model.Columns[i].MappingParameter == "FilterDateFrom,FilterDateTo" ? "selected" : null)">FilterDateRange (From + To)</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input name="Columns[@i].DisplayOrder"
+                                       value="@Model.Columns[i].DisplayOrder"
+                                       type="number" min="1" max="999"
+                                       class="form-control form-control-sm" required />
+                            </td>
+                            <td class="text-center align-middle">
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
+                            </td>
+                            <td class="text-center align-middle">
+                                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">X</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div id="no-cols-msg" class="text-center text-muted p-3 small"
+                 style="display:@(Model.Columns.Any() ? "none" : "block")">
+                No columns yet. Click <strong>+ Add Column</strong>.
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">@(isEdit ? "Save Changes" : "Create Data File")</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        let rowIndex = @Model.Columns.Count;
+
+        function addColumnRow(seed) {
+            const body = document.getElementById('columns-body');
+            const tr = document.createElement('tr');
+            tr.className = 'col-row';
+            tr.dataset.index = rowIndex;
+            const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row)').length;
+            const displayOrder = seed?.displayOrder ?? (currentVisibleRows + 1);
+            tr.innerHTML = `
+                <td class="text-center text-muted small row-num align-middle">${currentVisibleRows + 1}</td>
+                <td>
+                    <input type="hidden" name="Columns[${rowIndex}].Id" value="0" />
+                    <input type="hidden" name="Columns[${rowIndex}].IsDeleted" value="false" class="is-deleted-input" />
+                    <input name="Columns[${rowIndex}].PropertyName" class="form-control form-control-sm" placeholder="e.g. SaleAmount" required />
+                </td>
+                <td>
+                    <input name="Columns[${rowIndex}].DefaultLabel" class="form-control form-control-sm" placeholder="e.g. Sale Amount" required />
+                </td>
+                <td>
+                    <select name="Columns[${rowIndex}].MappingParameter" class="form-select form-select-sm">
+                        <option value="">-- None --</option>
+                        <option value="ClientCode">ClientCode</option>
+                        <option value="FilterDateFrom,FilterDateTo">FilterDateRange (From + To)</option>
+                    </select>
+                </td>
+                <td>
+                    <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
+                </td>
+                <td class="text-center align-middle">
+                    <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
+                </td>
+                <td class="text-center align-middle">
+                    <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">X</button>
+                </td>`;
+            body.appendChild(tr);
+
+            const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
+            const labelInput = tr.querySelector('input[name$=".DefaultLabel"]');
+            const mappingInput = tr.querySelector('select[name$=".MappingParameter"]');
+            if (propertyInput && seed?.propertyName) propertyInput.value = seed.propertyName;
+            if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
+            if (mappingInput && seed?.mappingParameter) mappingInput.value = seed.mappingParameter;
+
+            rowIndex++;
+            refreshRowNumbers();
+            toggleNoColsMessage();
+            refreshMappingParameterOptions();
+            if (!seed) {
+                tr.querySelector('input[name$=".PropertyName"]').focus();
+            }
+        }
+
+        document.getElementById('btn-add-col').addEventListener('click', addColumnRow);
+        document.getElementById('columns-body').addEventListener('click', e => {
+            if (e.target.closest('.btn-add-col-inline')) {
+                addColumnRow();
+            }
+        });
+
+        document.getElementById('columns-body').addEventListener('change', e => {
+            if (!(e.target instanceof HTMLSelectElement)) return;
+            if (!e.target.matches('select[name$=".MappingParameter"]')) return;
+            refreshMappingParameterOptions();
+        });
+
+        document.getElementById('columns-body').addEventListener('click', e => {
+            const btn = e.target.closest('.btn-remove-col');
+            if (!btn) return;
+            const tr = btn.closest('tr');
+            const deletedInput = tr.querySelector('.is-deleted-input');
+
+            if (deletedInput && deletedInput.value === 'false') {
+                deletedInput.value = 'true';
+                tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                tr.classList.add('deleted-row');
+                tr.style.display = 'none';
+            } else {
+                tr.remove();
+            }
+            refreshRowNumbers();
+            toggleNoColsMessage();
+            refreshMappingParameterOptions();
+        });
+
+        function refreshRowNumbers() {
+            let n = 1;
+            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+                tr.querySelector('.row-num').textContent = n++;
+            });
+        }
+
+        function toggleNoColsMessage() {
+            const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+            document.getElementById('no-cols-msg').style.display = visible === 0 ? 'block' : 'none';
+        }
+
+        function getVisibleMappingSelects() {
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row) select[name$=".MappingParameter"]')];
+        }
+
+        function refreshMappingParameterOptions() {
+            const selects = getVisibleMappingSelects();
+            const trackedOptions = ['ClientCode', 'FilterDateFrom,FilterDateTo'];
+
+            selects.forEach(currentSelect => {
+                const selectedByOthers = new Set(
+                    selects
+                        .filter(otherSelect => otherSelect !== currentSelect)
+                        .map(otherSelect => (otherSelect.value || '').trim())
+                        .filter(value => trackedOptions.includes(value))
+                );
+
+                trackedOptions.forEach(value => {
+                    const option = currentSelect.querySelector(`option[value="${value}"]`);
+                    if (!option) return;
+
+                    const shouldHide = selectedByOthers.has(value) && currentSelect.value !== value;
+                    option.disabled = shouldHide;
+                    option.hidden = shouldHide;
+                });
+            });
+        }
+
+        function validateRequiredMappingParameters() {
+            const selectedSourceTable = (document.getElementById('input-source-table')?.value || '').trim();
+            const selectedSourceSP = (document.getElementById('input-source-sp')?.value || '').trim();
+            if (!selectedSourceTable && !selectedSourceSP) {
+                return { valid: true, message: '' };
+            }
+
+            const requiredValues = ['ClientCode', 'FilterDateFrom', 'FilterDateTo'];
+            const selectedValues = [];
+
+            if (selectedSourceTable) {
+                getVisibleMappingSelects().forEach(select => {
+                    splitMappingAliases(select.value || '').forEach(value => selectedValues.push(value));
+                });
+            }
+
+            if (selectedSourceSP) {
+                getVisibleParameterMappingSelects().forEach(select => {
+                    const value = normalizeMappingAlias(select.value || '');
+                    if (value) {
+                        selectedValues.push(value);
+                    }
+                });
+            }
+
+            for (const requiredValue of requiredValues) {
+                if (!selectedValues.includes(requiredValue)) {
+                    return {
+                        valid: false,
+                        message: 'Please map ClientCode, FilterDateFrom, and FilterDateTo before saving the data file.'
+                    };
+                }
+            }
+
+            return { valid: true, message: '' };
+        }
+
+        const databaseInput = document.getElementById('input-source-database');
+        const tableInput = document.getElementById('input-source-table');
+        const spInput = document.getElementById('input-source-sp');
+        const parametersInput = document.getElementById('input-parameters');
+        const sourceParametersList = document.getElementById('source-parameters-list');
+        const sourceParametersEmpty = document.getElementById('source-parameters-empty');
+        const sourceObjectsUrl = '@Url.Action("SourceObjects", "DataFileManage")';
+        const sourceProceduresUrl = '@Url.Action("SourceProcedures", "DataFileManage")';
+        const sourceColumnsUrl = '@Url.Action("SourceColumns", "DataFileManage")';
+        const sourceParametersUrl = '@Url.Action("SourceParameters", "DataFileManage")';
+        let sourceObjectsRequestSeq = 0;
+        let sourceProceduresRequestSeq = 0;
+        let sourceParametersRequestSeq = 0;
+        const searchableDropdownStates = new Map();
+
+        function getDropdownDisplayText(placeholder, value) {
+            const trimmed = (value || '').trim();
+            return trimmed ? trimmed : placeholder;
+        }
+
+        function createDropdownOption(value, text) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'dropdown-item dropdown-option';
+            button.dataset.value = value;
+            button.textContent = text;
+            return button;
+        }
+
+        function setDropdownItems(state, items) {
+            state.options = [
+                { value: '', text: state.placeholder },
+                ...items.map(item => ({ value: item, text: item }))
+            ];
+
+            state.optionsContainer.innerHTML = '';
+            state.options.forEach(option => {
+                state.optionsContainer.appendChild(createDropdownOption(option.value, option.text));
+            });
+
+            filterDropdownOptions(state);
+        }
+
+        function filterDropdownOptions(state) {
+            const keyword = (state.searchInput.value || '').trim().toLowerCase();
+            let visibleCount = 0;
+
+            state.optionsContainer.querySelectorAll('.dropdown-option').forEach(optionButton => {
+                const value = optionButton.dataset.value || '';
+                const text = optionButton.textContent || '';
+                const isPlaceholder = value === '';
+                const isVisible =
+                    isPlaceholder ||
+                    keyword === '' ||
+                    text.toLowerCase().includes(keyword) ||
+                    value.toLowerCase().includes(keyword);
+
+                optionButton.classList.toggle('d-none', !isVisible);
+                if (isVisible) {
+                    visibleCount++;
+                }
+            });
+
+            if (!state.noResultElement) {
+                state.noResultElement = document.createElement('div');
+                state.noResultElement.className = 'dropdown-item-text text-muted small py-2 no-results';
+                state.noResultElement.textContent = 'No matches found';
+                state.optionsContainer.appendChild(state.noResultElement);
+            }
+
+            state.noResultElement.classList.toggle('d-none', visibleCount > 0);
+        }
+
+        function updateDropdownSelection(state, value, triggerChange) {
+            const normalizedValue = (value || '').trim();
+            state.hiddenInput.value = normalizedValue;
+            state.toggleButton.textContent = getDropdownDisplayText(state.placeholder, normalizedValue);
+
+            state.optionsContainer.querySelectorAll('.dropdown-option').forEach(optionButton => {
+                const selected = (optionButton.dataset.value || '') === normalizedValue;
+                optionButton.classList.toggle('active', selected);
+            });
+
+            if (triggerChange) {
+                state.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        function initializeSearchableDropdown(config) {
+            const state = {
+                hiddenInput: config.hiddenInput,
+                toggleButton: config.toggleButton,
+                optionsContainer: config.optionsContainer,
+                searchInput: config.searchInput,
+                placeholder: config.placeholder,
+                options: [],
+                noResultElement: null
+            };
+
+            searchableDropdownStates.set(config.hiddenInput.id, state);
+
+            const initialItems = Array.from(config.optionsContainer.querySelectorAll('.dropdown-option'))
+                .map(btn => ({
+                    value: btn.dataset.value || '',
+                    text: btn.textContent || ''
+                }))
+                .filter(option => option.value !== '');
+
+            setDropdownItems(state, initialItems.map(option => option.value));
+            updateDropdownSelection(state, config.hiddenInput.value, false);
+
+            config.searchInput.addEventListener('input', () => {
+                filterDropdownOptions(state);
+            });
+
+            config.optionsContainer.addEventListener('click', e => {
+                const optionButton = e.target.closest('.dropdown-option');
+                if (!optionButton || optionButton.classList.contains('d-none')) return;
+
+                updateDropdownSelection(state, optionButton.dataset.value || '', true);
+                config.searchInput.value = '';
+                filterDropdownOptions(state);
+
+                const dropdown = bootstrap.Dropdown.getOrCreateInstance(config.toggleButton);
+                dropdown.hide();
+            });
+
+            config.toggleButton.addEventListener('shown.bs.dropdown', () => {
+                config.searchInput.value = '';
+                filterDropdownOptions(state);
+                config.searchInput.focus();
+            });
+
+            return state;
+        }
+
+        function setDropdownItemsByInputId(inputId, items, preferredValue) {
+            const state = searchableDropdownStates.get(inputId);
+            if (!state) return;
+
+            setDropdownItems(state, items);
+            const nextValue = items.includes((preferredValue || '').trim()) ? (preferredValue || '').trim() : '';
+            updateDropdownSelection(state, nextValue, false);
+        }
+
+        function resetDropdownSelectionByInputId(inputId) {
+            const state = searchableDropdownStates.get(inputId);
+            if (!state) return;
+
+            updateDropdownSelection(state, '', false);
+            state.searchInput.value = '';
+            filterDropdownOptions(state);
+        }
+
+        function toDefaultLabel(columnName) {
+            return (columnName || '')
+                .replace(/_/g, ' ')
+                .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+                .trim()
+                .replace(/\s+/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function markAllRowsAsDeleted() {
+            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+                const deletedInput = tr.querySelector('.is-deleted-input');
+                if (deletedInput) {
+                    deletedInput.value = 'true';
+                }
+                tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                tr.classList.add('deleted-row');
+                tr.style.display = 'none';
+            });
+        }
+
+        function normalizeParameterName(name) {
+            return (name || '').trim().replace(/^@@+/, '');
+        }
+
+        function normalizeMappingAlias(name) {
+            const normalized = normalizeParameterName(name || '');
+            if (!normalized) {
+                return '';
+            }
+            if (normalized.toLowerCase() === 'datefrom') {
+                return 'FilterDateFrom';
+            }
+            if (normalized.toLowerCase() === 'dateto') {
+                return 'FilterDateTo';
+            }
+            if (normalized.toLowerCase() === 'filterclientcode') {
+                return 'ClientCode';
+            }
+            return normalized;
+        }
+
+        function splitMappingAliases(value) {
+            return (value || '')
+                .split(/[,;|]/)
+                .map(token => normalizeMappingAlias(token))
+                .filter(Boolean);
+        }
+
+        function escapeHtmlAttribute(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function buildParameterMappingOptions(selectedValue) {
+            const normalized = normalizeParameterName(selectedValue || '');
+            const allowedValues = ['ClientCode', 'FilterDateFrom', 'FilterDateTo'];
+            return [
+                `<option value="">-- None --</option>`,
+                ...allowedValues.map(value => {
+                    const selected = normalized === value ? ' selected' : '';
+                    return `<option value="${value}"${selected}>${value}</option>`;
+                })
+            ].join('');
+        }
+
+        function getVisibleParameterMappingSelects() {
+            return [...document.querySelectorAll('#source-parameters-list [data-param-row] select[data-param-mapping]')];
+        }
+
+        function parseConfiguredParameters() {
+            const raw = (parametersInput.value || '').trim();
+            if (!raw) {
+                return [];
+            }
+
+            try {
+                const parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) {
+                    return [];
+                }
+
+                return parsed
+                    .map(item => ({
+                        name: normalizeParameterName(item?.name || item?.Name || ''),
+                        defaultValue: (item?.defaultValue || item?.DefaultValue || '').toString().trim(),
+                        mappingParameter: normalizeParameterName(item?.mappingParameter || item?.MappingParameter || '')
+                    }))
+                    .filter(item => item.name);
+            } catch {
+                return [];
+            }
+        }
+
+        function serializeParametersFromUi() {
+            const rows = [...sourceParametersList.querySelectorAll('[data-param-row]')];
+            const payload = rows
+                .map(row => {
+                    const name = normalizeParameterName(row.getAttribute('data-param-name') || '');
+                    const defaultInput = row.querySelector('input[data-param-default]');
+                    const mappingInput = row.querySelector('select[data-param-mapping]');
+                    const defaultValue = (defaultInput?.value || '').trim();
+                    const mappingParameter = normalizeParameterName(mappingInput?.value || '');
+                    return name
+                        ? {
+                            Name: `@@${name}`,
+                            DefaultValue: defaultValue || null,
+                            MappingParameter: mappingParameter || null
+                        }
+                        : null;
+                })
+                .filter(Boolean);
+
+            parametersInput.value = payload.length ? JSON.stringify(payload) : '';
+        }
+
+        function renderSourceParameters(parameterNames, existingDefaults) {
+            sourceParametersList.querySelectorAll('[data-param-row]').forEach(item => item.remove());
+
+            const defaultsByName = new Map(
+                existingDefaults.map(item => [
+                    normalizeParameterName(item.name),
+                    {
+                        defaultValue: item.defaultValue || '',
+                        mappingParameter: normalizeParameterName(item.mappingParameter || '')
+                    }
+                ])
+            );
+
+            const uniqueNames = [...new Set((parameterNames || []).map(name => normalizeParameterName(name)).filter(Boolean))];
+
+            if (uniqueNames.length === 0) {
+                sourceParametersEmpty.style.display = 'block';
+                parametersInput.value = '';
+                return;
+            }
+
+            sourceParametersEmpty.style.display = 'none';
+            uniqueNames.forEach(name => {
+                const row = document.createElement('div');
+                row.className = 'row g-2 align-items-center mb-2';
+                row.setAttribute('data-param-row', 'true');
+                row.setAttribute('data-param-name', name);
+
+                const configured = defaultsByName.get(name) || { defaultValue: '', mappingParameter: '' };
+                const defaultValue = configured.defaultValue;
+                const mappingParameter = configured.mappingParameter;
+                row.innerHTML = `
+                    <div class="col-md-4">
+                        <span class="bg-secondary-subtle text-secondary-emphasis border">@@${name}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" data-param-default="true" value="${escapeHtmlAttribute(defaultValue)}" placeholder="Default value (optional)" />
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select form-select-sm" data-param-mapping="true">
+                            ${buildParameterMappingOptions(mappingParameter)}
+                        </select>
+                    </div>`;
+
+                sourceParametersList.appendChild(row);
+            });
+
+            serializeParametersFromUi();
+        }
+
+        async function loadSourceParameters() {
+            const requestSeq = ++sourceParametersRequestSeq;
+            const dbName = (databaseInput.value || '').trim();
+            const sourceSP = (spInput.value || '').trim();
+
+            if (!dbName || !sourceSP) {
+                renderSourceParameters([], []);
+                return;
+            }
+
+            const existingDefaults = parseConfiguredParameters();
+
+            try {
+                const response = await fetch(
+                    `${sourceParametersUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=&sourceSP=${encodeURIComponent(sourceSP)}`,
+                    { cache: 'no-store' }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Failed to load source parameters');
+                }
+
+                const items = await response.json();
+                if (requestSeq !== sourceParametersRequestSeq) {
+                    return;
+                }
+
+                renderSourceParameters(Array.isArray(items) ? items : [], existingDefaults);
+            } catch {
+                if (requestSeq !== sourceParametersRequestSeq) {
+                    return;
+                }
+                renderSourceParameters([], existingDefaults);
+            }
+        }
+
+        async function loadSourceObjects(selectedValue) {
+            const requestSeq = ++sourceObjectsRequestSeq;
+            const dbName = (databaseInput.value || '').trim();
+
+            if (!dbName) {
+                tableInput.value = '';
+                setDropdownItemsByInputId('input-source-table', [], '');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${sourceObjectsUrl}?sourceDatabase=${encodeURIComponent(dbName)}`, { cache: 'no-store' });
+                if (!response.ok) throw new Error('Failed to load source objects');
+
+                const items = await response.json();
+                if (requestSeq !== sourceObjectsRequestSeq) return;
+                setDropdownItemsByInputId('input-source-table', items, selectedValue || '');
+            } catch {
+                if (requestSeq !== sourceObjectsRequestSeq) return;
+                tableInput.value = '';
+                setDropdownItemsByInputId('input-source-table', [], '');
+            }
+        }
+
+        async function loadSourceProcedures(selectedValue) {
+            const requestSeq = ++sourceProceduresRequestSeq;
+            const dbName = (databaseInput.value || '').trim();
+
+            if (!dbName) {
+                spInput.value = '';
+                setDropdownItemsByInputId('input-source-sp', [], '');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${sourceProceduresUrl}?sourceDatabase=${encodeURIComponent(dbName)}`, { cache: 'no-store' });
+                if (!response.ok) throw new Error('Failed to load stored procedures');
+
+                const items = await response.json();
+                if (requestSeq !== sourceProceduresRequestSeq) return;
+                setDropdownItemsByInputId('input-source-sp', items, selectedValue || '');
+            } catch {
+                if (requestSeq !== sourceProceduresRequestSeq) return;
+                spInput.value = '';
+                setDropdownItemsByInputId('input-source-sp', [], '');
+            }
+        }
+
+        async function autoGenerateColumnsFromSource() {
+            const dbName = (databaseInput.value || '').trim();
+            const sourceTable = (tableInput.value || '').trim();
+            const sourceSP = (spInput.value || '').trim();
+
+            if (!dbName || ((!sourceTable && !sourceSP) || (sourceTable && sourceSP))) {
+                return;
+            }
+
+            const visibleRows = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+            if (visibleRows > 0) {
+                const shouldReplace = confirm('Auto-generate will replace current visible column rows. Continue?');
+                if (!shouldReplace) return;
+            }
+
+            try {
+                const response = await fetch(
+                    `${sourceColumnsUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=${encodeURIComponent(sourceTable)}&sourceSP=${encodeURIComponent(sourceSP)}`,
+                    { cache: 'no-store' }
+                );
+                if (!response.ok) throw new Error('Failed to load source columns');
+
+                const items = await response.json();
+                if (!Array.isArray(items) || items.length === 0) {
+                    alert('No columns were found for the selected source.');
+                    return;
+                }
+
+                markAllRowsAsDeleted();
+
+                items.forEach((columnName, index) => {
+                    addColumnRow({
+                        propertyName: columnName,
+                        defaultLabel: toDefaultLabel(columnName),
+                        displayOrder: index + 1
+                    });
+                });
+
+                refreshRowNumbers();
+                toggleNoColsMessage();
+            } catch {
+                alert('Failed to auto-generate columns from the selected source.');
+            }
+        }
+
+        databaseInput.addEventListener('change', () => {
+            loadSourceObjects('');
+            loadSourceProcedures('');
+            loadSourceParameters();
+        });
+
+        tableInput.addEventListener('change', () => {
+            if ((tableInput.value || '').trim()) {
+                resetDropdownSelectionByInputId('input-source-sp');
+                loadSourceParameters();
+                autoGenerateColumnsFromSource();
+            }
+        });
+
+        spInput.addEventListener('change', () => {
+            if ((spInput.value || '').trim()) {
+                resetDropdownSelectionByInputId('input-source-table');
+                autoGenerateColumnsFromSource();
+            }
+            loadSourceParameters();
+        });
+
+        sourceParametersList.addEventListener('input', e => {
+            if (e.target instanceof HTMLInputElement && e.target.matches('[data-param-default]')) {
+                serializeParametersFromUi();
+            }
+        });
+
+        sourceParametersList.addEventListener('change', e => {
+            if (e.target instanceof HTMLSelectElement && e.target.matches('[data-param-mapping]')) {
+                serializeParametersFromUi();
+            }
+        });
+
+        document.getElementById('btn-auto-cols').addEventListener('click', autoGenerateColumnsFromSource);
+
+        document.getElementById('data-file-form').addEventListener('submit', e => {
+            const validationResult = validateRequiredMappingParameters();
+            if (!validationResult.valid) {
+                e.preventDefault();
+                alert(validationResult.message);
+            }
+        });
+
+        initializeSearchableDropdown({
+            hiddenInput: databaseInput,
+            toggleButton: document.getElementById('btn-source-database'),
+            optionsContainer: document.getElementById('options-source-database'),
+            searchInput: document.getElementById('search-source-database'),
+            placeholder: '-- Select database --'
+        });
+
+        initializeSearchableDropdown({
+            hiddenInput: tableInput,
+            toggleButton: document.getElementById('btn-source-table'),
+            optionsContainer: document.getElementById('options-source-table'),
+            searchInput: document.getElementById('search-source-table'),
+            placeholder: '-- Select table or view --'
+        });
+
+        initializeSearchableDropdown({
+            hiddenInput: spInput,
+            toggleButton: document.getElementById('btn-source-sp'),
+            optionsContainer: document.getElementById('options-source-sp'),
+            searchInput: document.getElementById('search-source-sp'),
+            placeholder: '-- Select stored procedure --'
+        });
+
+        loadSourceObjects(tableInput.value);
+        loadSourceProcedures(spInput.value);
+        loadSourceParameters();
+        refreshMappingParameterOptions();
+    </script>
+}

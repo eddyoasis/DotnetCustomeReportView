@@ -1,0 +1,19 @@
+using DataWarehousePower.Models;
+
+namespace DataWarehousePower.Services
+{
+    public interface IDataFileManageService
+    {
+        Task<List<string>> GetSourceDatabaseOptionsAsync();
+        Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase);
+        Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase);
+        Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+        Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+        Task<DataFileManageListViewModel> GetListViewModelAsync(DataFileManageFilterViewModel? filter = null);
+        Task<DataFileManageFormViewModel> GetFormViewModelAsync(int id);
+        Task<DataFileDefinition> CreateDataFileAsync(DataFileManageFormViewModel form);
+        Task UpdateDataFileAsync(DataFileManageFormViewModel form);
+        Task DeleteAsync(int id);
+        Task ToggleActiveAsync(int id);
+    }
+}

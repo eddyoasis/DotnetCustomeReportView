@@ -23,6 +23,8 @@ namespace DataWarehousePower.Data
         public DbSet<ReportStaff>          ReportStaff           { get; set; }
         public DbSet<ReportDefinition>     ReportDefinitions     { get; set; }
         public DbSet<ReportColumn>         ReportColumns         { get; set; }
+        public DbSet<DataFileDefinition>   DataFileDefinitions   { get; set; }
+        public DbSet<DataFileColumn>       DataFileColumns       { get; set; }
         public DbSet<UserColumnPreference> UserColumnPreferences { get; set; }
         public DbSet<AuditLog>             AuditLogs             { get; set; }
         public DbSet<ScheduledReportJob>   ScheduledReportJobs   { get; set; }
@@ -127,6 +129,12 @@ namespace DataWarehousePower.Data
                 .HasMany(r => r.Columns)
                 .WithOne(c => c.Report)
                 .HasForeignKey(c => c.ReportDefinitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DataFileDefinition>()
+                .HasMany(d => d.Columns)
+                .WithOne(c => c.DataFile)
+                .HasForeignKey(c => c.DataFileDefinitionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<ScheduledReportJob>(e =>
