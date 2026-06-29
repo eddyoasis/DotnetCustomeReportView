@@ -148,16 +148,16 @@ namespace DataWarehousePower.Controllers
                 return View("Form", form);
             }
 
-            string? requiredMappingValidationError = ValidateRequiredMappingParameters(form, hasTable, hasSP);
-            if (!string.IsNullOrWhiteSpace(requiredMappingValidationError))
-            {
-                ModelState.AddModelError("", requiredMappingValidationError);
-                await PopulateSourceDatabaseOptionsAsync(form);
-                await PopulateSourceTableOptionsAsync(form);
-                await PopulateSourceSPOptionsAsync(form);
-                await PopulateDepartmentOptionsAsync(form);
-                return View("Form", form);
-            }
+            //string? requiredMappingValidationError = ValidateRequiredMappingParameters(form, hasTable, hasSP);
+            //if (!string.IsNullOrWhiteSpace(requiredMappingValidationError))
+            //{
+            //    ModelState.AddModelError("", requiredMappingValidationError);
+            //    await PopulateSourceDatabaseOptionsAsync(form);
+            //    await PopulateSourceTableOptionsAsync(form);
+            //    await PopulateSourceSPOptionsAsync(form);
+            //    await PopulateDepartmentOptionsAsync(form);
+            //    return View("Form", form);
+            //}
 
             try
             {
@@ -319,6 +319,23 @@ namespace DataWarehousePower.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> SourceColumnMetadata(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            try
+            {
+                var items = await _service.GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP);
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Column metadata(type) access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    sourceDatabase, sourceTable, sourceSP);
+                return Json(Array.Empty<SourceColumnMetadata>());
+            }
+        }
+
+        [HttpGet]
         public async Task<IActionResult> SourceParameters(string? sourceDatabase, string? sourceTable, string? sourceSP)
         {
             try
@@ -332,6 +349,39 @@ namespace DataWarehousePower.Controllers
                     "Parameter metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
                     sourceDatabase, sourceTable, sourceSP);
                 return Json(Array.Empty<string>());
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Preview([FromBody] DataFilePreviewRequest request)
+        {
+            try
+            {
+                DataFilePreviewResult preview = await _service.GetPreviewDataAsync(request);
+                return Json(new
+                {
+                    columns = preview.Columns,
+                    rows = preview.Rows,
+                    count = preview.Rows.Count
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Preview query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    request?.SourceDatabase,
+                    request?.SourceTable,
+                    request?.SourceSP);
+                return BadRequest(new { message = "Failed to load preview data due to source access restrictions." });
             }
         }
 

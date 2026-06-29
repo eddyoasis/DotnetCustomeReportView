@@ -166,6 +166,11 @@
                 <tbody id="columns-body">
                     @for (int i = 0; i < Model.Columns.Count; i++)
                     {
+                        var mappingInputType = (!string.IsNullOrWhiteSpace(Model.Columns[i].PropertyName) &&
+                            (Model.Columns[i].PropertyName.Contains("date", StringComparison.OrdinalIgnoreCase) ||
+                             Model.Columns[i].PropertyName.Contains("time", StringComparison.OrdinalIgnoreCase)))
+                            ? "datetime-local"
+                            : "text";
                         <tr class="col-row" data-index="@i">
                             <td class="text-center text-muted small row-num align-middle">@(i + 1)</td>
                             <td>
@@ -183,11 +188,11 @@
                                        placeholder="e.g. Sale Amount" required />
                             </td>
                             <td>
-                                <select name="Columns[@i].MappingParameter" class="form-select form-select-sm">
-                                    <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameter) ? "selected" : null)">-- None --</option>
-                                    <option value="ClientCode" selected="@(Model.Columns[i].MappingParameter == "ClientCode" ? "selected" : null)">ClientCode</option>
-                                    <option value="FilterDateFrom,FilterDateTo" selected="@(Model.Columns[i].MappingParameter == "FilterDateFrom,FilterDateTo" ? "selected" : null)">FilterDateRange (From + To)</option>
-                                </select>
+                                <input name="Columns[@i].MappingParameter"
+                                       value="@Model.Columns[i].MappingParameter"
+                                       type="@mappingInputType"
+                                       class="form-control form-control-sm mapping-parameter-input"
+                                       placeholder="@(mappingInputType == "datetime-local" ? "Select date and time" : "Enter mapping value")" />
                             </td>
                             <td>
                                 <input name="Columns[@i].DisplayOrder"
@@ -208,6 +213,30 @@
             <div id="no-cols-msg" class="text-center text-muted p-3 small"
                  style="display:@(Model.Columns.Any() ? "none" : "block")">
                 No columns yet. Click <strong>+ Add Column</strong>.
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>Preview</span>
+            <div class="d-flex align-items-center gap-2">
+                <label for="preview-take" class="small text-muted mb-0">Rows</label>
+                <select id="preview-take" class="form-select form-select-sm" style="width:90px;">
+                    <option value="10" selected>10</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <button type="button" id="btn-preview" class="btn btn-outline-success btn-sm">Preview</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="preview-status" class="text-muted small mb-2">Click Preview to load sample rows from the selected source.</div>
+            <div class="table-responsive" id="preview-table-wrap" style="display:none;">
+                <table class="table table-sm table-bordered align-middle mb-0" id="preview-table">
+                    <thead class="table-light" id="preview-table-head"></thead>
+                    <tbody id="preview-table-body"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -240,11 +269,10 @@
                     <input name="Columns[${rowIndex}].DefaultLabel" class="form-control form-control-sm" placeholder="e.g. Sale Amount" required />
                 </td>
                 <td>
-                    <select name="Columns[${rowIndex}].MappingParameter" class="form-select form-select-sm">
-                        <option value="">-- None --</option>
-                        <option value="ClientCode">ClientCode</option>
-                        <option value="FilterDateFrom,FilterDateTo">FilterDateRange (From + To)</option>
-                    </select>
+                    <input name="Columns[${rowIndex}].MappingParameter"
+                           class="form-control form-control-sm mapping-parameter-input"
+                           type="text"
+                           placeholder="Enter mapping value" />
                 </td>
                 <td>
                     <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
@@ -259,15 +287,16 @@
 
             const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
             const labelInput = tr.querySelector('input[name$=".DefaultLabel"]');
-            const mappingInput = tr.querySelector('select[name$=".MappingParameter"]');
+            const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
             if (propertyInput && seed?.propertyName) propertyInput.value = seed.propertyName;
             if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
+            if (seed?.columnType) tr.dataset.columnType = seed.columnType;
             if (mappingInput && seed?.mappingParameter) mappingInput.value = seed.mappingParameter;
 
             rowIndex++;
             refreshRowNumbers();
             toggleNoColsMessage();
-            refreshMappingParameterOptions();
+            refreshMappingParameterInputTypes();
             if (!seed) {
                 tr.querySelector('input[name$=".PropertyName"]').focus();
             }
@@ -280,10 +309,10 @@
             }
         });
 
-        document.getElementById('columns-body').addEventListener('change', e => {
-            if (!(e.target instanceof HTMLSelectElement)) return;
-            if (!e.target.matches('select[name$=".MappingParameter"]')) return;
-            refreshMappingParameterOptions();
+        document.getElementById('columns-body').addEventListener('input', e => {
+            if (!(e.target instanceof HTMLInputElement)) return;
+            if (!e.target.matches('input[name$=".PropertyName"]')) return;
+            refreshMappingParameterInputTypes();
         });
 
         document.getElementById('columns-body').addEventListener('click', e => {
@@ -302,7 +331,7 @@
             }
             refreshRowNumbers();
             toggleNoColsMessage();
-            refreshMappingParameterOptions();
+            refreshMappingParameterInputTypes();
         });
 
         function refreshRowNumbers() {
@@ -317,30 +346,69 @@
             document.getElementById('no-cols-msg').style.display = visible === 0 ? 'block' : 'none';
         }
 
-        function getVisibleMappingSelects() {
-            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row) select[name$=".MappingParameter"]')];
+        function getVisibleMappingInputs() {
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row) input[name$=".MappingParameter"]')];
         }
 
-        function refreshMappingParameterOptions() {
-            const selects = getVisibleMappingSelects();
-            const trackedOptions = ['ClientCode', 'FilterDateFrom,FilterDateTo'];
+        function isDateTimeInputValue(value) {
+            return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test((value || '').trim());
+        }
 
-            selects.forEach(currentSelect => {
-                const selectedByOthers = new Set(
-                    selects
-                        .filter(otherSelect => otherSelect !== currentSelect)
-                        .map(otherSelect => (otherSelect.value || '').trim())
-                        .filter(value => trackedOptions.includes(value))
-                );
+        function isDateLikeColumnType(columnType) {
+            const normalized = (columnType || '').trim().toLowerCase();
+            if (!normalized) {
+                return false;
+            }
 
-                trackedOptions.forEach(value => {
-                    const option = currentSelect.querySelector(`option[value="${value}"]`);
-                    if (!option) return;
+            return normalized.includes('date') ||
+                normalized.includes('time');
+        }
 
-                    const shouldHide = selectedByOthers.has(value) && currentSelect.value !== value;
-                    option.disabled = shouldHide;
-                    option.hidden = shouldHide;
-                });
+        function inferMappingInputType(propertyName, columnType) {
+            if (isDateLikeColumnType(columnType)) {
+                return 'datetime-local';
+            }
+
+            const normalizedName = (propertyName || '').trim().toLowerCase();
+            if (!normalizedName) {
+                return 'text';
+            }
+
+            if (normalizedName.includes('date') || normalizedName.includes('time') || normalizedName.includes('dob')) {
+                return 'datetime-local';
+            }
+
+            return 'text';
+        }
+
+        function refreshMappingParameterInputTypes() {
+            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+                const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
+                const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
+                if (!(mappingInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                const propertyName = (propertyInput?.value || '').trim();
+                const metadataType = sourceColumnTypeLookup.get(propertyName.toLowerCase()) || '';
+                const columnType = (tr.dataset.columnType || '').trim() || metadataType;
+                const targetType = inferMappingInputType(propertyName, columnType);
+                const existingValue = mappingInput.value || '';
+
+                if (mappingInput.type !== targetType) {
+                    mappingInput.type = targetType;
+                    if (targetType === 'datetime-local' && existingValue && !isDateTimeInputValue(existingValue)) {
+                        mappingInput.value = '';
+                    } else {
+                        mappingInput.value = existingValue;
+                    }
+                }
+
+                mappingInput.placeholder = targetType === 'datetime-local'
+                    ? 'Select date and time'
+                    : 'Enter mapping value';
+
+                tr.dataset.columnType = columnType;
             });
         }
 
@@ -355,8 +423,8 @@
             const selectedValues = [];
 
             if (selectedSourceTable) {
-                getVisibleMappingSelects().forEach(select => {
-                    splitMappingAliases(select.value || '').forEach(value => selectedValues.push(value));
+                getVisibleMappingInputs().forEach(input => {
+                    splitMappingAliases(input.value || '').forEach(value => selectedValues.push(value));
                 });
             }
 
@@ -389,11 +457,14 @@
         const sourceParametersEmpty = document.getElementById('source-parameters-empty');
         const sourceObjectsUrl = '@Url.Action("SourceObjects", "DataFileManage")';
         const sourceProceduresUrl = '@Url.Action("SourceProcedures", "DataFileManage")';
-        const sourceColumnsUrl = '@Url.Action("SourceColumns", "DataFileManage")';
+        const sourceColumnMetadataUrl = '@Url.Action("SourceColumnMetadata", "DataFileManage")';
         const sourceParametersUrl = '@Url.Action("SourceParameters", "DataFileManage")';
+        const previewUrl = '@Url.Action("Preview", "DataFileManage")';
         let sourceObjectsRequestSeq = 0;
         let sourceProceduresRequestSeq = 0;
+        let sourceColumnMetadataRequestSeq = 0;
         let sourceParametersRequestSeq = 0;
+        let sourceColumnTypeLookup = new Map();
         const searchableDropdownStates = new Map();
 
         function getDropdownDisplayText(placeholder, value) {
@@ -789,6 +860,186 @@
             }
         }
 
+        function normalizeSourceColumnMetadata(items) {
+            if (!Array.isArray(items)) {
+                return [];
+            }
+
+            return items
+                .map(item => {
+                    if (typeof item === 'string') {
+                        return { name: item, dataType: '' };
+                    }
+
+                    return {
+                        name: (item?.name || item?.Name || '').toString().trim(),
+                        dataType: (item?.dataType || item?.DataType || '').toString().trim()
+                    };
+                })
+                .filter(item => item.name);
+        }
+
+        async function loadSourceColumnMetadata() {
+            const requestSeq = ++sourceColumnMetadataRequestSeq;
+            const dbName = (databaseInput.value || '').trim();
+            const sourceTable = (tableInput.value || '').trim();
+            const sourceSP = (spInput.value || '').trim();
+
+            if (!dbName || ((!sourceTable && !sourceSP) || (sourceTable && sourceSP))) {
+                sourceColumnTypeLookup = new Map();
+                refreshMappingParameterInputTypes();
+                return [];
+            }
+
+            try {
+                const response = await fetch(
+                    `${sourceColumnMetadataUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=${encodeURIComponent(sourceTable)}&sourceSP=${encodeURIComponent(sourceSP)}`,
+                    { cache: 'no-store' }
+                );
+                if (!response.ok) {
+                    throw new Error('Failed to load source column metadata');
+                }
+
+                const payload = await response.json();
+                if (requestSeq !== sourceColumnMetadataRequestSeq) {
+                    return [];
+                }
+
+                const metadataItems = normalizeSourceColumnMetadata(payload);
+                sourceColumnTypeLookup = new Map(
+                    metadataItems.map(item => [item.name.toLowerCase(), item.dataType || ''])
+                );
+                refreshMappingParameterInputTypes();
+                return metadataItems;
+            } catch {
+                if (requestSeq !== sourceColumnMetadataRequestSeq) {
+                    return [];
+                }
+
+                sourceColumnTypeLookup = new Map();
+                refreshMappingParameterInputTypes();
+                return [];
+            }
+        }
+
+        function getVisibleColumnRowsForPreview() {
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)')]
+                .map(tr => {
+                    const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
+                    const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
+                    return {
+                        propertyName: (propertyInput?.value || '').trim(),
+                        mappingParameter: (mappingInput?.value || '').trim()
+                    };
+                })
+                .filter(item => item.propertyName);
+        }
+
+        function setPreviewStatus(message, isError) {
+            const status = document.getElementById('preview-status');
+            status.textContent = message;
+            status.classList.toggle('text-danger', !!isError);
+            status.classList.toggle('text-muted', !isError);
+        }
+
+        function clearPreviewTable() {
+            document.getElementById('preview-table-head').innerHTML = '';
+            document.getElementById('preview-table-body').innerHTML = '';
+            document.getElementById('preview-table-wrap').style.display = 'none';
+        }
+
+        function renderPreviewTable(columns, rows) {
+            const head = document.getElementById('preview-table-head');
+            const body = document.getElementById('preview-table-body');
+            const wrap = document.getElementById('preview-table-wrap');
+
+            head.innerHTML = '';
+            body.innerHTML = '';
+
+            if (!Array.isArray(columns) || columns.length === 0) {
+                wrap.style.display = 'none';
+                return;
+            }
+
+            const headRow = document.createElement('tr');
+            columns.forEach(column => {
+                const th = document.createElement('th');
+                th.textContent = column;
+                headRow.appendChild(th);
+            });
+            head.appendChild(headRow);
+
+            (Array.isArray(rows) ? rows : []).forEach(row => {
+                const tr = document.createElement('tr');
+                columns.forEach(column => {
+                    const td = document.createElement('td');
+                    const value = row?.[column];
+                    td.textContent = value === null || value === undefined ? '' : String(value);
+                    tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+
+            wrap.style.display = 'block';
+        }
+
+        async function previewData() {
+            const dbName = (databaseInput.value || '').trim();
+            const sourceTable = (tableInput.value || '').trim();
+            const sourceSP = (spInput.value || '').trim();
+            const take = Number.parseInt(document.getElementById('preview-take').value, 10) || 10;
+            const columns = getVisibleColumnRowsForPreview();
+
+            if (!dbName || ((!sourceTable && !sourceSP) || (sourceTable && sourceSP))) {
+                setPreviewStatus('Please select one source (table or stored procedure) before preview.', true);
+                clearPreviewTable();
+                return;
+            }
+
+            if (columns.length === 0) {
+                setPreviewStatus('Please add at least one visible column before preview.', true);
+                clearPreviewTable();
+                return;
+            }
+
+            setPreviewStatus('Loading preview...', false);
+
+            const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+            try {
+                const response = await fetch(previewUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': antiForgeryToken
+                    },
+                    body: JSON.stringify({
+                        sourceDatabase: dbName,
+                        sourceTable,
+                        sourceSP,
+                        take,
+                        columns
+                    })
+                });
+
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    setPreviewStatus(payload?.message || 'Failed to load preview data.', true);
+                    clearPreviewTable();
+                    return;
+                }
+
+                const previewColumns = Array.isArray(payload?.columns) ? payload.columns : [];
+                const previewRows = Array.isArray(payload?.rows) ? payload.rows : [];
+
+                renderPreviewTable(previewColumns, previewRows);
+                setPreviewStatus(`Showing ${previewRows.length} row(s).`, false);
+            } catch {
+                setPreviewStatus('Failed to load preview data.', true);
+                clearPreviewTable();
+            }
+        }
+
         async function autoGenerateColumnsFromSource() {
             const dbName = (databaseInput.value || '').trim();
             const sourceTable = (tableInput.value || '').trim();
@@ -805,30 +1056,28 @@
             }
 
             try {
-                const response = await fetch(
-                    `${sourceColumnsUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=${encodeURIComponent(sourceTable)}&sourceSP=${encodeURIComponent(sourceSP)}`,
-                    { cache: 'no-store' }
-                );
-                if (!response.ok) throw new Error('Failed to load source columns');
-
-                const items = await response.json();
-                if (!Array.isArray(items) || items.length === 0) {
+                const metadataItems = await loadSourceColumnMetadata();
+                if (!Array.isArray(metadataItems) || metadataItems.length === 0) {
                     alert('No columns were found for the selected source.');
                     return;
                 }
 
                 markAllRowsAsDeleted();
 
-                items.forEach((columnName, index) => {
+                metadataItems.forEach((column, index) => {
+                    const name = column.name;
+                    const dataType = column.dataType;
                     addColumnRow({
-                        propertyName: columnName,
-                        defaultLabel: toDefaultLabel(columnName),
-                        displayOrder: index + 1
+                        propertyName: name,
+                        defaultLabel: toDefaultLabel(name),
+                        displayOrder: index + 1,
+                        columnType: dataType
                     });
                 });
 
                 refreshRowNumbers();
                 toggleNoColsMessage();
+                refreshMappingParameterInputTypes();
             } catch {
                 alert('Failed to auto-generate columns from the selected source.');
             }
@@ -837,6 +1086,7 @@
         databaseInput.addEventListener('change', () => {
             loadSourceObjects('');
             loadSourceProcedures('');
+            loadSourceColumnMetadata();
             loadSourceParameters();
         });
 
@@ -845,14 +1095,20 @@
                 resetDropdownSelectionByInputId('input-source-sp');
                 loadSourceParameters();
                 autoGenerateColumnsFromSource();
+                return;
             }
+
+            loadSourceColumnMetadata();
         });
 
         spInput.addEventListener('change', () => {
             if ((spInput.value || '').trim()) {
                 resetDropdownSelectionByInputId('input-source-table');
                 autoGenerateColumnsFromSource();
+                return;
             }
+
+            loadSourceColumnMetadata();
             loadSourceParameters();
         });
 
@@ -869,13 +1125,14 @@
         });
 
         document.getElementById('btn-auto-cols').addEventListener('click', autoGenerateColumnsFromSource);
+        document.getElementById('btn-preview').addEventListener('click', previewData);
 
         document.getElementById('data-file-form').addEventListener('submit', e => {
-            const validationResult = validateRequiredMappingParameters();
-            if (!validationResult.valid) {
-                e.preventDefault();
-                alert(validationResult.message);
-            }
+            // const validationResult = validateRequiredMappingParameters();
+            // if (!validationResult.valid) {
+            //     e.preventDefault();
+            //     alert(validationResult.message);
+            // }
         });
 
         initializeSearchableDropdown({
@@ -904,7 +1161,8 @@
 
         loadSourceObjects(tableInput.value);
         loadSourceProcedures(spInput.value);
+        loadSourceColumnMetadata();
         loadSourceParameters();
-        refreshMappingParameterOptions();
+        refreshMappingParameterInputTypes();
     </script>
 }

@@ -4,6 +4,7 @@ using DataWarehousePower.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.Globalization;
 
 namespace DataWarehousePower.Repositories
 {
@@ -129,6 +130,147 @@ namespace DataWarehousePower.Repositories
         }
 
         public async Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+            => (await GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP))
+                .Select(column => column.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList();
+
+        public async Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request)
+        {
+            if (request is null)
+            {
+                throw new ArgumentException("Preview request is required.");
+            }
+
+            string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
+            string sourceTable = (request.SourceTable ?? string.Empty).Trim();
+            string sourceSP = (request.SourceSP ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+            {
+                throw new ArgumentException("Source database is required for preview.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceSP))
+            {
+                throw new InvalidOperationException("Preview currently supports Source Table only.");
+            }
+
+            if (string.IsNullOrWhiteSpace(sourceTable))
+            {
+                throw new ArgumentException("Source table is required for preview.");
+            }
+
+            int take = request.Take;
+            if (take != 10 && take != 50 && take != 100)
+            {
+                take = 10;
+            }
+
+            var metadata = await GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, null);
+            if (metadata.Count == 0)
+            {
+                return new DataFilePreviewResult();
+            }
+
+            var metadataByName = metadata
+                .Where(column => !string.IsNullOrWhiteSpace(column.Name))
+                .ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
+
+            List<DataFilePreviewColumnRequest> requestedColumns = (request.Columns ?? new())
+                .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                .GroupBy(column => column.PropertyName.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            var selectedColumns = requestedColumns
+                .Select(column => column.PropertyName.Trim())
+                .Where(metadataByName.ContainsKey)
+                .ToList();
+
+            if (selectedColumns.Count == 0)
+            {
+                return new DataFilePreviewResult();
+            }
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string escapedDatabase = EscapeSqlIdentifier(sourceDatabase);
+            string escapedTable = EscapeSqlIdentifier(sourceTable);
+
+            await using var cmd = conn.CreateCommand();
+
+            string selectList = string.Join(", ", selectedColumns.Select(column => $"[{EscapeSqlIdentifier(column)}]"));
+            var whereClauses = new List<string>();
+            int parameterIndex = 0;
+
+            foreach (DataFilePreviewColumnRequest requestedColumn in requestedColumns)
+            {
+                string columnName = requestedColumn.PropertyName.Trim();
+                if (!metadataByName.TryGetValue(columnName, out SourceColumnMetadata? metadataColumn))
+                {
+                    continue;
+                }
+
+                string filterValue = (requestedColumn.MappingParameter ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(filterValue))
+                {
+                    continue;
+                }
+
+                string parameterName = $"@f{parameterIndex++}";
+                bool isDateTimeType = IsDateTimeTypeName(metadataColumn.DataType);
+
+                if (isDateTimeType)
+                {
+                    if (!TryParseDateTimeFilter(filterValue, out DateTime parsedDateTime))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid datetime.");
+                    }
+
+                    whereClauses.Add($"[{EscapeSqlIdentifier(columnName)}] = {parameterName}");
+                    AddParameter(cmd, parameterName, parsedDateTime);
+                }
+                else
+                {
+                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) = {parameterName}");
+                    AddParameter(cmd, parameterName, filterValue);
+                }
+            }
+
+            string whereSql = whereClauses.Count > 0
+                ? " WHERE " + string.Join(" AND ", whereClauses)
+                : string.Empty;
+
+            cmd.CommandText =
+                $"SELECT TOP ({take}) {selectList} " +
+                $"FROM [{escapedDatabase}]..[{escapedTable}]" +
+                whereSql;
+
+            var result = new DataFilePreviewResult
+            {
+                Columns = selectedColumns
+            };
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                result.Rows.Add(row);
+            }
+
+            return result;
+        }
+
+        public async Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
         {
             if (string.IsNullOrWhiteSpace(sourceDatabase))
             {
@@ -204,7 +346,7 @@ namespace DataWarehousePower.Repositories
             return items;
         }
 
-        private static async Task<List<string>> GetSourceColumnsFromTableOrViewAsync(
+        private static async Task<List<SourceColumnMetadata>> GetSourceColumnsFromTableOrViewAsync(
             System.Data.Common.DbConnection conn,
             string safeDatabase,
             string sourceTable)
@@ -213,7 +355,7 @@ namespace DataWarehousePower.Repositories
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
-                "SELECT COLUMN_NAME " +
+                "SELECT COLUMN_NAME, DATA_TYPE " +
                 "FROM [" + escapedDatabase + "].INFORMATION_SCHEMA.COLUMNS " +
                 "WHERE TABLE_NAME = @tableName " +
                 "ORDER BY ORDINAL_POSITION";
@@ -223,15 +365,30 @@ namespace DataWarehousePower.Repositories
             p.Value = sourceTable;
             cmd.Parameters.Add(p);
 
-            var items = new List<string>();
+            var items = new List<SourceColumnMetadata>();
             try
             {
                 await using var reader = await cmd.ExecuteReaderAsync();
+                int nameOrdinal = TryGetOrdinal(reader, "COLUMN_NAME");
+                int dataTypeOrdinal = TryGetOrdinal(reader, "DATA_TYPE");
+
                 while (await reader.ReadAsync())
                 {
-                    if (!reader.IsDBNull(0))
+                    string? name = nameOrdinal < 0 || reader.IsDBNull(nameOrdinal)
+                        ? null
+                        : reader.GetString(nameOrdinal);
+
+                    if (!string.IsNullOrWhiteSpace(name))
                     {
-                        items.Add(reader.GetString(0));
+                        string? dataType = dataTypeOrdinal < 0 || reader.IsDBNull(dataTypeOrdinal)
+                            ? null
+                            : reader.GetString(dataTypeOrdinal);
+
+                        items.Add(new SourceColumnMetadata
+                        {
+                            Name = name,
+                            DataType = dataType
+                        });
                     }
                 }
             }
@@ -243,7 +400,7 @@ namespace DataWarehousePower.Repositories
             return items;
         }
 
-        private static async Task<List<string>> GetSourceColumnsFromStoredProcedureAsync(
+        private static async Task<List<SourceColumnMetadata>> GetSourceColumnsFromStoredProcedureAsync(
             System.Data.Common.DbConnection conn,
             string safeDatabase,
             string sourceSP)
@@ -275,12 +432,13 @@ namespace DataWarehousePower.Repositories
                 "EXEC [" + escapedDatabase + "].sys.sp_describe_first_result_set " +
                 "@tsql = @tsql, @params = NULL, @browse_information_mode = 0;";
 
-            var items = new List<string>();
+            var items = new List<SourceColumnMetadata>();
             try
             {
                 await using var reader = await cmd.ExecuteReaderAsync();
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 int nameOrdinal = TryGetOrdinal(reader, "name");
+                int dataTypeOrdinal = TryGetOrdinal(reader, "system_type_name");
                 int hiddenOrdinal = TryGetOrdinal(reader, "is_hidden");
                 int errorOrdinal = TryGetOrdinal(reader, "error_number");
 
@@ -303,7 +461,15 @@ namespace DataWarehousePower.Repositories
 
                     if (seen.Add(name))
                     {
-                        items.Add(name);
+                        string? dataType = dataTypeOrdinal < 0 || reader.IsDBNull(dataTypeOrdinal)
+                            ? null
+                            : reader.GetString(dataTypeOrdinal);
+
+                        items.Add(new SourceColumnMetadata
+                        {
+                            Name = name,
+                            DataType = dataType
+                        });
                     }
                 }
             }
@@ -325,6 +491,31 @@ namespace DataWarehousePower.Repositories
             {
                 return -1;
             }
+        }
+
+        private static bool IsDateTimeTypeName(string? dataType)
+        {
+            string normalized = (dataType ?? string.Empty).Trim().ToLowerInvariant();
+            return normalized.Contains("date") ||
+                normalized.Contains("time");
+        }
+
+        private static bool TryParseDateTimeFilter(string value, out DateTime parsed)
+        {
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out parsed))
+            {
+                return true;
+            }
+
+            return DateTime.TryParse(value, out parsed);
+        }
+
+        private static void AddParameter(System.Data.Common.DbCommand cmd, string name, object? value)
+        {
+            var parameter = cmd.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value ?? DBNull.Value;
+            cmd.Parameters.Add(parameter);
         }
 
         private static string EscapeSqlIdentifier(string value)

@@ -8,6 +8,8 @@ namespace DataWarehousePower.Services
         Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+        Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+        Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request);
         Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
         Task<DataFileManageListViewModel> GetListViewModelAsync(DataFileManageFilterViewModel? filter = null);
         Task<DataFileManageFormViewModel> GetFormViewModelAsync(int id);
