@@ -36,6 +36,7 @@ namespace DataWarehousePower.Repositories
             var department = await _context.Departments.FirstOrDefaultAsync(d => d.Id == departmentReq.Id);
             if (department != null)
             {
+                department.Name = departmentReq.Name;
                 department.Description = departmentReq.Description;
                 department.IsActive = departmentReq.IsActive;
                 department.ModifiedBy = departmentReq.ModifiedBy;
