@@ -17,6 +17,7 @@ namespace DataWarehousePower.Controllers
     public class DataFileManageController : Controller
     {
         private readonly IDataFileManageService _service;
+        private readonly IScheduledReportJobService _scheduledReportJobService;
         private readonly IDepartmentService _departmentService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IAuditLogService _auditLogService;
@@ -24,12 +25,14 @@ namespace DataWarehousePower.Controllers
 
         public DataFileManageController(
             IDataFileManageService service,
+            IScheduledReportJobService scheduledReportJobService,
             IDepartmentService departmentService,
             IColumnPreferenceService prefService,
             IAuditLogService auditLogService,
             ILogger<DataFileManageController> logger)
         {
             _service = service;
+            _scheduledReportJobService = scheduledReportJobService;
             _departmentService = departmentService;
             _prefService = prefService;
             _auditLogService = auditLogService;
@@ -90,6 +93,27 @@ namespace DataWarehousePower.Controllers
             {
                 return NotFound();
             }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ScheduleDataFile(int id, string? returnUrl = null)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            int? existingJobId = await _scheduledReportJobService.FindExistingJobIdAsync(userId, id, null, null);
+
+            if (existingJobId.HasValue)
+            {
+                return RedirectToAction("Edit", "ScheduledJob", new { id = existingJobId.Value });
+            }
+
+            return RedirectToAction("Create", "ScheduledJob", new
+            {
+                reportDefinitionId = id,
+                schemaTemplate = (string?)null,
+                clientCode = (string?)null,
+                returnUrl,
+                isDataFile = true
+            });
         }
 
         // POST /DataFileManage/Save (handles both Create and Edit)

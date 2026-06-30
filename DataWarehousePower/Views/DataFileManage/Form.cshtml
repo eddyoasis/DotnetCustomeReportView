@@ -227,6 +227,13 @@
                     <option value="100">100</option>
                 </select>
                 <button type="button" id="btn-preview" class="btn btn-outline-success btn-sm">Preview</button>
+                <button type="button"
+                        id="btn-schedule-data-file"
+                        class="btn btn-outline-primary btn-sm"
+                        @(!isEdit ? "disabled" : null)
+                        title="@(!isEdit ? "Save the data file first to enable scheduling." : "")">
+                    Schedule Data File
+                </button>
             </div>
         </div>
         <div class="card-body">
@@ -836,6 +843,9 @@
         const sourceColumnMetadataUrl = '@Url.Action("SourceColumnMetadata", "DataFileManage")';
         const sourceParametersUrl = '@Url.Action("SourceParameters", "DataFileManage")';
         const previewUrl = '@Url.Action("Preview", "DataFileManage")';
+        const scheduleDataFileButton = document.getElementById('btn-schedule-data-file');
+        const scheduleDataFileUrl = '@Url.Action("ScheduleDataFile", "DataFileManage")';
+        const dataFileId = @Model.Id;
         let sourceObjectsRequestSeq = 0;
         let sourceProceduresRequestSeq = 0;
         let sourceColumnMetadataRequestSeq = 0;
@@ -1643,6 +1653,22 @@
 
         document.getElementById('btn-auto-cols').addEventListener('click', autoGenerateColumnsFromSource);
         document.getElementById('btn-preview').addEventListener('click', previewData);
+
+        if (scheduleDataFileButton) {
+            scheduleDataFileButton.addEventListener('click', () => {
+                if (!(dataFileId > 0)) {
+                    return;
+                }
+
+                const scheduleUrl = new URL(scheduleDataFileUrl, window.location.origin);
+                const returnUrl = `${window.location.pathname}${window.location.search}`;
+
+                scheduleUrl.searchParams.set('id', String(dataFileId));
+                scheduleUrl.searchParams.set('returnUrl', returnUrl);
+
+                window.location.href = scheduleUrl.toString();
+            });
+        }
 
         document.getElementById('data-file-form').addEventListener('submit', e => {
             // const validationResult = validateRequiredMappingParameters();
