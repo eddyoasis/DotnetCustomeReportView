@@ -787,10 +787,10 @@ public sealed class ScheduledReportJobService(
 
         if (form.RequiresSchemaTemplateAndClientCode)
         {
-            if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
-            {
-                throw new InvalidOperationException("Schema Template is required.");
-            }
+            //if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
+            //{
+            //    throw new InvalidOperationException("Schema Template is required.");
+            //}
 
             if (string.IsNullOrWhiteSpace(form.ClientCode))
             {
