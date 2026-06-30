@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using DataWarehousePower.Helper;
 
 namespace DataWarehousePower.Controllers
 {
@@ -44,7 +45,11 @@ namespace DataWarehousePower.Controllers
                 IsActive = isActive
             };
 
-            var vm = await _service.GetListViewModelAsync(filter);
+            var userId = HttpHelper.ResolveUserId(HttpContext);
+            var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+
+            //var vm = await _service.GetListViewModelAsync(filter);
+            var vm = await _service.GetListViewModelAsync(userId, userDepartment, filter);
             ViewData["DepartmentLookup"] = (await _departmentService.GetAllAsync())
                 .GroupBy(department => department.Id)
                 .ToDictionary(group => group.Key, group => group.First().Name);

@@ -12,6 +12,7 @@ namespace DataWarehousePower.Services
         Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request);
         Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
         Task<DataFileManageListViewModel> GetListViewModelAsync(DataFileManageFilterViewModel? filter = null);
+        Task<DataFileManageListViewModel> GetListViewModelAsync(string userId, string userDepartment, DataFileManageFilterViewModel? filter = null);
         Task<DataFileManageFormViewModel> GetFormViewModelAsync(int id);
         Task<DataFileDefinition> CreateDataFileAsync(DataFileManageFormViewModel form);
         Task UpdateDataFileAsync(DataFileManageFormViewModel form);

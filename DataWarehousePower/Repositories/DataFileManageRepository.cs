@@ -756,6 +756,21 @@ namespace DataWarehousePower.Repositories
                 .OrderBy(dataFile => dataFile.DataFileName)
                 .ToListAsync();
 
+        public async Task<List<DataFileDefinition>> GetAllWithColumnsAsync(string userId, string userDepartment)
+        {
+            int? userDepartmentId = await ResolveUserDepartmentIdAsync(userDepartment);
+
+            var datafiles = await _context.DataFileDefinitions
+                .AsNoTracking()
+                .Include(dataFile => dataFile.Columns.OrderBy(column => column.DisplayOrder))
+                .OrderBy(dataFile => dataFile.DataFileName)
+                .ToListAsync();
+
+            return datafiles
+                    .Where(dataFile => dataFile.UserId == userId || IsVisibleToDepartment(dataFile.Departments, userDepartment, userDepartmentId))
+                    .ToList();
+        }
+
         public async Task<DataFileDefinition?> GetByIdWithColumnsAsync(int id)
             => await _context.DataFileDefinitions
                 .Include(definition => definition.Columns.OrderBy(column => column.DisplayOrder))
@@ -798,7 +813,7 @@ namespace DataWarehousePower.Repositories
             dataFileDefinition.Parameters = dataFileDefinitionRequest.Parameters;
             dataFileDefinition.IsActive = dataFileDefinitionRequest.IsActive;
             dataFileDefinition.Departments = dataFileDefinitionRequest.Departments;
-            dataFileDefinition.UserId = dataFileDefinitionRequest.UserId;
+            //dataFileDefinition.UserId = dataFileDefinitionRequest.UserId;
             dataFileDefinition.ModifiedBy = dataFileDefinitionRequest.ModifiedBy;
             dataFileDefinition.ModifiedAt = DateTimeHelper.GetCurrentLocalTime();
 
@@ -863,6 +878,56 @@ namespace DataWarehousePower.Repositories
             dataFileDefinition.IsActive = !dataFileDefinition.IsActive;
             dataFileDefinition.ModifiedAt = DateTimeHelper.GetCurrentLocalTime();
             await _context.SaveChangesAsync();
+        }
+
+        private async Task<int?> ResolveUserDepartmentIdAsync(string? userDepartment)
+        {
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                return null;
+            }
+
+            string normalizedUserDepartment = userDepartment.Trim();
+
+            return await _context.Departments
+                .AsNoTracking()
+                .Where(department => department.IsActive)
+                .Where(department => department.Name == normalizedUserDepartment)
+                .Select(department => (int?)department.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        private static bool IsVisibleToDepartment(string? reportDepartments, string? userDepartment, int? userDepartmentId)
+        {
+            if (string.IsNullOrWhiteSpace(reportDepartments))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                return false;
+            }
+
+            string normalizedUserDepartment = userDepartment.Trim();
+
+            HashSet<string> configuredDepartments = reportDepartments
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (configuredDepartments.Contains(normalizedUserDepartment))
+            {
+                return true;
+            }
+
+            if (!userDepartmentId.HasValue)
+            {
+                return false;
+            }
+
+            string userDepartmentIdToken = userDepartmentId.Value.ToString();
+
+            return configuredDepartments.Contains(userDepartmentIdToken);
         }
     }
 }

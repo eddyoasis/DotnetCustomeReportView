@@ -13,6 +13,41 @@ namespace DataWarehousePower.Services
             _repository = repository;
         }
 
+        public async Task<DataFileManageListViewModel> GetListViewModelAsync(string userId, string userDepartment, DataFileManageFilterViewModel? filter = null)
+        {
+            var dataFiles = await _repository.GetAllWithColumnsAsync(userId, userDepartment);
+            filter ??= new DataFileManageFilterViewModel();
+
+            string? search = string.IsNullOrWhiteSpace(filter.Search)
+                ? null
+                : filter.Search.Trim();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                dataFiles = dataFiles.Where(dataFile =>
+                        ContainsIgnoreCase(dataFile.DataFileName, search) ||
+                        ContainsIgnoreCase(dataFile.SourceDatabase, search) ||
+                        ContainsIgnoreCase(dataFile.SourceTable, search) ||
+                        ContainsIgnoreCase(dataFile.SourceSP, search) ||
+                        ContainsIgnoreCase(dataFile.Departments, search) ||
+                        dataFile.Columns.Any(column =>
+                            ContainsIgnoreCase(column.PropertyName, search) ||
+                            ContainsIgnoreCase(column.DefaultLabel, search)))
+                    .ToList();
+            }
+
+            if (filter.IsActive.HasValue)
+            {
+                dataFiles = dataFiles.Where(dataFile => dataFile.IsActive == filter.IsActive.Value).ToList();
+            }
+
+            return new DataFileManageListViewModel
+            {
+                Filter = filter,
+                DataFiles = dataFiles
+            };
+        }
+
         public async Task<DataFileManageListViewModel> GetListViewModelAsync(DataFileManageFilterViewModel? filter = null)
         {
             var dataFiles = await _repository.GetAllWithColumnsAsync();

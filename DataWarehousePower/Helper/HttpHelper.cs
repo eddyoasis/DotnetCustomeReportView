@@ -10,6 +10,9 @@ namespace DataWarehousePower.Helper
         private static readonly Regex _asciiPrintable =
             new(@"^[\x20-\x7E]+$", RegexOptions.Compiled);
 
+        public static string ResolveUserDepartment(HttpContext httpContext)
+            => httpContext.Session.GetString("UserDepartment");
+
         public static string ResolveUserId(HttpContext httpContext)
         {
             string? loginUserId = ExtractLoginUserId(httpContext.User);
