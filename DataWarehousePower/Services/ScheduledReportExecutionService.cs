@@ -264,7 +264,51 @@ public sealed class ScheduledReportExecutionService(
             filteredRows = filteredRows.Where(row => RowMatchesMappedValue(row, mappedColumns, parameterValue));
         }
 
+        // Support literal MappingParameter values on individual columns.
+        // Example: MappingParameter="Sam" on ColumnA means ColumnA LIKE "%Sam%".
+        filteredRows = ApplyLiteralMappingParameterFilters(filteredRows, dataFileColumns, parameterValues);
+
         return filteredRows.ToList();
+    }
+
+    private static IEnumerable<Dictionary<string, object?>> ApplyLiteralMappingParameterFilters(
+        IEnumerable<Dictionary<string, object?>> rows,
+        IEnumerable<DataFileColumn> dataFileColumns,
+        IReadOnlyDictionary<string, string?> parameterValues)
+    {
+        HashSet<string> parameterNames = parameterValues.Keys
+            .Select(NormalizeFilterParameterAlias)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        IEnumerable<Dictionary<string, object?>> filteredRows = rows;
+
+        foreach (DataFileColumn column in dataFileColumns)
+        {
+            string columnName = column.PropertyName?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(columnName))
+            {
+                continue;
+            }
+
+            List<string> literalTerms = GetMappingParameters(column.MappingParameter)
+                .Where(term =>
+                    !term.Equals("ClientCode", StringComparison.OrdinalIgnoreCase) &&
+                    !term.Equals("DateFrom", StringComparison.OrdinalIgnoreCase) &&
+                    !term.Equals("DateTo", StringComparison.OrdinalIgnoreCase) &&
+                    !parameterNames.Contains(term))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (literalTerms.Count == 0)
+            {
+                continue;
+            }
+
+            filteredRows = filteredRows.Where(row => RowMatchesAnyContainsTerm(row, columnName, literalTerms));
+        }
+
+        return filteredRows;
     }
 
     private static bool TryGetMappedColumns(
@@ -361,6 +405,33 @@ public sealed class ScheduledReportExecutionService(
             }
 
             if (isLowerBound ? valueDate.Date >= boundary : valueDate.Date <= boundary)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool RowMatchesAnyContainsTerm(
+        IReadOnlyDictionary<string, object?> row,
+        string columnName,
+        IEnumerable<string> terms)
+    {
+        if (!row.TryGetValue(columnName, out object? rawValue) || rawValue is null)
+        {
+            return false;
+        }
+
+        string actualValue = Convert.ToString(rawValue) ?? string.Empty;
+        foreach (string term in terms)
+        {
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                continue;
+            }
+
+            if (actualValue.Contains(term, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
