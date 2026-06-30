@@ -44,7 +44,7 @@
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Report Viewer</a>
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Data Hub</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -70,8 +70,11 @@
                                             <a class="dropdown-item" asp-area="" asp-controller="Report" asp-action="List">View</a>
                                         </li>
                                         <li>
-                                            <a class="dropdown-item" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report Folder</a>
+                                            <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index">Scheduler</a>
                                         </li>
+                                       @*  <li>
+                                            <a class="dropdown-item" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report Folder</a>
+                                        </li> *@
                                     }
                                 </ul>
                             </li>
@@ -87,6 +90,9 @@
                                     {
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="DataFileManage" asp-action="Index">Manage</a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index">Scheduler</a>
                                         </li>
                                     }
                                 </ul>

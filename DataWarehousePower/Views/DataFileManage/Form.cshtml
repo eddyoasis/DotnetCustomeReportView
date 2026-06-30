@@ -67,7 +67,7 @@
                 <div class="form-text">Loaded from the selected source database tables and views.</div>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-3" hidden>
                 <label asp-for="SourceSP" class="form-label"></label>
                 <div class="dropdown searchable-source-dropdown" id="source-sp-dropdown" data-bs-auto-close="outside">
                     <input asp-for="SourceSP" type="hidden" class="source-input" id="input-source-sp" />
@@ -88,7 +88,7 @@
                 <div class="form-text">Loaded from the selected source database stored procedures.</div>
             </div>
 
-            <div class="col-md-12">
+            <div class="col-md-12" hidden>
                 <input asp-for="Parameters" type="hidden" id="input-parameters" />
                 <label class="form-label">Parameters</label>
                 <div id="source-parameters-list" class="border rounded p-2 bg-light-subtle">
@@ -145,7 +145,7 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
             <span>Columns</span>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 d-none">
                 <button type="button" id="btn-auto-cols" class="btn btn-outline-secondary btn-sm">Auto Generate</button>
                 <button type="button" id="btn-add-col" class="btn btn-outline-primary btn-sm">+ Add Column</button>
             </div>
@@ -159,7 +159,7 @@
                         <th>Default Label <span class="text-muted small">(UI header)</span></th>
                         <th>Mapping Parameter <span class="text-muted small">(optional filter key)</span></th>
                         <th style="width:110px;">Display Order</th>
-                        <th style="width:70px;"></th>
+                        @* <th style="width:70px;"></th> *@
                         <th style="width:70px;"></th>
                     </tr>
                 </thead>
@@ -174,7 +174,7 @@
                                 <input name="Columns[@i].PropertyName"
                                        value="@Model.Columns[i].PropertyName"
                                        class="form-control form-control-sm"
-                                       placeholder="e.g. SaleAmount" required />
+                                       placeholder="e.g. SaleAmount" required readonly />
                             </td>
                             <td>
                                 <input name="Columns[@i].DefaultLabel"
@@ -195,7 +195,7 @@
                                        type="number" min="1" max="999"
                                        class="form-control form-control-sm" required />
                             </td>
-                            <td class="text-center align-middle">
+                            <td class="text-center align-middle" hidden>
                                 <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
                             </td>
                             <td class="text-center align-middle">
