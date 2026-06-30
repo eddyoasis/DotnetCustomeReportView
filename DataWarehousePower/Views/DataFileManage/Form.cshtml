@@ -199,7 +199,7 @@
                                 <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
                             </td>
                             <td class="text-center align-middle">
-                                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">X</button>
+                                <button type="button" class="btn btn-outline-warning btn-sm btn-remove-col">Disable</button>
                             </td>
                         </tr>
                     }
@@ -251,14 +251,14 @@
             const tr = document.createElement('tr');
             tr.className = 'col-row';
             tr.dataset.index = rowIndex;
-            const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row)').length;
+            const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             const displayOrder = seed?.displayOrder ?? (currentVisibleRows + 1);
             tr.innerHTML = `
                 <td class="text-center text-muted small row-num align-middle">${currentVisibleRows + 1}</td>
                 <td>
                     <input type="hidden" name="Columns[${rowIndex}].Id" value="0" />
                     <input type="hidden" name="Columns[${rowIndex}].IsDeleted" value="false" class="is-deleted-input" />
-                    <input name="Columns[${rowIndex}].PropertyName" class="form-control form-control-sm" placeholder="e.g. SaleAmount" required />
+                    <input readonly name="Columns[${rowIndex}].PropertyName" class="form-control form-control-sm" placeholder="e.g. SaleAmount" required />
                 </td>
                 <td>
                     <input name="Columns[${rowIndex}].DefaultLabel" class="form-control form-control-sm" placeholder="e.g. Sale Amount" required />
@@ -273,10 +273,7 @@
                     <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
                 </td>
                 <td class="text-center align-middle">
-                    <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
-                </td>
-                <td class="text-center align-middle">
-                    <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">X</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm btn-remove-col">Disable</button>
                 </td>`;
             body.appendChild(tr);
 
@@ -316,14 +313,30 @@
             const tr = btn.closest('tr');
             const deletedInput = tr.querySelector('.is-deleted-input');
 
-            if (deletedInput && deletedInput.value === 'false') {
-                deletedInput.value = 'true';
-                tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
-                tr.classList.add('deleted-row');
-                tr.style.display = 'none';
+            const isCurrentlyDisabled = tr.classList.contains('disabled-row');
+
+            if (isCurrentlyDisabled) {
+                // Re-enable the row
+                if (deletedInput) deletedInput.value = 'false';
+                tr.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.removeAttribute('disabled'));
+                tr.querySelectorAll('input[name$=".PropertyName"], input[name$=".DefaultLabel"], input[name$=".DisplayOrder"]').forEach(i => i.setAttribute('required', ''));
+                tr.classList.remove('disabled-row');
+                tr.style.opacity = '';
+                btn.textContent = 'Disable';
+                btn.classList.remove('btn-outline-success');
+                btn.classList.add('btn-outline-warning');
             } else {
-                tr.remove();
+                // Disable the row
+                if (deletedInput) deletedInput.value = 'true';
+                tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                tr.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.setAttribute('disabled', 'disabled'));
+                tr.classList.add('disabled-row');
+                tr.style.opacity = '0.45';
+                btn.textContent = 'Enable';
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-outline-success');
             }
+
             refreshRowNumbers();
             toggleNoColsMessage();
             refreshMappingParameterInputTypes();
@@ -331,18 +344,18 @@
 
         function refreshRowNumbers() {
             let n = 1;
-            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').forEach(tr => {
                 tr.querySelector('.row-num').textContent = n++;
             });
         }
 
         function toggleNoColsMessage() {
-            const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+            const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             document.getElementById('no-cols-msg').style.display = visible === 0 ? 'block' : 'none';
         }
 
         function getVisibleMappingInputs() {
-            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row) input[name$=".MappingParameter"]')];
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) input[name$=".MappingParameter"]')];
         }
 
         function isDateTimeInputValue(value) {
@@ -717,7 +730,7 @@
         }
 
         function refreshMappingParameterInputTypes() {
-            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').forEach(tr => {
                 const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
                 const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
                 const mappingCell = tr.querySelector('.mapping-parameter-cell');
@@ -1260,7 +1273,7 @@
         }
 
         function getVisibleColumnRowsForPreview() {
-            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)')]
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)')]
                 .map(tr => {
                     const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
                     const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
@@ -1386,7 +1399,7 @@
                 return;
             }
 
-            const visibleRows = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+            const visibleRows = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             if (visibleRows > 0) {
                 const shouldReplace = confirm('Auto-generate will replace current visible column rows. Continue?');
                 if (!shouldReplace) return;
@@ -1418,6 +1431,55 @@
             } catch {
                 alert('Failed to auto-generate columns from the selected source.');
             }
+        }
+
+        async function syncMissingColumnsFromSource() {
+            const metadataItems = await loadSourceColumnMetadata();
+            if (!Array.isArray(metadataItems) || metadataItems.length === 0) {
+                return;
+            }
+
+            const existingNames = new Set(
+                [...document.querySelectorAll('#columns-body tr.col-row input[name$=".PropertyName"]')]
+                    .map(input => (input.value || '').trim().toLowerCase())
+                    .filter(Boolean)
+            );
+
+            const missingColumns = metadataItems.filter(col => !existingNames.has(col.name.toLowerCase()));
+            if (missingColumns.length === 0) {
+                return;
+            }
+
+            const maxDisplayOrder = Math.max(
+                0,
+                ...[...document.querySelectorAll('#columns-body tr.col-row input[name$=".DisplayOrder"]')]
+                    .map(input => Number.parseInt(input.value, 10) || 0)
+            );
+
+            missingColumns.forEach((column, index) => {
+                addColumnRow({
+                    propertyName: column.name,
+                    defaultLabel: toDefaultLabel(column.name),
+                    displayOrder: maxDisplayOrder + index + 1,
+                    columnType: column.dataType
+                });
+
+                const newRow = document.querySelector(`#columns-body tr.col-row[data-index="${rowIndex - 1}"]`);
+                if (newRow) {
+                    const deletedInput = newRow.querySelector('.is-deleted-input');
+                    if (deletedInput) deletedInput.value = 'true';
+                    newRow.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                    newRow.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.setAttribute('disabled', 'disabled'));
+                    newRow.classList.add('disabled-row');
+                    newRow.style.opacity = '0.45';
+                    const btn = newRow.querySelector('.btn-remove-col');
+                    if (btn) {
+                        btn.textContent = 'Enable';
+                        btn.classList.remove('btn-outline-warning');
+                        btn.classList.add('btn-outline-success');
+                    }
+                }
+            });
         }
 
         databaseInput.addEventListener('change', () => {
@@ -1498,7 +1560,7 @@
 
         loadSourceObjects(tableInput.value);
         loadSourceProcedures(spInput.value);
-        loadSourceColumnMetadata();
+        syncMissingColumnsFromSource();
         loadSourceParameters();
         refreshMappingParameterInputTypes();
     </script>
