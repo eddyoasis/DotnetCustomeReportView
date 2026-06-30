@@ -1377,9 +1377,11 @@
             return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)')]
                 .map(tr => {
                     const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
+                    const defaultLabelInput = tr.querySelector('input[name$=".DefaultLabel"]');
                     const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
                     return {
                         propertyName: (propertyInput?.value || '').trim(),
+                        defaultLabel: (defaultLabelInput?.value || '').trim(),
                         mappingParameter: (mappingInput?.value || '').trim()
                     };
                 })
@@ -1399,7 +1401,7 @@
             document.getElementById('preview-table-wrap').style.display = 'none';
         }
 
-        function renderPreviewTable(columns, rows) {
+        function renderPreviewTable(columnDefinitions, rows) {
             const head = document.getElementById('preview-table-head');
             const body = document.getElementById('preview-table-body');
             const wrap = document.getElementById('preview-table-wrap');
@@ -1407,24 +1409,24 @@
             head.innerHTML = '';
             body.innerHTML = '';
 
-            if (!Array.isArray(columns) || columns.length === 0) {
+            if (!Array.isArray(columnDefinitions) || columnDefinitions.length === 0) {
                 wrap.style.display = 'none';
                 return;
             }
 
             const headRow = document.createElement('tr');
-            columns.forEach(column => {
+            columnDefinitions.forEach(column => {
                 const th = document.createElement('th');
-                th.textContent = column;
+                th.textContent = column.label;
                 headRow.appendChild(th);
             });
             head.appendChild(headRow);
 
             (Array.isArray(rows) ? rows : []).forEach(row => {
                 const tr = document.createElement('tr');
-                columns.forEach(column => {
+                columnDefinitions.forEach(column => {
                     const td = document.createElement('td');
-                    const value = row?.[column];
+                    const value = row?.[column.key];
                     td.textContent = value === null || value === undefined ? '' : String(value);
                     tr.appendChild(td);
                 });
@@ -1482,8 +1484,22 @@
 
                 const previewColumns = Array.isArray(payload?.columns) ? payload.columns : [];
                 const previewRows = Array.isArray(payload?.rows) ? payload.rows : [];
+                const labelLookup = new Map(
+                    columns
+                        .filter(column => (column.propertyName || '').trim())
+                        .map(column => [
+                            column.propertyName.trim().toLowerCase(),
+                            (column.defaultLabel || '').trim() || column.propertyName.trim()
+                        ])
+                );
 
-                renderPreviewTable(previewColumns, previewRows);
+                const previewColumnDefinitions = previewColumns.map(columnName => {
+                    const key = (columnName || '').toString();
+                    const label = labelLookup.get(key.trim().toLowerCase()) || key;
+                    return { key, label };
+                });
+
+                renderPreviewTable(previewColumnDefinitions, previewRows);
                 setPreviewStatus(`Showing ${previewRows.length} row(s).`, false);
             } catch {
                 setPreviewStatus('Failed to load preview data.', true);
