@@ -166,11 +166,6 @@
                 <tbody id="columns-body">
                     @for (int i = 0; i < Model.Columns.Count; i++)
                     {
-                        var mappingInputType = (!string.IsNullOrWhiteSpace(Model.Columns[i].PropertyName) &&
-                            (Model.Columns[i].PropertyName.Contains("date", StringComparison.OrdinalIgnoreCase) ||
-                             Model.Columns[i].PropertyName.Contains("time", StringComparison.OrdinalIgnoreCase)))
-                            ? "datetime-local"
-                            : "text";
                         <tr class="col-row" data-index="@i">
                             <td class="text-center text-muted small row-num align-middle">@(i + 1)</td>
                             <td>
@@ -187,12 +182,12 @@
                                        class="form-control form-control-sm"
                                        placeholder="e.g. Sale Amount" required />
                             </td>
-                            <td>
+                            <td class="mapping-parameter-cell">
                                 <input name="Columns[@i].MappingParameter"
                                        value="@Model.Columns[i].MappingParameter"
-                                       type="@mappingInputType"
-                                       class="form-control form-control-sm mapping-parameter-input"
-                                       placeholder="@(mappingInputType == "datetime-local" ? "Select date and time" : "Enter mapping value")" />
+                                       type="hidden"
+                                       class="mapping-parameter-input" />
+                                <div class="mapping-parameter-editor"></div>
                             </td>
                             <td>
                                 <input name="Columns[@i].DisplayOrder"
@@ -268,11 +263,11 @@
                 <td>
                     <input name="Columns[${rowIndex}].DefaultLabel" class="form-control form-control-sm" placeholder="e.g. Sale Amount" required />
                 </td>
-                <td>
+                <td class="mapping-parameter-cell">
                     <input name="Columns[${rowIndex}].MappingParameter"
-                           class="form-control form-control-sm mapping-parameter-input"
-                           type="text"
-                           placeholder="Enter mapping value" />
+                           class="mapping-parameter-input"
+                           type="hidden" />
+                    <div class="mapping-parameter-editor"></div>
                 </td>
                 <td>
                     <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
@@ -381,11 +376,128 @@
             return 'text';
         }
 
+        function normalizeDateTimeLocalValue(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            if (isDateTimeInputValue(raw)) {
+                return raw.slice(0, 16);
+            }
+
+            const match = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+            if (match) {
+                return `${match[1]}T${match[2]}`;
+            }
+
+            const parsed = new Date(raw);
+            if (Number.isNaN(parsed.getTime())) {
+                return '';
+            }
+
+            const yyyy = parsed.getFullYear();
+            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+            const dd = String(parsed.getDate()).padStart(2, '0');
+            const hh = String(parsed.getHours()).padStart(2, '0');
+            const mi = String(parsed.getMinutes()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+        }
+
+        function parseDateRangeMappingValue(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return { start: '', end: '' };
+            }
+
+            if (raw.includes('|')) {
+                const [startRaw, endRaw] = raw.split('|', 2);
+                return {
+                    start: normalizeDateTimeLocalValue(startRaw),
+                    end: normalizeDateTimeLocalValue(endRaw)
+                };
+            }
+
+            const normalized = normalizeDateTimeLocalValue(raw);
+            return {
+                start: normalized,
+                end: ''
+            };
+        }
+
+        function buildDateRangeMappingValue(start, end) {
+            const normalizedStart = normalizeDateTimeLocalValue(start);
+            const normalizedEnd = normalizeDateTimeLocalValue(end);
+            if (!normalizedStart && !normalizedEnd) {
+                return '';
+            }
+
+            return `${normalizedStart}|${normalizedEnd}`;
+        }
+
+        function renderTextMappingEditor(mappingCell, mappingInput) {
+            const editor = mappingCell.querySelector('.mapping-parameter-editor');
+            if (!editor) {
+                return;
+            }
+
+            editor.innerHTML = '';
+
+            const textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.className = 'form-control form-control-sm';
+            textInput.placeholder = 'Enter mapping value';
+            textInput.value = mappingInput.value || '';
+            textInput.addEventListener('input', () => {
+                mappingInput.value = textInput.value;
+            });
+
+            editor.appendChild(textInput);
+        }
+
+        function renderDateRangeMappingEditor(mappingCell, mappingInput) {
+            const editor = mappingCell.querySelector('.mapping-parameter-editor');
+            if (!editor) {
+                return;
+            }
+
+            editor.innerHTML = '';
+            const parsed = parseDateRangeMappingValue(mappingInput.value || '');
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'd-flex flex-column gap-1';
+
+            const startInput = document.createElement('input');
+            startInput.type = 'datetime-local';
+            startInput.className = 'form-control form-control-sm';
+            startInput.placeholder = 'Start date and time';
+            startInput.value = parsed.start;
+
+            const endInput = document.createElement('input');
+            endInput.type = 'datetime-local';
+            endInput.className = 'form-control form-control-sm';
+            endInput.placeholder = 'End date and time';
+            endInput.value = parsed.end;
+
+            const syncValue = () => {
+                mappingInput.value = buildDateRangeMappingValue(startInput.value, endInput.value);
+            };
+
+            startInput.addEventListener('input', syncValue);
+            endInput.addEventListener('input', syncValue);
+
+            wrapper.appendChild(startInput);
+            wrapper.appendChild(endInput);
+            editor.appendChild(wrapper);
+            syncValue();
+        }
+
         function refreshMappingParameterInputTypes() {
             document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
                 const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
                 const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
-                if (!(mappingInput instanceof HTMLInputElement)) {
+                const mappingCell = tr.querySelector('.mapping-parameter-cell');
+                if (!(mappingInput instanceof HTMLInputElement) || !(mappingCell instanceof HTMLElement)) {
                     return;
                 }
 
@@ -393,20 +505,15 @@
                 const metadataType = sourceColumnTypeLookup.get(propertyName.toLowerCase()) || '';
                 const columnType = (tr.dataset.columnType || '').trim() || metadataType;
                 const targetType = inferMappingInputType(propertyName, columnType);
-                const existingValue = mappingInput.value || '';
-
-                if (mappingInput.type !== targetType) {
-                    mappingInput.type = targetType;
-                    if (targetType === 'datetime-local' && existingValue && !isDateTimeInputValue(existingValue)) {
-                        mappingInput.value = '';
+                const previousEditorType = tr.dataset.mappingEditorType || '';
+                if (previousEditorType !== targetType || !mappingCell.querySelector('.mapping-parameter-editor')?.children.length) {
+                    if (targetType === 'datetime-local') {
+                        renderDateRangeMappingEditor(mappingCell, mappingInput);
                     } else {
-                        mappingInput.value = existingValue;
+                        renderTextMappingEditor(mappingCell, mappingInput);
                     }
+                    tr.dataset.mappingEditorType = targetType;
                 }
-
-                mappingInput.placeholder = targetType === 'datetime-local'
-                    ? 'Select date and time'
-                    : 'Enter mapping value';
 
                 tr.dataset.columnType = columnType;
             });

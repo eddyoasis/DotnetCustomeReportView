@@ -227,13 +227,24 @@ namespace DataWarehousePower.Repositories
 
                 if (isDateTimeType)
                 {
-                    if (!TryParseDateTimeFilter(filterValue, out DateTime parsedDateTime))
+                    if (!TryParseDateTimeRangeFilter(filterValue, out DateTime? startDateTime, out DateTime? endDateTime))
                     {
                         throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid datetime.");
                     }
 
-                    whereClauses.Add($"[{EscapeSqlIdentifier(columnName)}] = {parameterName}");
-                    AddParameter(cmd, parameterName, parsedDateTime);
+                    string escapedColumnName = EscapeSqlIdentifier(columnName);
+                    if (startDateTime.HasValue)
+                    {
+                        whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+                        AddParameter(cmd, parameterName, startDateTime.Value);
+                    }
+
+                    if (endDateTime.HasValue)
+                    {
+                        string endParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+                        AddParameter(cmd, endParameterName, endDateTime.Value);
+                    }
                 }
                 else
                 {
@@ -500,7 +511,52 @@ namespace DataWarehousePower.Repositories
                 normalized.Contains("time");
         }
 
-        private static bool TryParseDateTimeFilter(string value, out DateTime parsed)
+        private static bool TryParseDateTimeRangeFilter(string value, out DateTime? start, out DateTime? end)
+        {
+            start = null;
+            end = null;
+            string raw = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return true;
+            }
+
+            if (raw.Contains('|', StringComparison.Ordinal))
+            {
+                string[] parts = raw.Split('|', 2, StringSplitOptions.None);
+
+                if (!string.IsNullOrWhiteSpace(parts[0]))
+                {
+                    if (!TryParseDateTime(parts[0], out DateTime parsedStart))
+                    {
+                        return false;
+                    }
+                    start = parsedStart;
+                }
+
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    if (!TryParseDateTime(parts[1], out DateTime parsedEnd))
+                    {
+                        return false;
+                    }
+                    end = parsedEnd;
+                }
+
+                return true;
+            }
+
+            if (!TryParseDateTime(raw, out DateTime singleValue))
+            {
+                return false;
+            }
+
+            start = singleValue;
+            end = singleValue;
+            return true;
+        }
+
+        private static bool TryParseDateTime(string value, out DateTime parsed)
         {
             if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out parsed))
             {
