@@ -224,6 +224,8 @@ namespace DataWarehousePower.Repositories
 
                 string parameterName = $"@f{parameterIndex++}";
                 bool isDateTimeType = IsDateTimeTypeName(metadataColumn.DataType);
+                bool isBooleanType = IsBooleanTypeName(metadataColumn.DataType);
+                bool isNumericType = IsNumericTypeName(metadataColumn.DataType);
 
                 if (isDateTimeType)
                 {
@@ -244,6 +246,37 @@ namespace DataWarehousePower.Repositories
                         string endParameterName = $"@f{parameterIndex++}";
                         whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
                         AddParameter(cmd, endParameterName, endDateTime.Value);
+                    }
+                }
+                else if (isBooleanType)
+                {
+                    if (!TryParseBooleanFilter(filterValue, out bool boolValue))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid boolean.");
+                    }
+
+                    whereClauses.Add($"[{EscapeSqlIdentifier(columnName)}] = {parameterName}");
+                    AddParameter(cmd, parameterName, boolValue);
+                }
+                else if (isNumericType)
+                {
+                    if (!TryParseNumericRangeFilter(filterValue, out decimal? fromValue, out decimal? toValue))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid number.");
+                    }
+
+                    string escapedColumnName = EscapeSqlIdentifier(columnName);
+                    if (fromValue.HasValue)
+                    {
+                        whereClauses.Add($"TRY_CONVERT(decimal(38, 10), [{escapedColumnName}]) >= {parameterName}");
+                        AddParameter(cmd, parameterName, fromValue.Value);
+                    }
+
+                    if (toValue.HasValue)
+                    {
+                        string toParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"TRY_CONVERT(decimal(38, 10), [{escapedColumnName}]) <= {toParameterName}");
+                        AddParameter(cmd, toParameterName, toValue.Value);
                     }
                 }
                 else
@@ -511,6 +544,33 @@ namespace DataWarehousePower.Repositories
                 normalized.Contains("time");
         }
 
+        private static bool IsBooleanTypeName(string? dataType)
+        {
+            string normalized = (dataType ?? string.Empty).Trim().ToLowerInvariant();
+            return normalized == "bit" || normalized.StartsWith("bit(");
+        }
+
+        private static bool IsNumericTypeName(string? dataType)
+        {
+            string normalized = (dataType ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return false;
+            }
+
+            if (IsBooleanTypeName(normalized))
+            {
+                return false;
+            }
+
+            return normalized.Contains("int") ||
+                normalized.Contains("decimal") ||
+                normalized.Contains("numeric") ||
+                normalized.Contains("float") ||
+                normalized.Contains("real") ||
+                normalized.Contains("money");
+        }
+
         private static bool TryParseDateTimeRangeFilter(string value, out DateTime? start, out DateTime? end)
         {
             start = null;
@@ -564,6 +624,78 @@ namespace DataWarehousePower.Repositories
             }
 
             return DateTime.TryParse(value, out parsed);
+        }
+
+        private static bool TryParseNumericRangeFilter(string value, out decimal? from, out decimal? to)
+        {
+            from = null;
+            to = null;
+            string raw = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return true;
+            }
+
+            if (raw.Contains('|', StringComparison.Ordinal))
+            {
+                string[] parts = raw.Split('|', 2, StringSplitOptions.None);
+
+                if (!string.IsNullOrWhiteSpace(parts[0]))
+                {
+                    if (!decimal.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedFrom) &&
+                        !decimal.TryParse(parts[0], NumberStyles.Any, CultureInfo.CurrentCulture, out parsedFrom))
+                    {
+                        return false;
+                    }
+                    from = parsedFrom;
+                }
+
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    if (!decimal.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedTo) &&
+                        !decimal.TryParse(parts[1], NumberStyles.Any, CultureInfo.CurrentCulture, out parsedTo))
+                    {
+                        return false;
+                    }
+                    to = parsedTo;
+                }
+
+                return true;
+            }
+
+            if (!decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal singleValue) &&
+                !decimal.TryParse(raw, NumberStyles.Any, CultureInfo.CurrentCulture, out singleValue))
+            {
+                return false;
+            }
+
+            from = singleValue;
+            to = singleValue;
+            return true;
+        }
+
+        private static bool TryParseBooleanFilter(string value, out bool parsed)
+        {
+            string normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                parsed = false;
+                return false;
+            }
+
+            if (normalized is "1" or "true" or "yes" or "y")
+            {
+                parsed = true;
+                return true;
+            }
+
+            if (normalized is "0" or "false" or "no" or "n")
+            {
+                parsed = false;
+                return true;
+            }
+
+            return bool.TryParse(normalized, out parsed);
         }
 
         private static void AddParameter(System.Data.Common.DbCommand cmd, string name, object? value)

@@ -359,9 +359,38 @@
                 normalized.includes('time');
         }
 
+        function isNumericColumnType(columnType) {
+            const normalized = (columnType || '').trim().toLowerCase();
+            if (!normalized) {
+                return false;
+            }
+
+            return normalized.includes('int') ||
+                normalized.includes('decimal') ||
+                normalized.includes('numeric') ||
+                normalized.includes('float') ||
+                normalized.includes('real') ||
+                normalized.includes('money') ||
+                normalized.includes('smallmoney') ||
+                normalized.includes('bit');
+        }
+
+        function isBooleanColumnType(columnType) {
+            const normalized = (columnType || '').trim().toLowerCase();
+            return normalized === 'bit' || normalized.startsWith('bit(');
+        }
+
         function inferMappingInputType(propertyName, columnType) {
+            if (isBooleanColumnType(columnType)) {
+                return 'boolean';
+            }
+
             if (isDateLikeColumnType(columnType)) {
                 return 'datetime-local';
+            }
+
+            if (isNumericColumnType(columnType)) {
+                return 'number-range';
             }
 
             const normalizedName = (propertyName || '').trim().toLowerCase();
@@ -423,6 +452,51 @@
                 start: normalized,
                 end: ''
             };
+        }
+
+        function normalizeNumberValue(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            const parsed = Number.parseFloat(raw);
+            if (Number.isNaN(parsed)) {
+                return '';
+            }
+
+            return `${parsed}`;
+        }
+
+        function parseNumberRangeMappingValue(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return { from: '', to: '' };
+            }
+
+            if (raw.includes('|')) {
+                const [fromRaw, toRaw] = raw.split('|', 2);
+                return {
+                    from: normalizeNumberValue(fromRaw),
+                    to: normalizeNumberValue(toRaw)
+                };
+            }
+
+            const normalized = normalizeNumberValue(raw);
+            return {
+                from: normalized,
+                to: ''
+            };
+        }
+
+        function buildNumberRangeMappingValue(from, to) {
+            const normalizedFrom = normalizeNumberValue(from);
+            const normalizedTo = normalizeNumberValue(to);
+            if (!normalizedFrom && !normalizedTo) {
+                return '';
+            }
+
+            return `${normalizedFrom}|${normalizedTo}`;
         }
 
         function buildDateRangeMappingValue(start, end) {
@@ -492,6 +566,77 @@
             syncValue();
         }
 
+        function renderNumberMappingEditor(mappingCell, mappingInput) {
+            const editor = mappingCell.querySelector('.mapping-parameter-editor');
+            if (!editor) {
+                return;
+            }
+
+            editor.innerHTML = '';
+            const parsed = parseNumberRangeMappingValue(mappingInput.value || '');
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'd-flex flex-column gap-1';
+
+            const fromInput = document.createElement('input');
+            fromInput.type = 'number';
+            fromInput.className = 'form-control form-control-sm';
+            fromInput.placeholder = 'From';
+            fromInput.step = 'any';
+            fromInput.value = parsed.from;
+
+            const toInput = document.createElement('input');
+            toInput.type = 'number';
+            toInput.className = 'form-control form-control-sm';
+            toInput.placeholder = 'To';
+            toInput.step = 'any';
+            toInput.value = parsed.to;
+
+            const syncValue = () => {
+                mappingInput.value = buildNumberRangeMappingValue(fromInput.value, toInput.value);
+            };
+
+            fromInput.addEventListener('input', syncValue);
+            toInput.addEventListener('input', syncValue);
+
+            wrapper.appendChild(fromInput);
+            wrapper.appendChild(toInput);
+            editor.appendChild(wrapper);
+            syncValue();
+        }
+
+        function renderBooleanMappingEditor(mappingCell, mappingInput) {
+            const editor = mappingCell.querySelector('.mapping-parameter-editor');
+            if (!editor) {
+                return;
+            }
+
+            editor.innerHTML = '';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'form-check';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input';
+            checkbox.checked = (mappingInput.value || '').trim().toLowerCase() === 'true';
+
+            const label = document.createElement('label');
+            label.className = 'form-check-label small';
+            label.textContent = 'True / False';
+
+            const syncValue = () => {
+                mappingInput.value = checkbox.checked ? 'true' : 'false';
+            };
+
+            checkbox.addEventListener('change', syncValue);
+
+            wrapper.appendChild(checkbox);
+            wrapper.appendChild(label);
+            editor.appendChild(wrapper);
+            syncValue();
+        }
+
         function refreshMappingParameterInputTypes() {
             document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
                 const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
@@ -509,6 +654,10 @@
                 if (previousEditorType !== targetType || !mappingCell.querySelector('.mapping-parameter-editor')?.children.length) {
                     if (targetType === 'datetime-local') {
                         renderDateRangeMappingEditor(mappingCell, mappingInput);
+                    } else if (targetType === 'number-range') {
+                        renderNumberMappingEditor(mappingCell, mappingInput);
+                    } else if (targetType === 'boolean') {
+                        renderBooleanMappingEditor(mappingCell, mappingInput);
                     } else {
                         renderTextMappingEditor(mappingCell, mappingInput);
                     }
