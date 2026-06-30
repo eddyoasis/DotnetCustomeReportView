@@ -154,11 +154,12 @@
             <table class="table table-bordered mb-0" id="columns-table">
                 <thead class="table-light">
                     <tr>
+                        <th style="width:52px;" class="text-center">Drag</th>
                         <th style="width:36px;" class="text-center">#</th>
                         <th>Property Name <span class="text-muted small">(DB column)</span></th>
                         <th>Default Label <span class="text-muted small">(UI header)</span></th>
                         <th>Mapping Parameter <span class="text-muted small">(optional filter key)</span></th>
-                        <th style="width:110px;">Display Order</th>
+                        @* <th style="width:110px;">Display Order</th> *@
                         @* <th style="width:70px;"></th> *@
                         <th style="width:70px;"></th>
                     </tr>
@@ -167,6 +168,9 @@
                     @for (int i = 0; i < Model.Columns.Count; i++)
                     {
                         <tr class="col-row" data-index="@i">
+                            <td class="text-center align-middle">
+                                <span class="drag-handle text-muted" draggable="true" title="Drag to reorder">::</span>
+                            </td>
                             <td class="text-center text-muted small row-num align-middle">@(i + 1)</td>
                             <td>
                                 <input type="hidden" name="Columns[@i].Id" value="@Model.Columns[i].Id" />
@@ -189,13 +193,13 @@
                                        class="mapping-parameter-input" />
                                 <div class="mapping-parameter-editor"></div>
                             </td>
-                            <td>
+                            <td hidden>
                                 <input name="Columns[@i].DisplayOrder"
                                        value="@Model.Columns[i].DisplayOrder"
                                        type="number" min="1" max="999"
                                        class="form-control form-control-sm" required />
                             </td>
-                            <td class="text-center align-middle" hidden>
+                            <td hidden class="text-center align-middle">
                                 <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
                             </td>
                             <td class="text-center align-middle">
@@ -254,6 +258,9 @@
             const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             const displayOrder = seed?.displayOrder ?? (currentVisibleRows + 1);
             tr.innerHTML = `
+                <td class="text-center align-middle">
+                    <span class="drag-handle text-muted" draggable="true" title="Drag to reorder">::</span>
+                </td>
                 <td class="text-center text-muted small row-num align-middle">${currentVisibleRows + 1}</td>
                 <td>
                     <input type="hidden" name="Columns[${rowIndex}].Id" value="0" />
@@ -269,7 +276,7 @@
                            type="hidden" />
                     <div class="mapping-parameter-editor"></div>
                 </td>
-                <td>
+                <td hidden>
                     <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
                 </td>
                 <td class="text-center align-middle">
@@ -284,6 +291,7 @@
             if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
             if (seed?.columnType) tr.dataset.columnType = seed.columnType;
             if (mappingInput && seed?.mappingParameter) mappingInput.value = seed.mappingParameter;
+            syncRowDragHandleState(tr);
 
             rowIndex++;
             refreshRowNumbers();
@@ -337,15 +345,33 @@
                 btn.classList.add('btn-outline-success');
             }
 
+            syncRowDragHandleState(tr);
             refreshRowNumbers();
             toggleNoColsMessage();
             refreshMappingParameterInputTypes();
         });
 
+        function syncRowDragHandleState(tr) {
+            const handle = tr?.querySelector('.drag-handle');
+            if (!(handle instanceof HTMLElement)) {
+                return;
+            }
+
+            const reorderable = !tr.classList.contains('deleted-row') && !tr.classList.contains('disabled-row');
+            handle.setAttribute('draggable', reorderable ? 'true' : 'false');
+            handle.style.cursor = reorderable ? 'grab' : 'not-allowed';
+            handle.classList.toggle('opacity-50', !reorderable);
+        }
+
         function refreshRowNumbers() {
             let n = 1;
             document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').forEach(tr => {
                 tr.querySelector('.row-num').textContent = n++;
+
+                const displayOrderInput = tr.querySelector('input[name$=".DisplayOrder"]');
+                if (displayOrderInput instanceof HTMLInputElement) {
+                    displayOrderInput.value = tr.querySelector('.row-num').textContent;
+                }
             });
         }
 
@@ -974,8 +1000,83 @@
                 tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
                 tr.classList.add('deleted-row');
                 tr.style.display = 'none';
+                syncRowDragHandleState(tr);
             });
         }
+
+        const columnsBody = document.getElementById('columns-body');
+        let draggedRow = null;
+
+        function isRowReorderable(tr) {
+            return !!tr &&
+                tr.classList.contains('col-row') &&
+                !tr.classList.contains('deleted-row') &&
+                !tr.classList.contains('disabled-row');
+        }
+
+        columnsBody.addEventListener('dragstart', e => {
+            const handle = e.target.closest('.drag-handle');
+            if (!handle) {
+                return;
+            }
+
+            const tr = handle.closest('tr.col-row');
+            if (!isRowReorderable(tr)) {
+                e.preventDefault();
+                return;
+            }
+
+            draggedRow = tr;
+            draggedRow.classList.add('table-warning');
+
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', tr.dataset.index || '');
+            }
+        });
+
+        columnsBody.addEventListener('dragover', e => {
+            if (!draggedRow) {
+                return;
+            }
+
+            const targetRow = e.target.closest('tr.col-row');
+            if (!isRowReorderable(targetRow) || targetRow === draggedRow) {
+                return;
+            }
+
+            e.preventDefault();
+
+            const rect = targetRow.getBoundingClientRect();
+            const placeAfter = e.clientY > (rect.top + rect.height / 2);
+
+            if (placeAfter) {
+                if (targetRow.nextSibling !== draggedRow) {
+                    columnsBody.insertBefore(draggedRow, targetRow.nextSibling);
+                }
+            } else if (draggedRow !== targetRow.previousSibling) {
+                columnsBody.insertBefore(draggedRow, targetRow);
+            }
+        });
+
+        columnsBody.addEventListener('drop', e => {
+            if (!draggedRow) {
+                return;
+            }
+
+            e.preventDefault();
+            refreshRowNumbers();
+        });
+
+        columnsBody.addEventListener('dragend', () => {
+            if (!draggedRow) {
+                return;
+            }
+
+            draggedRow.classList.remove('table-warning');
+            draggedRow = null;
+            refreshRowNumbers();
+        });
 
         function normalizeParameterName(name) {
             return (name || '').trim().replace(/^@@+/, '');
@@ -1472,6 +1573,7 @@
                     newRow.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.setAttribute('disabled', 'disabled'));
                     newRow.classList.add('disabled-row');
                     newRow.style.opacity = '0.45';
+                    syncRowDragHandleState(newRow);
                     const btn = newRow.querySelector('.btn-remove-col');
                     if (btn) {
                         btn.textContent = 'Enable';
@@ -1562,6 +1664,7 @@
         loadSourceProcedures(spInput.value);
         syncMissingColumnsFromSource();
         loadSourceParameters();
+        document.querySelectorAll('#columns-body tr.col-row').forEach(syncRowDragHandleState);
         refreshMappingParameterInputTypes();
     </script>
 }
