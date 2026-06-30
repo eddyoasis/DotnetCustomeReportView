@@ -8,6 +8,8 @@ namespace DataWarehousePower.Services;
 public sealed class ScheduledReportExecutionService(
     IScheduledReportJobRepository scheduledJobRepository,
     IReportService reportService,
+    IDataFileManageService dataFileManageService,
+    IReportRepository reportRepository,
     IReportExportService reportExportService,
     IScheduledReportEmailService scheduledReportEmailService,
     IHangfireDataProtectionService dataProtectionService,
@@ -36,21 +38,42 @@ public sealed class ScheduledReportExecutionService(
         (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
         Dictionary<string, string?> jobParameters = ParseJobParameters(job.Parameters);
 
-        ReportViewModel? reportViewModel = await reportService.BuildReportViewModelAsync(
-            reportId: job.ReportDefinitionId,
-            userId: job.CreatedByUserId,
-            schemaTemplate: job.SchemaTemplate,
-            clientCode: job.ClientCode,
-            dateFrom: effectiveDateFrom,
-            dateTo: effectiveDateTo,
-            parameterValues: jobParameters);
+        ReportViewModel? reportViewModel;
+        if (job.ReportDefinitionId.HasValue)
+        {
+            reportViewModel = await reportService.BuildReportViewModelAsync(
+                reportId: job.ReportDefinitionId.Value,
+                userId: job.CreatedByUserId,
+                schemaTemplate: job.SchemaTemplate,
+                clientCode: job.ClientCode,
+                dateFrom: effectiveDateFrom,
+                dateTo: effectiveDateTo,
+                parameterValues: jobParameters);
+        }
+        else if (job.DataFileDefinitionId.HasValue)
+        {
+            reportViewModel = await BuildDataFileReportViewModelAsync(
+                job.DataFileDefinitionId.Value,
+                job.ClientCode,
+                effectiveDateFrom,
+                effectiveDateTo,
+                jobParameters);
+        }
+        else
+        {
+            logger.LogWarning(
+                "Scheduled export job {ScheduledJobId} skipped because no source definition id was provided.",
+                scheduledJobId);
+            return;
+        }
 
         if (reportViewModel is null)
         {
             logger.LogWarning(
-                "Scheduled export job {ScheduledJobId} skipped because report {ReportDefinitionId} was not found.",
+                "Scheduled export job {ScheduledJobId} skipped because source was not found. ReportDefinitionId={ReportDefinitionId}, DataFileDefinitionId={DataFileDefinitionId}",
                 scheduledJobId,
-                job.ReportDefinitionId);
+                job.ReportDefinitionId,
+                job.DataFileDefinitionId);
             return;
         }
 
@@ -59,9 +82,10 @@ public sealed class ScheduledReportExecutionService(
                 $"{effectiveDateFrom:yyyy-MM-dd}_{effectiveDateTo:yyyy-MM-dd}";
 
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+        string clientCodeSegment = string.IsNullOrWhiteSpace(job.ClientCode) ? "all" : job.ClientCode.Trim();
         //string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}.zip";
-        string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
-        string zipSubFileName = $"{safeReportName}_format_{job.ClientCode}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+        string fileName = $"{safeReportName}_{clientCodeSegment}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
+        string zipSubFileName = $"{safeReportName}_format_{clientCodeSegment}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
 
         byte[] zipBytes = await reportExportService.BuildPasswordProtectedZipAsync(
             reportViewModel,
@@ -99,8 +123,8 @@ public sealed class ScheduledReportExecutionService(
                 throw new InvalidOperationException($"Scheduled job {scheduledJobId} is configured for email action but recipient email is empty.");
             }
 
-            string emailSubject = $"{safeReportName} {job.ClientCode} {reportDate}";
-            string emailBody = $"The {safeReportName} for {reportDate} was automatically exported for {job.ClientCode}, and the ZIP file is attached.";
+            string emailSubject = $"{safeReportName} {clientCodeSegment} {reportDate}";
+            string emailBody = $"The {safeReportName} for {reportDate} was automatically exported for {clientCodeSegment}, and the ZIP file is attached.";
 
             await scheduledReportEmailService.SendExportResultAsync(
                 job.RecipientEmail,
@@ -110,6 +134,263 @@ public sealed class ScheduledReportExecutionService(
                 zipBytes,
                 emailSubject,
                 emailBody);
+        }
+    }
+
+    private async Task<ReportViewModel?> BuildDataFileReportViewModelAsync(
+        int dataFileDefinitionId,
+        string? clientCode,
+        DateTime? dateFrom,
+        DateTime? dateTo,
+        IReadOnlyDictionary<string, string?> parameterValues)
+    {
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync();
+        DataFileDefinition? dataFile = dataFileList.DataFiles
+            .FirstOrDefault(candidate => candidate.Id == dataFileDefinitionId && candidate.IsActive);
+
+        if (dataFile is null)
+        {
+            return null;
+        }
+
+        List<ColumnDefinition> displayColumns = dataFile.Columns
+            .OrderBy(column => column.DisplayOrder)
+            .Select(column => new ColumnDefinition
+            {
+                Key = column.PropertyName,
+                DefaultLabel = column.DefaultLabel,
+                DisplayLabel = column.DefaultLabel,
+                IsVisible = true,
+                Order = column.DisplayOrder
+            })
+            .ToList();
+
+        List<Dictionary<string, object?>> rows;
+        if (!string.IsNullOrWhiteSpace(dataFile.SourceSP))
+        {
+            rows = await reportRepository.GetReportDataFromSpAsync(
+                dataFile.SourceSP,
+                clientCode,
+                dateFrom,
+                dateTo,
+                parameterValues);
+        }
+        else if (!string.IsNullOrWhiteSpace(dataFile.SourceTable))
+        {
+            List<string> columnNames = dataFile.Columns
+                .Select(column => column.PropertyName)
+                .Where(columnName => !string.IsNullOrWhiteSpace(columnName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            rows = await reportRepository.GetReportDataFromTableAsync(
+                dataFile.SourceTable,
+                columnNames,
+                dataFile.SourceDatabase);
+
+            rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
+        }
+        else
+        {
+            rows = [];
+        }
+
+        return new ReportViewModel
+        {
+            ReportId = dataFile.Id,
+            ReportName = dataFile.DataFileName,
+            ClientCode = clientCode?.Trim() ?? string.Empty,
+            HasAppliedFilters = true,
+            FilterDateFrom = dateFrom,
+            FilterDateTo = dateTo,
+            AvailableColumns = displayColumns,
+            DisplayColumns = displayColumns,
+            Rows = rows
+        };
+    }
+
+    private static List<Dictionary<string, object?>> ApplyMappedDataFileFilters(
+        List<Dictionary<string, object?>> rows,
+        IEnumerable<DataFileColumn> dataFileColumns,
+        string? clientCode,
+        DateTime? dateFrom,
+        DateTime? dateTo,
+        IReadOnlyDictionary<string, string?> parameterValues)
+    {
+        Dictionary<string, List<string>> columnsByParameter = dataFileColumns
+            .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+            .SelectMany(column => GetMappingParameters(column.MappingParameter)
+                .Select(parameterName => new
+                {
+                    ParameterName = parameterName,
+                    ColumnName = column.PropertyName
+                }))
+            .GroupBy(item => item.ParameterName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.ColumnName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
+        IEnumerable<Dictionary<string, object?>> filteredRows = rows;
+
+        if (!string.IsNullOrWhiteSpace(clientCode) &&
+            columnsByParameter.TryGetValue("ClientCode", out List<string>? clientCodeColumns))
+        {
+            filteredRows = filteredRows.Where(row => RowMatchesMappedValue(row, clientCodeColumns, clientCode));
+        }
+
+        if (dateFrom.HasValue &&
+            TryGetMappedColumns(columnsByParameter, ["DateFrom", "FilterDateFrom"], out List<string> dateFromColumns))
+        {
+            filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateFromColumns, dateFrom.Value.Date, isLowerBound: true));
+        }
+
+        if (dateTo.HasValue &&
+            TryGetMappedColumns(columnsByParameter, ["DateTo", "FilterDateTo"], out List<string> dateToColumns))
+        {
+            filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateToColumns, dateTo.Value.Date, isLowerBound: false));
+        }
+
+        foreach ((string parameterName, string? parameterValue) in parameterValues)
+        {
+            if (string.IsNullOrWhiteSpace(parameterValue) ||
+                !columnsByParameter.TryGetValue(parameterName, out List<string>? mappedColumns))
+            {
+                continue;
+            }
+
+            filteredRows = filteredRows.Where(row => RowMatchesMappedValue(row, mappedColumns, parameterValue));
+        }
+
+        return filteredRows.ToList();
+    }
+
+    private static bool TryGetMappedColumns(
+        IReadOnlyDictionary<string, List<string>> columnsByParameter,
+        IEnumerable<string> aliases,
+        out List<string> mappedColumns)
+    {
+        List<string> combinedColumns = [];
+
+        foreach (string alias in aliases)
+        {
+            if (columnsByParameter.TryGetValue(alias, out List<string>? aliasColumns))
+            {
+                combinedColumns.AddRange(aliasColumns);
+            }
+        }
+
+        mappedColumns = combinedColumns
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return mappedColumns.Count > 0;
+    }
+
+    private static IEnumerable<string> GetMappingParameters(string? mappingParameter)
+        => (mappingParameter ?? string.Empty)
+            .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormalizeFilterParameterAlias)
+            .Where(parameterName => !string.IsNullOrWhiteSpace(parameterName));
+
+    private static string NormalizeFilterParameterAlias(string parameterName)
+    {
+        string normalized = NormalizeMappingParameterName(parameterName);
+        if (normalized.Equals("FilterDateFrom", StringComparison.OrdinalIgnoreCase))
+        {
+            return "DateFrom";
+        }
+
+        if (normalized.Equals("FilterDateTo", StringComparison.OrdinalIgnoreCase))
+        {
+            return "DateTo";
+        }
+
+        if (normalized.Equals("FilterClientCode", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ClientCode";
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeMappingParameterName(string? name)
+        => (name ?? string.Empty).Trim().TrimStart('@');
+
+    private static bool RowMatchesMappedValue(
+        IReadOnlyDictionary<string, object?> row,
+        IEnumerable<string> columnNames,
+        string expectedValue)
+    {
+        string normalizedExpectedValue = expectedValue.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedExpectedValue))
+        {
+            return true;
+        }
+
+        foreach (string columnName in columnNames)
+        {
+            if (!row.TryGetValue(columnName, out object? rawValue) || rawValue is null)
+            {
+                continue;
+            }
+
+            string actualValue = Convert.ToString(rawValue)?.Trim() ?? string.Empty;
+            if (actualValue.Equals(normalizedExpectedValue, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool RowMatchesMappedDate(
+        IReadOnlyDictionary<string, object?> row,
+        IEnumerable<string> columnNames,
+        DateTime boundary,
+        bool isLowerBound)
+    {
+        foreach (string columnName in columnNames)
+        {
+            if (!row.TryGetValue(columnName, out object? rawValue) || !TryConvertToDate(rawValue, out DateTime valueDate))
+            {
+                continue;
+            }
+
+            if (isLowerBound ? valueDate.Date >= boundary : valueDate.Date <= boundary)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryConvertToDate(object? rawValue, out DateTime valueDate)
+    {
+        switch (rawValue)
+        {
+            case DateTime dateTime:
+                valueDate = dateTime;
+                return true;
+            case DateTimeOffset dateTimeOffset:
+                valueDate = dateTimeOffset.DateTime;
+                return true;
+            case DateOnly dateOnly:
+                valueDate = dateOnly.ToDateTime(TimeOnly.MinValue);
+                return true;
+            default:
+                if (DateTime.TryParse(Convert.ToString(rawValue), out DateTime parsed))
+                {
+                    valueDate = parsed;
+                    return true;
+                }
+
+                valueDate = default;
+                return false;
         }
     }
 

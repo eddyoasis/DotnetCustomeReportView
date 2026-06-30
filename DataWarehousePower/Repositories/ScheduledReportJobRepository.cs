@@ -11,6 +11,7 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
         return await dbContext.ScheduledReportJobs
             .AsNoTracking()
             .Include(job => job.ReportDefinition)
+            .Include(job => job.DataFileDefinition)
             .OrderByDescending(job => job.CreatedUtc)
             .ToListAsync();
     }
@@ -21,6 +22,7 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
             .AsNoTracking()
             .Where(job => job.CreatedByUserId == userId)
             .Include(job => job.ReportDefinition)
+            .Include(job => job.DataFileDefinition)
             .OrderByDescending(job => job.CreatedUtc)
             .ToListAsync();
     }
@@ -30,6 +32,7 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
         return await dbContext.ScheduledReportJobs
             .AsNoTracking()
             .Include(job => job.ReportDefinition)
+            .Include(job => job.DataFileDefinition)
             .FirstOrDefaultAsync(job => job.Id == id);
     }
 
@@ -37,6 +40,7 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
     {
         return await dbContext.ScheduledReportJobs
             .Include(job => job.ReportDefinition)
+            .Include(job => job.DataFileDefinition)
             .FirstOrDefaultAsync(job => job.Id == id);
     }
 
@@ -45,6 +49,7 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
         return await dbContext.ScheduledReportJobs
             .AsNoTracking()
             .Include(job => job.ReportDefinition)
+            .Include(job => job.DataFileDefinition)
             .FirstOrDefaultAsync(job => job.Id == id && job.CreatedByUserId == userId);
     }
 
@@ -52,6 +57,7 @@ public sealed class ScheduledReportJobRepository(AppDbContext dbContext) : ISche
     {
         return await dbContext.ScheduledReportJobs
             .Include(job => job.ReportDefinition)
+            .Include(job => job.DataFileDefinition)
             .FirstOrDefaultAsync(job => job.Id == id && job.CreatedByUserId == userId);
     }
 

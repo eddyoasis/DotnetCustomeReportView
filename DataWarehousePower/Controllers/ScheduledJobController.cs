@@ -10,6 +10,7 @@ namespace DataWarehousePower.Controllers;
 [Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
 public sealed class ScheduledJobController(
     IScheduledReportJobService scheduledReportJobService,
+    IDataFileManageService dataFileManageService,
     IColumnPreferenceService columnPreferenceService,
     IConfiguration configuration,
     ILogger<ScheduledJobController> logger) : Controller
@@ -26,11 +27,13 @@ public sealed class ScheduledJobController(
         return View(viewModel);
     }
 
-    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null)
+    public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null, bool isDataFile = false)
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         string? userDepartment = ResolveUserDepartment();
         ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
+        viewModel.RequiresSchemaTemplateAndClientCode = !isDataFile;
+        await PopulateDataFileOptionsAsync(viewModel, userId, userDepartment);
         viewModel.ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
         if (reportDefinitionId.HasValue && reportDefinitionId.Value > 0)
@@ -38,12 +41,12 @@ public sealed class ScheduledJobController(
             viewModel.ReportDefinitionId = reportDefinitionId.Value;
         }
 
-        if (!string.IsNullOrWhiteSpace(schemaTemplate))
+        if (viewModel.RequiresSchemaTemplateAndClientCode && !string.IsNullOrWhiteSpace(schemaTemplate))
         {
             viewModel.SchemaTemplate = schemaTemplate.Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(clientCode))
+        if (viewModel.RequiresSchemaTemplateAndClientCode && !string.IsNullOrWhiteSpace(clientCode))
         {
             viewModel.ClientCode = clientCode.Trim();
         }
@@ -63,7 +66,8 @@ public sealed class ScheduledJobController(
             }
         }
 
-        if (viewModel.ReportDefinitionId > 0 &&
+        if (viewModel.RequiresSchemaTemplateAndClientCode &&
+            viewModel.ReportDefinitionId > 0 &&
             viewModel.AvailableSchemaTemplatesByReportId.TryGetValue(viewModel.ReportDefinitionId, out List<string>? reportSchemaTemplates))
         {
             viewModel.AvailableSchemaTemplates = reportSchemaTemplates;
@@ -84,6 +88,7 @@ public sealed class ScheduledJobController(
             string userId = columnPreferenceService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
             ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
+            await PopulateDataFileOptionsAsync(viewModel, userId, userDepartment);
             viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
             viewModel.AvailableExportLocationBasePaths = viewModel.AvailableExportLocationBasePathOptions
                 .Select(option => option.Path)
@@ -103,6 +108,7 @@ public sealed class ScheduledJobController(
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
 
         ValidateExportLocation(form);
+        ValidateSchemaAndClientCode(form);
 
         if (!ModelState.IsValid)
         {
@@ -414,11 +420,13 @@ public sealed class ScheduledJobController(
     {
         ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         form.AvailableReports = lookupForm.AvailableReports;
+        await PopulateDataFileOptionsAsync(form, userId, userDepartment);
         form.AvailableClientCodes = lookupForm.AvailableClientCodes;
         form.AvailableClientCodeFolders = lookupForm.AvailableClientCodeFolders;
         form.AvailableSchemaTemplatesByReportId = lookupForm.AvailableSchemaTemplatesByReportId;
         form.AvailableParametersByReportId = lookupForm.AvailableParametersByReportId;
-        form.AvailableSchemaTemplates = lookupForm.AvailableSchemaTemplatesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
+        form.AvailableSchemaTemplates = form.RequiresSchemaTemplateAndClientCode &&
+            lookupForm.AvailableSchemaTemplatesByReportId.TryGetValue(form.ReportDefinitionId, out List<string>? reportClientCodes)
             ? reportClientCodes
             : [];
         form.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
@@ -430,6 +438,45 @@ public sealed class ScheduledJobController(
         {
             ScheduledJobFormViewModel editForm = await scheduledReportJobService.GetEditFormAsync(form.Id, userId, userDepartment);
             form.ExistingPassword = editForm.ExistingPassword;
+        }
+    }
+
+    private async Task PopulateDataFileOptionsAsync(ScheduledJobFormViewModel form, string userId, string? userDepartment)
+    {
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(
+            userId,
+            userDepartment ?? string.Empty);
+
+        form.AvailableDataFiles = dataFileList.DataFiles
+            .Where(dataFile => dataFile.IsActive)
+            .OrderBy(dataFile => dataFile.DataFileName, StringComparer.OrdinalIgnoreCase)
+            .Select(dataFile => new ReportDefinitionLookupItem
+            {
+                Id = dataFile.Id,
+                ReportName = dataFile.DataFileName
+            })
+            .ToList();
+    }
+
+    private void ValidateSchemaAndClientCode(ScheduledJobFormViewModel form)
+    {
+        if (!form.RequiresSchemaTemplateAndClientCode)
+        {
+            form.SchemaTemplate = null;
+            form.ClientCode = null;
+            ModelState.Remove(nameof(form.SchemaTemplate));
+            ModelState.Remove(nameof(form.ClientCode));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
+        {
+            ModelState.AddModelError(nameof(form.SchemaTemplate), "Schema Template is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(form.ClientCode))
+        {
+            ModelState.AddModelError(nameof(form.ClientCode), "Client Code is required.");
         }
     }
 

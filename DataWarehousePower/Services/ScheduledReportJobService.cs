@@ -12,6 +12,7 @@ namespace DataWarehousePower.Services;
 public sealed class ScheduledReportJobService(
     IScheduledReportJobRepository scheduledJobRepository,
     IReportRepository reportRepository,
+    IDataFileManageService dataFileManageService,
     IColumnPreferenceRepository columnPreferenceRepository,
     IRecurringJobManager recurringJobManager,
     IHangfireDataProtectionService dataProtectionService,
@@ -46,8 +47,10 @@ public sealed class ScheduledReportJobService(
             Id = entity.Id,
             JobName = entity.JobName,
             HangfireJobId = entity.HangfireJobId,
-            ReportDefinitionId = entity.ReportDefinitionId,
-            ReportName = entity.ReportDefinition?.ReportName ?? $"Report #{entity.ReportDefinitionId}",
+            ReportDefinitionId = entity.ReportDefinitionId ?? entity.DataFileDefinitionId ?? 0,
+            ReportName = entity.ReportDefinition?.ReportName
+                ?? entity.DataFileDefinition?.DataFileName
+                ?? $"Source #{entity.ReportDefinitionId ?? entity.DataFileDefinitionId}",
             Format = string.Join(", ", ParseFormats(entity.Format).Select(format => format.ToUpperInvariant())),
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
@@ -129,7 +132,7 @@ public sealed class ScheduledReportJobService(
         string? normalizedClientCode = NormalizeNullable(clientCode);
 
         ScheduledReportJob? existingJob = entities.FirstOrDefault(entity =>
-            entity.ReportDefinitionId == reportDefinitionId
+            (entity.ReportDefinitionId == reportDefinitionId || entity.DataFileDefinitionId == reportDefinitionId)
             && string.Equals(NormalizeNullable(entity.SchemaTemplate), normalizedSchemaTemplate, StringComparison.OrdinalIgnoreCase)
             && string.Equals(NormalizeNullable(entity.ClientCode), normalizedClientCode, StringComparison.OrdinalIgnoreCase));
 
@@ -184,7 +187,7 @@ public sealed class ScheduledReportJobService(
         {
             Id = entity.Id,
             JobName = entity.JobName,
-            ReportDefinitionId = entity.ReportDefinitionId,
+            ReportDefinitionId = entity.ReportDefinitionId ?? entity.DataFileDefinitionId ?? 0,
             Formats = ParseFormats(entity.Format),
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
@@ -200,6 +203,9 @@ public sealed class ScheduledReportJobService(
             IsCustom = entity.IsCustom,
             ExistingPassword = dataProtectionService.Unprotect(entity.EncryptedPassword),
             IsActive = entity.IsActive,
+            RequiresSchemaTemplateAndClientCode =
+                !string.IsNullOrWhiteSpace(entity.SchemaTemplate)
+                || !string.IsNullOrWhiteSpace(entity.ClientCode),
             AvailableReports = availableReports,
             AvailableClientCodes = BuildAvailableClientCodes(entity.ClientCode, availableClientCodes),
             AvailableClientCodeFolders = availableClientCodeFolders,
@@ -207,7 +213,7 @@ public sealed class ScheduledReportJobService(
             AvailableParametersByReportId = availableParametersByReportId,
             AvailableSchemaTemplates = BuildAvailableSchemaTemplates(
                 entity.SchemaTemplate,
-                availableSchemaTemplatesByReportId.TryGetValue(entity.ReportDefinitionId, out List<string>? reportClientCodes)
+                availableSchemaTemplatesByReportId.TryGetValue(entity.ReportDefinitionId ?? 0, out List<string>? reportClientCodes)
                     ? reportClientCodes
                     : [])
         };
@@ -219,15 +225,28 @@ public sealed class ScheduledReportJobService(
     public async Task<int> CreateAsync(ScheduledJobFormViewModel form, string userId, string username, string userDepartment)
     {
         ValidateForm(form);
-        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId, userDepartment);
-        string? normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
+        string sourceName;
+        string? normalizedParameters;
 
-        string generatedJobName = await BuildJobNameAsync(form, userId, userDepartment);
+        if (form.RequiresSchemaTemplateAndClientCode)
+        {
+            ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId, userDepartment);
+            sourceName = report.ReportName;
+            normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
+        }
+        else
+        {
+            sourceName = await GetDataFileNameAsync(form.ReportDefinitionId, userId, userDepartment);
+            normalizedParameters = null;
+        }
+
+        string generatedJobName = await BuildJobNameAsync(form, userId, userDepartment, null, sourceName);
 
         ScheduledReportJob entity = new()
         {
             JobName = generatedJobName,
-            ReportDefinitionId = form.ReportDefinitionId,
+            ReportDefinitionId = form.RequiresSchemaTemplateAndClientCode ? form.ReportDefinitionId : null,
+            DataFileDefinitionId = form.RequiresSchemaTemplateAndClientCode ? null : form.ReportDefinitionId,
             Format = BuildFormatsStorageValue(form.Formats),
             JobAction = NormalizeJobAction(form.JobAction),
             RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail),
@@ -257,18 +276,31 @@ public sealed class ScheduledReportJobService(
     public async Task UpdateAsync(ScheduledJobFormViewModel form, string userId, string username, string userDepartment)
     {
         ValidateForm(form);
-        ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId, userDepartment);
-        string? normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
+        string sourceName;
+        string? normalizedParameters;
+
+        if (form.RequiresSchemaTemplateAndClientCode)
+        {
+            ReportDefinition report = await GetReportDefinitionAsync(form.ReportDefinitionId, userDepartment);
+            sourceName = report.ReportName;
+            normalizedParameters = await NormalizeScheduledParametersJsonAsync(form.Parameters, report);
+        }
+        else
+        {
+            sourceName = await GetDataFileNameAsync(form.ReportDefinitionId, userId, userDepartment);
+            normalizedParameters = null;
+        }
 
         ScheduledReportJob entity = await scheduledJobRepository.GetByIdForUserUpdateAsync(form.Id, userId)
             ?? throw new InvalidOperationException($"Scheduled job {form.Id} was not found.");
 
-        string newJobName = await BuildJobNameAsync(form, userId, userDepartment, form.Id);
+        string newJobName = await BuildJobNameAsync(form, userId, userDepartment, form.Id, sourceName);
         string oldHangfireJobId = entity.HangfireJobId;
         string newHangfireJobId = newJobName;
 
         entity.JobName = newJobName;
-        entity.ReportDefinitionId = form.ReportDefinitionId;
+        entity.ReportDefinitionId = form.RequiresSchemaTemplateAndClientCode ? form.ReportDefinitionId : null;
+        entity.DataFileDefinitionId = form.RequiresSchemaTemplateAndClientCode ? null : form.ReportDefinitionId;
         entity.Format = BuildFormatsStorageValue(form.Formats);
         entity.JobAction = NormalizeJobAction(form.JobAction);
         entity.RecipientEmail = NormalizeRecipientEmails(form.RecipientEmail);
@@ -364,6 +396,16 @@ public sealed class ScheduledReportJobService(
         List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
         return reports.FirstOrDefault(candidate => candidate.Id == reportDefinitionId)
             ?? throw new InvalidOperationException("Report was not found.");
+    }
+
+    private async Task<string> GetDataFileNameAsync(int dataFileDefinitionId, string userId, string userDepartment)
+    {
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment);
+        DataFileDefinition? dataFile = dataFileList.DataFiles
+            .FirstOrDefault(candidate => candidate.Id == dataFileDefinitionId && candidate.IsActive);
+
+        return dataFile?.DataFileName
+            ?? throw new InvalidOperationException("Data file was not found.");
     }
 
     private async Task<Dictionary<int, List<string>>> GetClientCodesLookupAsync(
@@ -557,16 +599,25 @@ public sealed class ScheduledReportJobService(
         public string? Value { get; set; }
     }
 
-    private async Task<string> BuildJobNameAsync(ScheduledJobFormViewModel form, string userId, string userDepartment, int? currentJobId = null)
+    private async Task<string> BuildJobNameAsync(ScheduledJobFormViewModel form, string userId, string userDepartment, int? currentJobId = null, string? sourceNameOverride = null)
     {
-        List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
-        ReportDefinition report = reports.FirstOrDefault(candidate => candidate.Id == form.ReportDefinitionId)
-            ?? throw new InvalidOperationException("Report was not found.");
+        string sourceName;
+        if (!string.IsNullOrWhiteSpace(sourceNameOverride))
+        {
+            sourceName = sourceNameOverride;
+        }
+        else
+        {
+            List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
+            ReportDefinition report = reports.FirstOrDefault(candidate => candidate.Id == form.ReportDefinitionId)
+                ?? throw new InvalidOperationException("Report was not found.");
+            sourceName = report.ReportName;
+        }
 
         string baseJobName = string.Join('-',
         [
             NormalizeJobNameSegment(userId, "user"),
-            NormalizeJobNameSegment(report.ReportName, "report"),
+            NormalizeJobNameSegment(sourceName, "source"),
             NormalizeJobNameSegment(form.SchemaTemplate, "default"),
             NormalizeJobNameSegment(form.ClientCode, "all")
         ]);
@@ -724,6 +775,19 @@ public sealed class ScheduledReportJobService(
         if (form.Id > 0 && form.UpdatePassword && string.IsNullOrWhiteSpace(form.Password))
         {
             throw new InvalidOperationException("Password is required when update password is enabled.");
+        }
+
+        if (form.RequiresSchemaTemplateAndClientCode)
+        {
+            if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
+            {
+                throw new InvalidOperationException("Schema Template is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(form.ClientCode))
+            {
+                throw new InvalidOperationException("Client Code is required.");
+            }
         }
 
         if (form.IsCustom &&

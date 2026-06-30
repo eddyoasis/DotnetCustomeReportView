@@ -102,9 +102,11 @@ public sealed class ScheduledJobFormViewModel
     public string? SchemaTemplate { get; set; }
 
     [MaxLength(128)]
-    [Required(ErrorMessage = "Client Code is required.")]
     [Display(Name = "Client Code")]
     public string? ClientCode { get; set; }
+
+    [Display(Name = "Requires Schema Template and Client Code")]
+    public bool RequiresSchemaTemplateAndClientCode { get; set; } = true;
 
     [Display(Name = "Parameters")]
     public string? Parameters { get; set; }
@@ -152,6 +154,7 @@ public sealed class ScheduledJobFormViewModel
     public string? ReturnUrl { get; set; }
 
     public List<ReportDefinitionLookupItem> AvailableReports { get; set; } = [];
+    public List<ReportDefinitionLookupItem> AvailableDataFiles { get; set; } = [];
     public List<string> AvailableSchemaTemplates { get; set; } = [];
     public List<string> AvailableClientCodes { get; set; } = [];
 

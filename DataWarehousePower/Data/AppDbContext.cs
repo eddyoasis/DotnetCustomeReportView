@@ -158,9 +158,15 @@ namespace DataWarehousePower.Data
                 e.Property(job => job.UpdatedByUserId).HasMaxLength(128);
                 e.Property(job => job.UpdatedByUsername).HasMaxLength(128);
                 e.HasIndex(job => job.HangfireJobId).IsUnique();
+                e.HasIndex(job => job.ReportDefinitionId);
+                e.HasIndex(job => job.DataFileDefinitionId);
                 e.HasOne(job => job.ReportDefinition)
                     .WithMany()
                     .HasForeignKey(job => job.ReportDefinitionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(job => job.DataFileDefinition)
+                    .WithMany()
+                    .HasForeignKey(job => job.DataFileDefinitionId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 

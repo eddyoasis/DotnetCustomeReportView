@@ -1,6 +1,10 @@
 @model DataWarehousePower.Models.ScheduledJobFormViewModel
 @{
     bool isEdit = Model.Id > 0;
+    bool isReportMode = Model.RequiresSchemaTemplateAndClientCode;
+    string sourceLabel = isReportMode ? "Report" : "Data File";
+    string sourcePlaceholder = isReportMode ? "-- Select report --" : "-- Select data file --";
+    List<ReportDefinitionLookupItem> selectedSourceOptions = isReportMode ? Model.AvailableReports : Model.AvailableDataFiles;
     ViewData["Title"] = isEdit ? "Edit Scheduled Job" : "Create Scheduled Job";
 }
 
@@ -15,6 +19,7 @@
             @Html.AntiForgeryToken()
             <input asp-for="Id" type="hidden" />
             <input asp-for="ReturnUrl" type="hidden" />
+            <input asp-for="RequiresSchemaTemplateAndClientCode" type="hidden" />
 
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -28,10 +33,18 @@
                     }
                 </div> *@
                 <div class="col-md-3">
-                    <label asp-for="ReportDefinitionId" class="form-label"></label>
+                    <label class="form-label" for="sourceModeSelect">Source Type</label>
+                    <select id="sourceModeSelect" class="form-select">
+                        <option value="report" selected="@(isReportMode ? "selected" : null)">Report</option>
+                        <option value="datafile" selected="@(!isReportMode ? "selected" : null)">DataFile</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label for="ReportDefinitionId" class="form-label">@sourceLabel</label>
                     <select asp-for="ReportDefinitionId" class="form-select">
-                        <option value="">-- Select report --</option>
-                        @foreach (ReportDefinitionLookupItem report in Model.AvailableReports)
+                        <option value="">@sourcePlaceholder</option>
+                        @foreach (ReportDefinitionLookupItem report in selectedSourceOptions)
                         {
                             <option value="@report.Id">@report.ReportName</option>
                         }
@@ -224,7 +237,7 @@
                     <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-6" id="schemaTemplateGroup">
                     @* <label asp-for="SchemaTemplate" class="form-label"></label> *@
                     <label class="form-label">Schema Template</label>
                     <input asp-for="SchemaTemplate" type="hidden" />
@@ -263,14 +276,14 @@
                     <span asp-validation-for="SchemaTemplate" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-6" id="clientCodeGroup">
                     <label asp-for="ClientCode" class="form-label"></label>
                     @{
                         string selectedClientCode = (Model.ClientCode ?? string.Empty).Trim();
                         bool hasSelectedClientCode = !string.IsNullOrWhiteSpace(selectedClientCode)
                             && Model.AvailableClientCodes.Any(code => code.Equals(selectedClientCode, StringComparison.OrdinalIgnoreCase));
                     }
-                    <select asp-for="ClientCode" class="form-select" required>
+                    <select asp-for="ClientCode" class="form-select">
                         <option value="">-- Select client code --</option>
                         @foreach (string availableClientCode in Model.AvailableClientCodes)
                         {
@@ -345,11 +358,17 @@
             const selectedWeekdayInputs = document.querySelectorAll('input[name="SelectedWeekdays"]');
             const cronGroup = document.getElementById('cronGroup');
             const reportDefinitionSelect = document.getElementById('ReportDefinitionId');
+            const sourceModeSelect = document.getElementById('sourceModeSelect');
+            const reportDefinitionLabel = document.querySelector('label[for="ReportDefinitionId"]');
             const updatePasswordToggle = document.getElementById('updatePasswordToggle');
             const passwordInput = document.getElementById('passwordInput');
             const existingPasswordInput = document.getElementById('existingPasswordInput');
             const toggleExistingPasswordVisibility = document.getElementById('toggleExistingPasswordVisibility');
             const clientCodeHiddenInput = document.getElementById('SchemaTemplate');
+            const requiresSchemaAndClientCodeInput = document.getElementById('RequiresSchemaTemplateAndClientCode');
+            const schemaTemplateGroup = document.getElementById('schemaTemplateGroup');
+            const clientCodeGroup = document.getElementById('clientCodeGroup');
+            const clientCodeFieldInput = document.getElementById('ClientCode');
             const isCustomToggle = document.getElementById('isCustomToggle');
             const dateFromGroup = document.getElementById('dateFromGroup');
             const dateToGroup = document.getElementById('dateToGroup');
@@ -368,6 +387,8 @@
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
             const clientCodeOptions = document.getElementById('scheduled-client-code-options');
             const clientCodeClearButton = document.getElementById('scheduled-client-code-clear');
+            const availableReports = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableReports));
+            const availableDataFiles = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableDataFiles));
             const availableSchemaTemplatesByReportId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableSchemaTemplatesByReportId));
             const parametersHiddenInput = document.getElementById('scheduled-job-parameters');
             const scheduledParametersContainer = document.getElementById('scheduled-parameters-container');
@@ -378,6 +399,84 @@
 
             if (!scheduleTypeSelect || !everyMinutesGroup || !dailyTimeGroup || !customDaysGroup || !cronGroup) {
                 return;
+            }
+
+            function requiresSchemaAndClientCode() {
+                if (!requiresSchemaAndClientCodeInput) {
+                    return true;
+                }
+
+                return (requiresSchemaAndClientCodeInput.value || '').toLowerCase() === 'true';
+            }
+
+            function getSourceMode() {
+                return sourceModeSelect?.value === 'datafile' ? 'datafile' : 'report';
+            }
+
+            function setSourceMode(mode) {
+                const isReportMode = mode !== 'datafile';
+
+                if (requiresSchemaAndClientCodeInput) {
+                    requiresSchemaAndClientCodeInput.value = isReportMode ? 'true' : 'false';
+                }
+
+                if (reportDefinitionLabel) {
+                    reportDefinitionLabel.textContent = isReportMode ? 'Report' : 'Data File';
+                }
+            }
+
+            function renderSourceOptions(clearSelection) {
+                if (!reportDefinitionSelect) {
+                    return;
+                }
+
+                const mode = getSourceMode();
+                const isReportMode = mode === 'report';
+                const options = isReportMode ? availableReports : availableDataFiles;
+                const selectedValue = clearSelection ? '' : reportDefinitionSelect.value;
+                const placeholder = isReportMode ? '-- Select report --' : '-- Select data file --';
+
+                reportDefinitionSelect.innerHTML = '';
+
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = placeholder;
+                reportDefinitionSelect.appendChild(defaultOption);
+
+                options.forEach(option => {
+                    const item = document.createElement('option');
+                    item.value = String(option.id ?? option.Id ?? '');
+                    item.textContent = String(option.reportName ?? option.ReportName ?? '');
+                    reportDefinitionSelect.appendChild(item);
+                });
+
+                if (!clearSelection && selectedValue) {
+                    reportDefinitionSelect.value = selectedValue;
+                }
+            }
+
+            function updateSchemaAndClientCodeFields() {
+                const isRequired = requiresSchemaAndClientCode();
+
+                if (schemaTemplateGroup) {
+                    schemaTemplateGroup.style.display = isRequired ? '' : 'none';
+                }
+
+                if (clientCodeGroup) {
+                    clientCodeGroup.style.display = isRequired ? '' : 'none';
+                }
+
+                if (clientCodeFieldInput) {
+                    clientCodeFieldInput.required = isRequired;
+                    clientCodeFieldInput.disabled = !isRequired;
+                    if (!isRequired) {
+                        clientCodeFieldInput.value = '';
+                    }
+                }
+
+                if (!isRequired && clientCodeHiddenInput) {
+                    clientCodeHiddenInput.value = '';
+                }
             }
 
             function updateScheduleFields() {
@@ -671,6 +770,16 @@
                     return;
                 }
 
+                if (!requiresSchemaAndClientCode()) {
+                    clientCodeSelect.innerHTML = '';
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Default';
+                    clientCodeSelect.appendChild(defaultOption);
+                    syncClientCodeUi('');
+                    return;
+                }
+
                 const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
                 const reportSchemaTemplates = Number.isFinite(selectedReportId)
                     ? (availableSchemaTemplatesByReportId[selectedReportId] || [])
@@ -930,6 +1039,16 @@
                 });
             }
 
+            if (sourceModeSelect) {
+                sourceModeSelect.addEventListener('change', () => {
+                    setSourceMode(getSourceMode());
+                    renderSourceOptions(true);
+                    updateSchemaAndClientCodeFields();
+                    updateClientCodeSelectOptions();
+                    renderScheduledParameterInputs();
+                });
+            }
+
             if (scheduledParametersContainer) {
                 scheduledParametersContainer.addEventListener('input', event => {
                     if (event.target instanceof HTMLInputElement && event.target.matches('[data-scheduled-param-value]')) {
@@ -958,7 +1077,10 @@
 
             updateScheduleFields();
             updateJobActionFields();
+            setSourceMode(getSourceMode());
+            renderSourceOptions(false);
             updateClientCodeSelectOptions();
+            updateSchemaAndClientCodeFields();
             renderScheduledParameterInputs();
             updatePasswordFields();
             updateDateFields();

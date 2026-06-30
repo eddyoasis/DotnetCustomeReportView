@@ -17,7 +17,9 @@ public class ScheduledReportJob
     [MaxLength(128)]
     public string HangfireJobId { get; set; } = string.Empty;
 
-    public int ReportDefinitionId { get; set; }
+    public int? ReportDefinitionId { get; set; }
+
+    public int? DataFileDefinitionId { get; set; }
 
     [Required]
     [MaxLength(16)]
@@ -79,4 +81,7 @@ public class ScheduledReportJob
 
     [ForeignKey(nameof(ReportDefinitionId))]
     public ReportDefinition? ReportDefinition { get; set; }
+
+    [ForeignKey(nameof(DataFileDefinitionId))]
+    public DataFileDefinition? DataFileDefinition { get; set; }
 }
