@@ -297,8 +297,8 @@ namespace DataWarehousePower.Repositories
                 }
                 else
                 {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) = {parameterName}");
-                    AddParameter(cmd, parameterName, filterValue);
+                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                    AddParameter(cmd, parameterName, $"%{filterValue}%");
                 }
             }
 
