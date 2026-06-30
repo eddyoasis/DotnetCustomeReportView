@@ -1,3 +1,4 @@
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
 
@@ -133,7 +134,12 @@ namespace DataWarehousePower.Services
                 SourceSP = string.IsNullOrWhiteSpace(form.SourceSP) ? null : form.SourceSP.Trim(),
                 Parameters = string.IsNullOrWhiteSpace(form.Parameters) ? null : form.Parameters.Trim(),
                 IsActive = form.IsActive,
-                Departments = string.IsNullOrWhiteSpace(form.Departments) ? null : form.Departments.Trim()
+                Departments = string.IsNullOrWhiteSpace(form.Departments) ? null : form.Departments.Trim(),
+                UserId = string.IsNullOrWhiteSpace(form.UserId) ? null : form.UserId.Trim(),
+                CreatedBy = string.IsNullOrWhiteSpace(form.UserId) ? null : form.UserId.Trim(),
+                CreatedAt = DateTimeHelper.GetCurrentLocalTime(),
+                ModifiedBy = string.IsNullOrWhiteSpace(form.UserId) ? null : form.UserId.Trim(),
+                ModifiedAt = DateTimeHelper.GetCurrentLocalTime(),
             };
 
             var activeColumns = form.Columns

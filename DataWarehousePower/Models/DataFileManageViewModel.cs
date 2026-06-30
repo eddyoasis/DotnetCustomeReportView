@@ -51,6 +51,8 @@ namespace DataWarehousePower.Models
         [Display(Name = "Departments")]
         public string? Departments { get; set; }
 
+        public string? UserId { get; set; }
+
         public List<DepartmentSelectionItem> ActiveDepartmentOptions { get; set; } = new();
         public List<int> SelectedDepartmentIds { get; set; } = new();
 

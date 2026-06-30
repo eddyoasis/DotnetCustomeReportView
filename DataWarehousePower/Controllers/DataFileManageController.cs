@@ -161,6 +161,8 @@ namespace DataWarehousePower.Controllers
 
             try
             {
+                form.UserId = userId;
+
                 if (form.Id == 0)
                 {
                     DataFileDefinition created = await _service.CreateDataFileAsync(form);
@@ -182,7 +184,10 @@ namespace DataWarehousePower.Controllers
                             created.SourceSP,
                             created.Parameters,
                             created.IsActive,
-                            created.Departments
+                            created.Departments,
+                            created.UserId,
+                            created.CreatedBy,
+                            created.CreatedAt,
                         },
                         detail: "Data file definition created.");
                 }
