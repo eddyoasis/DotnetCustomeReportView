@@ -359,20 +359,31 @@
                 normalized.includes('time');
         }
 
-        function isNumericColumnType(columnType) {
+        function isIntegerColumnType(columnType) {
             const normalized = (columnType || '').trim().toLowerCase();
             if (!normalized) {
                 return false;
             }
 
             return normalized.includes('int') ||
+                normalized.includes('tinyint') ||
+                normalized.includes('smallint') ||
+                normalized.includes('bigint');
+        }
+
+        function isDecimalColumnType(columnType) {
+            const normalized = (columnType || '').trim().toLowerCase();
+            if (!normalized) {
+                return false;
+            }
+
+            return normalized.includes('decimal') ||
                 normalized.includes('decimal') ||
                 normalized.includes('numeric') ||
                 normalized.includes('float') ||
                 normalized.includes('real') ||
                 normalized.includes('money') ||
-                normalized.includes('smallmoney') ||
-                normalized.includes('bit');
+                normalized.includes('smallmoney');
         }
 
         function isBooleanColumnType(columnType) {
@@ -389,8 +400,12 @@
                 return 'datetime-local';
             }
 
-            if (isNumericColumnType(columnType)) {
-                return 'number-range';
+            if (isDecimalColumnType(columnType)) {
+                return 'decimal-range';
+            }
+
+            if (isIntegerColumnType(columnType)) {
+                return 'number';
             }
 
             const normalizedName = (propertyName || '').trim().toLowerCase();
@@ -454,7 +469,7 @@
             };
         }
 
-        function normalizeNumberValue(value) {
+        function normalizeDecimalValue(value) {
             const raw = (value || '').trim();
             if (!raw) {
                 return '';
@@ -468,7 +483,7 @@
             return `${parsed}`;
         }
 
-        function parseNumberRangeMappingValue(value) {
+        function parseDecimalRangeMappingValue(value) {
             const raw = (value || '').trim();
             if (!raw) {
                 return { from: '', to: '' };
@@ -477,26 +492,59 @@
             if (raw.includes('|')) {
                 const [fromRaw, toRaw] = raw.split('|', 2);
                 return {
-                    from: normalizeNumberValue(fromRaw),
-                    to: normalizeNumberValue(toRaw)
+                    from: normalizeDecimalValue(fromRaw),
+                    to: normalizeDecimalValue(toRaw)
                 };
             }
 
-            const normalized = normalizeNumberValue(raw);
+            const normalized = normalizeDecimalValue(raw);
             return {
                 from: normalized,
                 to: ''
             };
         }
 
-        function buildNumberRangeMappingValue(from, to) {
-            const normalizedFrom = normalizeNumberValue(from);
-            const normalizedTo = normalizeNumberValue(to);
+        function buildDecimalRangeMappingValue(from, to) {
+            const normalizedFrom = normalizeDecimalValue(from);
+            const normalizedTo = normalizeDecimalValue(to);
             if (!normalizedFrom && !normalizedTo) {
                 return '';
             }
 
             return `${normalizedFrom}|${normalizedTo}`;
+        }
+
+        function normalizeIntegerValue(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            const parsed = Number.parseInt(raw, 10);
+            if (Number.isNaN(parsed)) {
+                return '';
+            }
+
+            return `${parsed}`;
+        }
+
+        function parseNumberMappingValue(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            if (raw.includes('|')) {
+                const [fromRaw, toRaw] = raw.split('|', 2);
+                const fromValue = normalizeIntegerValue(fromRaw);
+                if (fromValue) {
+                    return fromValue;
+                }
+
+                return normalizeIntegerValue(toRaw);
+            }
+
+            return normalizeIntegerValue(raw);
         }
 
         function buildDateRangeMappingValue(start, end) {
@@ -566,14 +614,14 @@
             syncValue();
         }
 
-        function renderNumberMappingEditor(mappingCell, mappingInput) {
+        function renderDecimalMappingEditor(mappingCell, mappingInput) {
             const editor = mappingCell.querySelector('.mapping-parameter-editor');
             if (!editor) {
                 return;
             }
 
             editor.innerHTML = '';
-            const parsed = parseNumberRangeMappingValue(mappingInput.value || '');
+            const parsed = parseDecimalRangeMappingValue(mappingInput.value || '');
 
             const wrapper = document.createElement('div');
             wrapper.className = 'd-flex flex-column gap-1';
@@ -593,7 +641,7 @@
             toInput.value = parsed.to;
 
             const syncValue = () => {
-                mappingInput.value = buildNumberRangeMappingValue(fromInput.value, toInput.value);
+                mappingInput.value = buildDecimalRangeMappingValue(fromInput.value, toInput.value);
             };
 
             fromInput.addEventListener('input', syncValue);
@@ -605,6 +653,29 @@
             syncValue();
         }
 
+        function renderNumberMappingEditor(mappingCell, mappingInput) {
+            const editor = mappingCell.querySelector('.mapping-parameter-editor');
+            if (!editor) {
+                return;
+            }
+
+            editor.innerHTML = '';
+
+            const numberInput = document.createElement('input');
+            numberInput.type = 'number';
+            numberInput.className = 'form-control form-control-sm';
+            numberInput.placeholder = 'Number';
+            numberInput.step = '1';
+            numberInput.value = parseNumberMappingValue(mappingInput.value || '');
+
+            numberInput.addEventListener('input', () => {
+                mappingInput.value = normalizeIntegerValue(numberInput.value);
+            });
+
+            editor.appendChild(numberInput);
+            mappingInput.value = normalizeIntegerValue(numberInput.value);
+        }
+
         function renderBooleanMappingEditor(mappingCell, mappingInput) {
             const editor = mappingCell.querySelector('.mapping-parameter-editor');
             if (!editor) {
@@ -614,25 +685,33 @@
             editor.innerHTML = '';
 
             const wrapper = document.createElement('div');
-            wrapper.className = 'form-check';
 
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'form-check-input';
-            checkbox.checked = (mappingInput.value || '').trim().toLowerCase() === 'true';
+            const select = document.createElement('select');
+            select.className = 'form-select form-select-sm';
 
-            const label = document.createElement('label');
-            label.className = 'form-check-label small';
-            label.textContent = 'True / False';
+            const options = [
+                { value: '', text: 'All' },
+                { value: 'true', text: 'True' },
+                { value: 'false', text: 'False' }
+            ];
+
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option.value;
+                opt.textContent = option.text;
+                select.appendChild(opt);
+            });
+
+            const normalized = (mappingInput.value || '').trim().toLowerCase();
+            select.value = normalized === 'true' || normalized === 'false' ? normalized : '';
 
             const syncValue = () => {
-                mappingInput.value = checkbox.checked ? 'true' : 'false';
+                mappingInput.value = select.value;
             };
 
-            checkbox.addEventListener('change', syncValue);
+            select.addEventListener('change', syncValue);
 
-            wrapper.appendChild(checkbox);
-            wrapper.appendChild(label);
+            wrapper.appendChild(select);
             editor.appendChild(wrapper);
             syncValue();
         }
@@ -654,7 +733,9 @@
                 if (previousEditorType !== targetType || !mappingCell.querySelector('.mapping-parameter-editor')?.children.length) {
                     if (targetType === 'datetime-local') {
                         renderDateRangeMappingEditor(mappingCell, mappingInput);
-                    } else if (targetType === 'number-range') {
+                    } else if (targetType === 'decimal-range') {
+                        renderDecimalMappingEditor(mappingCell, mappingInput);
+                    } else if (targetType === 'number') {
                         renderNumberMappingEditor(mappingCell, mappingInput);
                     } else if (targetType === 'boolean') {
                         renderBooleanMappingEditor(mappingCell, mappingInput);

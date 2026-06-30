@@ -225,7 +225,8 @@ namespace DataWarehousePower.Repositories
                 string parameterName = $"@f{parameterIndex++}";
                 bool isDateTimeType = IsDateTimeTypeName(metadataColumn.DataType);
                 bool isBooleanType = IsBooleanTypeName(metadataColumn.DataType);
-                bool isNumericType = IsNumericTypeName(metadataColumn.DataType);
+                bool isDecimalType = IsDecimalTypeName(metadataColumn.DataType);
+                bool isIntegerType = IsIntegerTypeName(metadataColumn.DataType);
 
                 if (isDateTimeType)
                 {
@@ -250,6 +251,11 @@ namespace DataWarehousePower.Repositories
                 }
                 else if (isBooleanType)
                 {
+                    if (filterValue.Equals("all", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     if (!TryParseBooleanFilter(filterValue, out bool boolValue))
                     {
                         throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid boolean.");
@@ -258,11 +264,11 @@ namespace DataWarehousePower.Repositories
                     whereClauses.Add($"[{EscapeSqlIdentifier(columnName)}] = {parameterName}");
                     AddParameter(cmd, parameterName, boolValue);
                 }
-                else if (isNumericType)
+                else if (isDecimalType)
                 {
-                    if (!TryParseNumericRangeFilter(filterValue, out decimal? fromValue, out decimal? toValue))
+                    if (!TryParseDecimalRangeFilter(filterValue, out decimal? fromValue, out decimal? toValue))
                     {
-                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid number.");
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid decimal.");
                     }
 
                     string escapedColumnName = EscapeSqlIdentifier(columnName);
@@ -278,6 +284,16 @@ namespace DataWarehousePower.Repositories
                         whereClauses.Add($"TRY_CONVERT(decimal(38, 10), [{escapedColumnName}]) <= {toParameterName}");
                         AddParameter(cmd, toParameterName, toValue.Value);
                     }
+                }
+                else if (isIntegerType)
+                {
+                    if (!TryParseIntegerFilter(filterValue, out long intValue))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid number.");
+                    }
+
+                    whereClauses.Add($"TRY_CONVERT(bigint, [{EscapeSqlIdentifier(columnName)}]) = {parameterName}");
+                    AddParameter(cmd, parameterName, intValue);
                 }
                 else
                 {
@@ -550,21 +566,26 @@ namespace DataWarehousePower.Repositories
             return normalized == "bit" || normalized.StartsWith("bit(");
         }
 
-        private static bool IsNumericTypeName(string? dataType)
+        private static bool IsIntegerTypeName(string? dataType)
         {
             string normalized = (dataType ?? string.Empty).Trim().ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(normalized))
+            if (string.IsNullOrWhiteSpace(normalized) || IsBooleanTypeName(normalized))
             {
                 return false;
             }
 
-            if (IsBooleanTypeName(normalized))
+            return normalized.Contains("int");
+        }
+
+        private static bool IsDecimalTypeName(string? dataType)
+        {
+            string normalized = (dataType ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(normalized) || IsBooleanTypeName(normalized))
             {
                 return false;
             }
 
-            return normalized.Contains("int") ||
-                normalized.Contains("decimal") ||
+            return normalized.Contains("decimal") ||
                 normalized.Contains("numeric") ||
                 normalized.Contains("float") ||
                 normalized.Contains("real") ||
@@ -626,7 +647,7 @@ namespace DataWarehousePower.Repositories
             return DateTime.TryParse(value, out parsed);
         }
 
-        private static bool TryParseNumericRangeFilter(string value, out decimal? from, out decimal? to)
+        private static bool TryParseDecimalRangeFilter(string value, out decimal? from, out decimal? to)
         {
             from = null;
             to = null;
@@ -672,6 +693,25 @@ namespace DataWarehousePower.Repositories
             from = singleValue;
             to = singleValue;
             return true;
+        }
+
+        private static bool TryParseIntegerFilter(string value, out long parsed)
+        {
+            string raw = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                parsed = 0;
+                return false;
+            }
+
+            if (raw.Contains('|', StringComparison.Ordinal))
+            {
+                string[] parts = raw.Split('|', 2, StringSplitOptions.None);
+                raw = !string.IsNullOrWhiteSpace(parts[0]) ? parts[0].Trim() : (parts.Length > 1 ? parts[1].Trim() : string.Empty);
+            }
+
+            return long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) ||
+                long.TryParse(raw, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsed);
         }
 
         private static bool TryParseBooleanFilter(string value, out bool parsed)
