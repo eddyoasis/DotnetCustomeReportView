@@ -7,6 +7,7 @@ public sealed class ScheduledJobListItemViewModel
     public int Id { get; set; }
     public string JobName { get; set; } = string.Empty;
     public string HangfireJobId { get; set; } = string.Empty;
+    public string SourceType { get; set; } = "Report";
     public int ReportDefinitionId { get; set; }
     public string ReportName { get; set; } = string.Empty;
     public string Format { get; set; } = string.Empty;
@@ -24,6 +25,7 @@ public sealed class ScheduledJobListItemViewModel
 
 public sealed class ScheduledJobFilterViewModel
 {
+    public string? SourceType { get; set; }
     public string? JobName { get; set; }
     public string? ReportName { get; set; }
     public string? Format { get; set; }

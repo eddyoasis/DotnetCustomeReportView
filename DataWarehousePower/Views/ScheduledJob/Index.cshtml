@@ -73,9 +73,17 @@
             <label class="form-label small mb-1">Job Name</label>
             <input type="text" name="JobName" value="@Model.Filter.JobName" class="form-control form-control-sm" placeholder="Search job name…" />
             </div> *@
+            <div class="col-sm-6 col-md-2">
+                <label class="form-label small mb-1">Source Type</label>
+                <select name="SourceType" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="Report" selected="@(string.Equals(Model.Filter.SourceType, "Report", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Report</option>
+                    <option value="DataFile" selected="@(string.Equals(Model.Filter.SourceType, "DataFile", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">DataFile</option>
+                </select>
+            </div>
             <div class="col-sm-6 col-md-3">
-                <label class="form-label small mb-1">Report</label>
-                <input type="text" name="ReportName" value="@Model.Filter.ReportName" class="form-control form-control-sm" placeholder="Search report…" />
+                <label class="form-label small mb-1">Source</label>
+                <input type="text" name="ReportName" value="@Model.Filter.ReportName" class="form-control form-control-sm" placeholder="Search source…" />
             </div>
             <div class="col-sm-4 col-md-2">
                 <label class="form-label small mb-1">Format</label>
@@ -253,7 +261,8 @@ else
                 <tr>
                     @*  <th style="width: 50px;">#</th>
                 <th>Job Name</th> *@
-                    <th>Report</th>
+                    <th>Source Type</th>
+                    <th>Source</th>
                     <th>Format</th>
                     <th>Action</th>
                     <th>Export Location</th>
@@ -273,6 +282,7 @@ else
                 <div class="fw-semibold">@job.JobName</div>
                 <div class="small text-muted">@job.HangfireJobId</div>
                 </td> *@
+                        <td>@job.SourceType</td>
                         <td>@job.ReportName</td>
                         <td class="text-uppercase">@job.Format</td>
                         <td>

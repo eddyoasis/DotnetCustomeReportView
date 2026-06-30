@@ -47,6 +47,11 @@ public sealed class ScheduledReportJobService(
             Id = entity.Id,
             JobName = entity.JobName,
             HangfireJobId = entity.HangfireJobId,
+            SourceType = entity.ReportDefinitionId.HasValue
+                ? "Report"
+                : entity.DataFileDefinitionId.HasValue
+                    ? "DataFile"
+                    : "Unknown",
             ReportDefinitionId = entity.ReportDefinitionId ?? entity.DataFileDefinitionId ?? 0,
             ReportName = entity.ReportDefinition?.ReportName
                 ?? entity.DataFileDefinition?.DataFileName
@@ -90,6 +95,9 @@ public sealed class ScheduledReportJobService(
 
         if (filter is not null)
         {
+            if (!string.IsNullOrWhiteSpace(filter.SourceType))
+                filtered = filtered.Where(j => string.Equals(j.SourceType, filter.SourceType.Trim(), StringComparison.OrdinalIgnoreCase));
+
             if (!string.IsNullOrWhiteSpace(filter.JobName))
                 filtered = filtered.Where(j => j.JobName.Contains(filter.JobName, StringComparison.OrdinalIgnoreCase));
 
