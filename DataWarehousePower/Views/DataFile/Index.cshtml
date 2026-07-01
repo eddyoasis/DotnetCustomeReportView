@@ -1,0 +1,167 @@
+@using DataWarehousePower.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@model DataWarehousePower.Models.DataFileBrowserViewModel
+@{
+    ViewData["Title"] = "Data Files";
+    var departmentLookup = ViewData["DepartmentLookup"] as Dictionary<int, string> ?? new Dictionary<int, string>();
+    var selectedDataFile = Model.SelectedDataFile;
+    var canManageReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportManageAccess)).Succeeded;
+
+    string GetDepartmentLabel(string? departments)
+    {
+        if (string.IsNullOrWhiteSpace(departments))
+        {
+            return "All";
+        }
+
+        var tokens = departments.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var displayNames = tokens
+            .Select(token => int.TryParse(token, out int id)
+                ? (departmentLookup.TryGetValue(id, out var name) ? name : $"Unknown ({id})")
+                : token)
+            .ToList();
+
+        return string.Join(", ", displayNames);
+    }
+}
+
+<div class="row">
+    <div class="col-md-3 pe-0">
+        <div class="card shadow-sm h-100 d-flex flex-column">
+            <div class="card-header fw-semibold small">Data Files</div>
+            <div class="p-2 border-bottom">
+                <form asp-action="Index" method="get" class="row g-2">
+                    <div class="col-12">
+                        <input class="form-control form-control-sm" type="text" name="search" value="@Model.Filter.Search" placeholder="Filter data files" autocomplete="off" />
+                    </div>
+                    <div class="col-7">
+                        <select class="form-select form-select-sm" name="isActive">
+                            <option value="">All</option>
+                            <option value="true" selected="@(Model.Filter.IsActive == true ? "selected" : null)">Active</option>
+                            <option value="false" selected="@(Model.Filter.IsActive == false ? "selected" : null)">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="col-5 d-grid">
+                        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                    </div>
+                </form>
+            </div>
+            <div class="flex-grow-1 overflow-auto">
+                <ul class="list-group list-group-flush">
+                    @foreach (var dataFile in Model.DataFiles)
+                    {
+                        <li class="list-group-item list-group-item-action p-2 @(selectedDataFile?.Id == dataFile.Id ? "active" : "")">
+                            <a asp-action="Index"
+                               asp-route-id="@dataFile.Id"
+                               asp-route-search="@Model.Filter.Search"
+                               asp-route-isActive="@Model.Filter.IsActive"
+                               class="text-decoration-none d-block @(selectedDataFile?.Id == dataFile.Id ? "text-white" : "")">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <span class="fw-semibold" style="font-size:.9rem;">@dataFile.DataFileName</span>
+                                    <span class="badge @(dataFile.IsActive ? "bg-success" : "bg-secondary")">@(dataFile.IsActive ? "Active" : "Inactive")</span>
+                                </div>
+                                <div class="small @(selectedDataFile?.Id == dataFile.Id ? "text-white-50" : "text-muted")">
+                                    @(string.IsNullOrWhiteSpace(dataFile.SourceDatabase) ? "No source database" : dataFile.SourceDatabase)
+                                </div>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        @if (selectedDataFile is null)
+        {
+            <div class="alert alert-info">No data file is selected.</div>
+        }
+        else
+        {
+            <div class="mb-2 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                <div>
+                    <h4 class="mb-1">@selectedDataFile.DataFileName</h4>
+                    <div class="text-muted small">Browse the source definition, columns, and allowed departments.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
+                    @if (canManageReports)
+                    {
+                        <a asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-secondary btn-sm">Manage</a>
+                    }
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header fw-semibold">Data File Details</div>
+                        <div class="card-body">
+                            <dl class="row mb-0 small">
+                                <dt class="col-5">Source Database</dt>
+                                <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceDatabase) ? "-" : selectedDataFile.SourceDatabase)</dd>
+
+                                <dt class="col-5">Source Table</dt>
+                                <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceTable) ? "-" : selectedDataFile.SourceTable)</dd>
+
+                                <dt class="col-5">Source SP</dt>
+                                <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceSP) ? "-" : selectedDataFile.SourceSP)</dd>
+
+                                <dt class="col-5">Departments</dt>
+                                <dd class="col-7">@GetDepartmentLabel(selectedDataFile.Departments)</dd>
+
+                                <dt class="col-5">Status</dt>
+                                <dd class="col-7">@(selectedDataFile.IsActive ? "Active" : "Inactive")</dd>
+
+                                <dt class="col-5">Created</dt>
+                                <dd class="col-7">@selectedDataFile.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+
+                                <dt class="col-5">Modified</dt>
+                                <dd class="col-7">@(selectedDataFile.ModifiedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header fw-semibold">Columns</div>
+                        <div class="card-body p-0">
+                            @if (selectedDataFile.Columns.Any())
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width:60px;">Order</th>
+                                                <th>Property Name</th>
+                                                <th>Label</th>
+                                                <th>Mapping Parameter</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var column in selectedDataFile.Columns.OrderBy(column => column.DisplayOrder))
+                                            {
+                                                <tr>
+                                                    <td class="text-muted small">@column.DisplayOrder</td>
+                                                    <td>@column.PropertyName</td>
+                                                    <td>@column.DefaultLabel</td>
+                                                    <td>@(string.IsNullOrWhiteSpace(column.MappingParameter) ? "-" : column.MappingParameter)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="p-3 text-muted small">No columns are defined for this data file.</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
