@@ -238,7 +238,6 @@
                 </div>
 
                 <div class="col-md-6" id="schemaTemplateGroup">
-                    @* <label asp-for="SchemaTemplate" class="form-label"></label> *@
                     <label class="form-label">Schema Template</label>
                     <input asp-for="SchemaTemplate" type="hidden" />
 
@@ -458,9 +457,9 @@
             function updateSchemaAndClientCodeFields() {
                 const isRequired = requiresSchemaAndClientCode();
 
-                if (schemaTemplateGroup) {
-                    schemaTemplateGroup.style.display = isRequired ? '' : 'none';
-                }
+                // if (schemaTemplateGroup) {
+                //     schemaTemplateGroup.style.display = isRequired ? '' : 'none';
+                // }
 
                 if (clientCodeGroup) {
                     clientCodeGroup.style.display = isRequired ? '' : 'none';
