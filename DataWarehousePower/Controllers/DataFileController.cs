@@ -166,7 +166,7 @@ namespace DataWarehousePower.Controllers
 
             try
             {
-                int preferenceId = await _prefService.SavePreferencesAsync(userId, id, request.SchemaTemplate, request.PreferenceId, request.Columns, systemColumns);
+                int preferenceId = await _prefService.SaveDataFilePreferencesAsync(userId, id, request.SchemaTemplate, request.PreferenceId, request.Columns, systemColumns);
                 return Ok(new { success = true, preferenceId });
             }
             catch (InvalidOperationException ex)

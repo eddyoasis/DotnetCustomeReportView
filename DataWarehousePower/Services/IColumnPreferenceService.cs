@@ -32,6 +32,11 @@ namespace DataWarehousePower.Services
             IEnumerable<SaveColumnRequest> columns,
             IReadOnlyList<ColumnDefinition> systemColumns);
 
+        Task<int> SaveDataFilePreferencesAsync(string userId, int dataFileId, string? clientCode,
+            int? preferenceId,
+            IEnumerable<SaveColumnRequest> columns,
+            IReadOnlyList<ColumnDefinition> systemColumns);
+
         Task UpdateSchemaTemplateAsync(string userId, int reportId, int preferenceId, string newSchemaTemplate);
         Task DeletePreferenceAsync(string userId, int reportId, int preferenceId);
     }

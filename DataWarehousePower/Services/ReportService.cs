@@ -222,6 +222,48 @@ namespace DataWarehousePower.Services
             };
         }
 
+        public async Task<int> SaveDataFilePreferencesAsync(
+            int dataFileId,
+            string userId,
+            string? clientCode,
+            int? preferenceId,
+            IEnumerable<SaveColumnRequest> columns,
+            IReadOnlyList<ColumnDefinition> systemColumns)
+        {
+            string normalizedClientCode = NormalizeSchemaTemplate(clientCode);
+            var validKeys = systemColumns.Select(c => c.Key)
+                                         .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var entries = columns
+                .Where(c => validKeys.Contains(c.Key))
+                .Select(c =>
+                {
+                    var sys = systemColumns.First(s => s.Key.Equals(c.Key, StringComparison.OrdinalIgnoreCase));
+                    var label = string.IsNullOrWhiteSpace(c.DisplayLabel)
+                                    ? sys.DefaultLabel
+                                    : c.DisplayLabel.Length > MaxLabelLen
+                                        ? c.DisplayLabel[..MaxLabelLen]
+                                        : c.DisplayLabel;
+
+                    return new ColumnJsonEntry
+                    {
+                        PropertyName = c.Key,
+                        IsVisible = c.IsVisible,
+                        DisplayOrder = Math.Max(1, c.Order),
+                        CustomName = label
+                    };
+                })
+                .ToList();
+
+            return await _prefRepo.UpsertAsync(new UserColumnPreference
+            {
+                UserId = userId,
+                DataFileDefinitionId = dataFileId,
+                SchemaTemplate = normalizedClientCode,
+                ColumnJson = JsonSerializer.Serialize(entries)
+            }, preferenceId);
+        }
+
         public async Task<int> SavePreferencesAsync(
             int reportId,
             string userId,
