@@ -35,6 +35,28 @@ namespace DataWarehousePower.Repositories
                                        && p.SchemaTemplate == string.Empty);
         }
 
+        public async Task<UserColumnPreference?> GetDataFileAsync(string userId, int dataFileDefinitionId, string? schemaTemplate)
+        {
+            string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
+
+            UserColumnPreference? scopedPreference = await _context.UserColumnPreferences
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == userId
+                                       && p.DataFileDefinitionId == dataFileDefinitionId
+                                       && p.SchemaTemplate == normalizedSchemaTemplate);
+
+            if (scopedPreference is not null || normalizedSchemaTemplate.Length == 0)
+            {
+                return scopedPreference;
+            }
+
+            return await _context.UserColumnPreferences
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == userId
+                                       && p.DataFileDefinitionId == dataFileDefinitionId
+                                       && p.SchemaTemplate == string.Empty);
+        }
+
         public Task<UserColumnPreference?> GetByIdAsync(string userId, int reportDefinitionId, int preferenceId)
             => _context.UserColumnPreferences
                 .AsNoTracking()
@@ -53,11 +75,30 @@ namespace DataWarehousePower.Repositories
                 .OrderBy(schemaTemplate => schemaTemplate)
                 .ToListAsync();
 
-            public async Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportDefinitionId)
+        public async Task<List<string>> GetDataFileSchemaTemplatesAsync(string userId, int dataFileDefinitionId)
+            => await _context.UserColumnPreferences
+                .AsNoTracking()
+                .Where(p => p.UserId == userId
+                         && p.DataFileDefinitionId == dataFileDefinitionId
+                         && p.SchemaTemplate != string.Empty)
+                .Select(p => p.SchemaTemplate)
+                .Distinct()
+                .OrderBy(schemaTemplate => schemaTemplate)
+                .ToListAsync();
+
+        public async Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportDefinitionId)
             => await _context.UserColumnPreferences
                 .AsNoTracking()
                 .Where(p => p.UserId == userId
                          && p.ReportDefinitionId == reportDefinitionId
+                         && p.SchemaTemplate != string.Empty)
+                .ToDictionaryAsync(p => p.SchemaTemplate, p => p.Id, StringComparer.OrdinalIgnoreCase);
+
+        public async Task<Dictionary<string, int>> GetDataFileSchemaTemplatePreferenceIdsAsync(string userId, int dataFileDefinitionId)
+            => await _context.UserColumnPreferences
+                .AsNoTracking()
+                .Where(p => p.UserId == userId
+                         && p.DataFileDefinitionId == dataFileDefinitionId
                          && p.SchemaTemplate != string.Empty)
                 .ToDictionaryAsync(p => p.SchemaTemplate, p => p.Id, StringComparer.OrdinalIgnoreCase);
 

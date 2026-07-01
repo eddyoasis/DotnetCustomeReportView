@@ -49,11 +49,24 @@ namespace DataWarehousePower.Services
             IReadOnlyList<ColumnDefinition> systemColumns)
             => LoadPreferencesAsync(userId, reportId, NormalizeSchemaTemplate(schemaTemplate), systemColumns.ToList());
 
+        public Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadDataFileColumnPreferencesAsync(
+            string userId,
+            int dataFileId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns)
+            => LoadDataFilePreferencesAsync(userId, dataFileId, NormalizeSchemaTemplate(schemaTemplate), systemColumns.ToList());
+
         public Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId)
             => _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
 
+        public Task<List<string>> GetDataFileSchemaTemplatesAsync(string userId, int dataFileDefinitionId)
+            => _prefRepo.GetDataFileSchemaTemplatesAsync(userId, dataFileDefinitionId);
+
         public Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId)
             => _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
+
+        public Task<Dictionary<string, int>> GetDataFileSchemaTemplatePreferenceIdsAsync(string userId, int dataFileDefinitionId)
+            => _prefRepo.GetDataFileSchemaTemplatePreferenceIdsAsync(userId, dataFileDefinitionId);
 
         public async Task<ReportViewModel?> BuildReportViewModelAsync(
             int reportId,
@@ -309,6 +322,60 @@ namespace DataWarehousePower.Services
                 _logger.LogError(ex,
                     "Failed to load preferences for user {UserId} report {ReportId} client code {ClientCode}. Using defaults.",
                     userId, reportId, schemaTemplate);
+                return (BuildDefaults(systemColumns), null);
+            }
+        }
+
+        private async Task<(List<ColumnDefinition> Columns, int? PreferenceId)> LoadDataFilePreferencesAsync(
+            string userId,
+            int dataFileId,
+            string schemaTemplate,
+            List<ColumnDefinition> systemColumns)
+        {
+            try
+            {
+                var row = await _prefRepo.GetDataFileAsync(userId, dataFileId, schemaTemplate);
+                if (row is null) return (BuildDefaults(systemColumns), null);
+
+                var entries = JsonSerializer.Deserialize<List<ColumnJsonEntry>>(row.ColumnJson, _jsonOpts)
+                              ?? new List<ColumnJsonEntry>();
+
+                var entryLookup = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.PropertyName))
+                    .GroupBy(e => e.PropertyName, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+                var mergedColumns = systemColumns
+                    .OrderBy(c => c.Order)
+                    .Select(c =>
+                    {
+                        bool hasSavedEntry = entryLookup.TryGetValue(c.Key, out ColumnJsonEntry? savedEntry);
+                        bool isVisible = hasSavedEntry ? savedEntry!.IsVisible : true;
+                        string displayLabel = hasSavedEntry && !string.IsNullOrWhiteSpace(savedEntry!.CustomName)
+                            ? savedEntry.CustomName
+                            : c.DefaultLabel;
+                        int order = hasSavedEntry
+                            ? Math.Max(1, savedEntry!.DisplayOrder)
+                            : c.Order;
+
+                        return new ColumnDefinition
+                        {
+                            Key = c.Key,
+                            DefaultLabel = c.DefaultLabel,
+                            DisplayLabel = displayLabel,
+                            IsVisible = isVisible,
+                            Order = order
+                        };
+                    })
+                    .ToList();
+
+                return (mergedColumns, row.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to load preferences for user {UserId} report {ReportId} client code {ClientCode}. Using defaults.",
+                    userId, dataFileId, schemaTemplate);
                 return (BuildDefaults(systemColumns), null);
             }
         }

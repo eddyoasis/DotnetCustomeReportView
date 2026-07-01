@@ -12,7 +12,17 @@ namespace DataWarehousePower.Services
             string? schemaTemplate,
             IReadOnlyList<ColumnDefinition> systemColumns);
 
+        Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadDataFileColumnPreferencesAsync(
+            string userId,
+            int dataFileId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns);
+
+        Task<List<string>> GetDataFileSchemaTemplatesAsync(string userId, int dataFileDefinitionId);
+
         Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId);
+
+        Task<Dictionary<string, int>> GetDataFileSchemaTemplatePreferenceIdsAsync(string userId, int dataFileDefinitionId);
 
         Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId);
 

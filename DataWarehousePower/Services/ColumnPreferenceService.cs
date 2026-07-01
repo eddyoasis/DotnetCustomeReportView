@@ -51,11 +51,24 @@ namespace DataWarehousePower.Services
             IReadOnlyList<ColumnDefinition> systemColumns)
             => _reportService.LoadColumnPreferencesAsync(userId, reportId, schemaTemplate, systemColumns);
 
+        public Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadDataFileColumnPreferencesAsync(
+            string userId,
+            int dataFileId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns)
+            => _reportService.LoadDataFileColumnPreferencesAsync(userId, dataFileId, schemaTemplate, systemColumns);
+
         public Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId)
             => _reportService.GetSchemaTemplatesAsync(userId, reportId);
 
+        public Task<List<string>> GetDataFileSchemaTemplatesAsync(string userId, int dataFileDefinitionId)
+            => _reportService.GetDataFileSchemaTemplatesAsync(userId, dataFileDefinitionId);
+
         public Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId)
             => _reportService.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
+
+        public Task<Dictionary<string, int>> GetDataFileSchemaTemplatePreferenceIdsAsync(string userId, int dataFileDefinitionId)
+            => _reportService.GetDataFileSchemaTemplatePreferenceIdsAsync(userId, dataFileDefinitionId);
 
         public Task<int> SavePreferencesAsync(string userId, int reportId, string? clientCode,
             int? preferenceId,

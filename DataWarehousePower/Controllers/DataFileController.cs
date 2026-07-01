@@ -67,14 +67,14 @@ namespace DataWarehousePower.Controllers
                 .ToList();
 
             string normalizedSchemaTemplate = schemaTemplate?.Trim() ?? string.Empty;
-            (List<ColumnDefinition> displayColumns, int? activePreferenceId) = await _prefService.LoadColumnPreferencesAsync(
+            (List<ColumnDefinition> displayColumns, int? activePreferenceId) = await _prefService.LoadDataFileColumnPreferencesAsync(
                 userId,
                 selectedDataFile.Id,
                 normalizedSchemaTemplate,
                 availableColumns);
 
-            List<string> savedSchemaTemplates = await _prefService.GetSchemaTemplatesAsync(userId, selectedDataFile.Id);
-            Dictionary<string, int> schemaTemplatePreferenceIds = await _prefService.GetSchemaTemplatePreferenceIdsAsync(userId, selectedDataFile.Id);
+            List<string> savedSchemaTemplates = await _prefService.GetDataFileSchemaTemplatesAsync(userId, selectedDataFile.Id);
+            Dictionary<string, int> schemaTemplatePreferenceIds = await _prefService.GetDataFileSchemaTemplatePreferenceIdsAsync(userId, selectedDataFile.Id);
             List<string> availableSchemaTemplates = BuildAvailableSchemaTemplates(normalizedSchemaTemplate, savedSchemaTemplates);
 
             ViewData["DepartmentLookup"] = await GetDepartmentLookupAsync();

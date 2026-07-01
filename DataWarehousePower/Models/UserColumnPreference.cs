@@ -18,6 +18,7 @@ namespace DataWarehousePower.Models
         public string UserId { get; set; } = string.Empty;
 
         public int ReportDefinitionId { get; set; }
+        public int DataFileDefinitionId { get; set; }
 
         [MaxLength(128)]
         public string SchemaTemplate { get; set; } = string.Empty;

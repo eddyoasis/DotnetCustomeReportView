@@ -121,7 +121,12 @@ namespace DataWarehousePower.Data
                     .HasDefaultValue(string.Empty);
                 e.Property(p => p.ColumnJson).HasColumnType("nvarchar(max)");
                 e.HasIndex(p => p.UserId);
-                e.HasIndex(p => new { p.UserId, p.ReportDefinitionId, p.SchemaTemplate }).IsUnique();
+                e.HasIndex(p => new { p.UserId, p.ReportDefinitionId, p.SchemaTemplate })
+                    .IsUnique()
+                    .HasFilter("[ReportDefinitionId] <> 0");
+                e.HasIndex(p => new { p.UserId, p.DataFileDefinitionId, p.SchemaTemplate })
+                    .IsUnique()
+                    .HasFilter("[DataFileDefinitionId] <> 0");
             });
 
             // ── ReportDefinition ──────────────────────────────────────────────
