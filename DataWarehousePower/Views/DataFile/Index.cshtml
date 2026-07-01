@@ -1,5 +1,6 @@
 @using DataWarehousePower.Authorization
 @using Microsoft.AspNetCore.Authorization
+@using System.Text.Json
 @inject IAuthorizationService AuthorizationService
 @model DataWarehousePower.Models.DataFileBrowserViewModel
 @{
@@ -160,8 +161,199 @@
                             }
                         </div>
                     </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header fw-semibold">Preview Data</div>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <label for="preview-take" class="form-label mb-0 small text-muted">Rows</label>
+                                <input id="preview-take" type="number" min="1" max="200" value="10" class="form-control form-control-sm" style="width: 90px;" />
+                                <button id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Preview</button>
+                                <span id="preview-status" class="small text-muted">Click Preview to load sample data.</span>
+                            </div>
+
+                            <div id="preview-table-wrap" class="table-responsive" style="display:none;">
+                                <table class="table table-sm table-bordered mb-0 align-middle">
+                                    <thead id="preview-table-head" class="table-light"></thead>
+                                    <tbody id="preview-table-body"></tbody>
+                                </table>
+                            </div>
+
+                            <div id="preview-empty-state" class="small text-muted" style="display:none;">No rows were returned for the selected source.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <form id="preview-antiforgery-form" class="d-none">
+                @Html.AntiForgeryToken()
+            </form>
         }
     </div>
 </div>
+
+@if (selectedDataFile is not null)
+{
+    <script>
+        (function () {
+            const previewUrl = '@Url.Action("Preview", "DataFileManage")';
+            const sourceDatabase = @Html.Raw(JsonSerializer.Serialize(selectedDataFile.SourceDatabase));
+            const sourceTable = @Html.Raw(JsonSerializer.Serialize(selectedDataFile.SourceTable));
+            const sourceSP = @Html.Raw(JsonSerializer.Serialize(selectedDataFile.SourceSP));
+            const columns = @Html.Raw(JsonSerializer.Serialize(
+                selectedDataFile.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .Select(column => new
+                    {
+                        propertyName = column.PropertyName,
+                        defaultLabel = column.DefaultLabel,
+                        mappingParameter = column.MappingParameter
+                    })
+                    .ToList()));
+
+            const button = document.getElementById('btn-preview-data');
+            const takeInput = document.getElementById('preview-take');
+            const status = document.getElementById('preview-status');
+            const tableWrap = document.getElementById('preview-table-wrap');
+            const head = document.getElementById('preview-table-head');
+            const body = document.getElementById('preview-table-body');
+            const emptyState = document.getElementById('preview-empty-state');
+
+            if (!button || !takeInput || !status || !tableWrap || !head || !body || !emptyState) {
+                return;
+            }
+
+            function setPreviewStatus(message, isError) {
+                status.textContent = message;
+                status.classList.toggle('text-danger', !!isError);
+                status.classList.toggle('text-muted', !isError);
+            }
+
+            function clearPreviewTable() {
+                head.innerHTML = '';
+                body.innerHTML = '';
+                tableWrap.style.display = 'none';
+                emptyState.style.display = 'none';
+            }
+
+            function renderPreviewTable(columnDefinitions, rows) {
+                head.innerHTML = '';
+                body.innerHTML = '';
+
+                if (!Array.isArray(columnDefinitions) || columnDefinitions.length === 0) {
+                    tableWrap.style.display = 'none';
+                    emptyState.style.display = 'none';
+                    return;
+                }
+
+                const headRow = document.createElement('tr');
+                columnDefinitions.forEach(column => {
+                    const th = document.createElement('th');
+                    th.textContent = column.label;
+                    headRow.appendChild(th);
+                });
+                head.appendChild(headRow);
+
+                (Array.isArray(rows) ? rows : []).forEach(row => {
+                    const tr = document.createElement('tr');
+                    columnDefinitions.forEach(column => {
+                        const td = document.createElement('td');
+                        const value = row?.[column.key];
+                        td.textContent = value === null || value === undefined ? '' : String(value);
+                        tr.appendChild(td);
+                    });
+                    body.appendChild(tr);
+                });
+
+                tableWrap.style.display = 'block';
+                emptyState.style.display = (Array.isArray(rows) && rows.length === 0) ? 'block' : 'none';
+            }
+
+            async function loadPreviewData() {
+                const dbName = (sourceDatabase || '').trim();
+                const tableName = (sourceTable || '').trim();
+                const procedureName = (sourceSP || '').trim();
+                const take = Number.parseInt(takeInput.value, 10) || 10;
+
+                if (!dbName || ((!tableName && !procedureName) || (tableName && procedureName))) {
+                    setPreviewStatus('Preview source is not configured correctly for this data file.', true);
+                    clearPreviewTable();
+                    return;
+                }
+
+                const previewColumns = (Array.isArray(columns) ? columns : [])
+                    .map(column => ({
+                        propertyName: (column?.propertyName || '').toString().trim(),
+                        defaultLabel: (column?.defaultLabel || '').toString().trim(),
+                        mappingParameter: (column?.mappingParameter || '').toString().trim()
+                    }))
+                    .filter(column => column.propertyName);
+
+                if (previewColumns.length === 0) {
+                    setPreviewStatus('No columns are available for preview.', true);
+                    clearPreviewTable();
+                    return;
+                }
+
+                button.disabled = true;
+                setPreviewStatus('Loading preview...', false);
+
+                const antiForgeryToken = document.querySelector('#preview-antiforgery-form input[name="__RequestVerificationToken"]')?.value || '';
+
+                try {
+                    const response = await fetch(previewUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': antiForgeryToken
+                        },
+                        body: JSON.stringify({
+                            sourceDatabase: dbName,
+                            sourceTable: tableName,
+                            sourceSP: procedureName,
+                            take,
+                            columns: previewColumns.map(column => ({
+                                propertyName: column.propertyName,
+                                mappingParameter: column.mappingParameter
+                            }))
+                        })
+                    });
+
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        setPreviewStatus(payload?.message || 'Failed to load preview data.', true);
+                        clearPreviewTable();
+                        return;
+                    }
+
+                    const responseColumns = Array.isArray(payload?.columns) ? payload.columns : [];
+                    const responseRows = Array.isArray(payload?.rows) ? payload.rows : [];
+
+                    const labelLookup = new Map(
+                        previewColumns.map(column => [
+                            column.propertyName.trim().toLowerCase(),
+                            column.defaultLabel || column.propertyName
+                        ])
+                    );
+
+                    const previewColumnDefinitions = responseColumns.map(columnName => {
+                        const key = (columnName || '').toString();
+                        const label = labelLookup.get(key.trim().toLowerCase()) || key;
+                        return { key, label };
+                    });
+
+                    renderPreviewTable(previewColumnDefinitions, responseRows);
+                    setPreviewStatus(`Showing ${responseRows.length} row(s).`, false);
+                } catch {
+                    setPreviewStatus('Failed to load preview data.', true);
+                    clearPreviewTable();
+                } finally {
+                    button.disabled = false;
+                }
+            }
+
+            button.addEventListener('click', loadPreviewData);
+            loadPreviewData();
+        })();
+    </script>
+}
