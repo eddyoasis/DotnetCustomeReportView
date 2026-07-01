@@ -6,6 +6,16 @@ namespace DataWarehousePower.Services
     {
         Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null);
 
+        Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadColumnPreferencesAsync(
+            string userId,
+            int reportId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns);
+
+        Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId);
+
+        Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId);
+
         /// <summary>
         /// Builds the complete ReportViewModel for the given report:
         /// loads the report definition, applies user preferences, and fetches data.

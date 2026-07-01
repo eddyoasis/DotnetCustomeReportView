@@ -42,6 +42,19 @@ namespace DataWarehousePower.Services
         public Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null)
             => _reportRepo.GetAllReportsAsync(userDepartment);
 
+        public Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadColumnPreferencesAsync(
+            string userId,
+            int reportId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns)
+            => LoadPreferencesAsync(userId, reportId, NormalizeSchemaTemplate(schemaTemplate), systemColumns.ToList());
+
+        public Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId)
+            => _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
+
+        public Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId)
+            => _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
+
         public async Task<ReportViewModel?> BuildReportViewModelAsync(
             int reportId,
             string userId,

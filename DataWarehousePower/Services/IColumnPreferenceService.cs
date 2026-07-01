@@ -6,6 +6,16 @@ namespace DataWarehousePower.Services
     {
         string ResolveUserId(HttpContext httpContext);
 
+        Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadColumnPreferencesAsync(
+            string userId,
+            int reportId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns);
+
+        Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId);
+
+        Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId);
+
         // Kept for direct use by the controller — delegates to ReportService internally
         Task<int> SavePreferencesAsync(string userId, int reportId, string? clientCode,
             int? preferenceId,

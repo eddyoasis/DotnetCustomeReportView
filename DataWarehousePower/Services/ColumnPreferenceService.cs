@@ -44,6 +44,19 @@ namespace DataWarehousePower.Services
             return fallbackUserId;
         }
 
+        public Task<(List<ColumnDefinition> DisplayColumns, int? ActivePreferenceId)> LoadColumnPreferencesAsync(
+            string userId,
+            int reportId,
+            string? schemaTemplate,
+            IReadOnlyList<ColumnDefinition> systemColumns)
+            => _reportService.LoadColumnPreferencesAsync(userId, reportId, schemaTemplate, systemColumns);
+
+        public Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId)
+            => _reportService.GetSchemaTemplatesAsync(userId, reportId);
+
+        public Task<Dictionary<string, int>> GetSchemaTemplatePreferenceIdsAsync(string userId, int reportId)
+            => _reportService.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
+
         public Task<int> SavePreferencesAsync(string userId, int reportId, string? clientCode,
             int? preferenceId,
             IEnumerable<SaveColumnRequest> columns,

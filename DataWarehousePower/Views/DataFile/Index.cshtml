@@ -53,6 +53,7 @@
                                asp-route-id="@dataFile.Id"
                                asp-route-search="@Model.Filter.Search"
                                asp-route-isActive="@Model.Filter.IsActive"
+                                         asp-route-schemaTemplate="@Model.SchemaTemplate"
                                class="text-decoration-none d-block @(selectedDataFile?.Id == dataFile.Id ? "text-white" : "")" 
                                style="font-size:.85rem;">
                                 @dataFile.DataFileName
@@ -78,12 +79,66 @@
                     <div class="text-muted small">Browse the source definition, columns, and allowed departments.</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <a asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
+                    <a asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" asp-route-schemaTemplate="@Model.SchemaTemplate" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
                     @if (canManageReports)
                     {
                         <a asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-secondary btn-sm">Manage</a>
                     }
                 </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body py-2 px-3">
+                    <label for="schema-template-select" class="form-label small fw-semibold mb-1">Schema Template</label>
+                    <div class="d-flex gap-2 align-items-center flex-nowrap flex-wrap">
+                        <select id="schema-template-select" class="d-none" aria-hidden="true">
+                            <option value="">Default</option>
+                            @foreach (var availableSchemaTemplate in Model.AvailableSchemaTemplates)
+                            {
+                                <option value="@availableSchemaTemplate" selected="@(availableSchemaTemplate.Equals(Model.SchemaTemplate, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableSchemaTemplate</option>
+                            }
+                        </select>
+
+                        <div class="dropdown flex-grow-1">
+                            <button id="schema-template-dropdown-toggle"
+                                    class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside"
+                                    aria-expanded="false">
+                                Default
+                            </button>
+                            <div class="dropdown-menu p-2 w-100" style="min-width: 260px;">
+                                <input id="schema-template-search"
+                                       type="text"
+                                       class="form-control form-control-sm mb-2"
+                                       maxlength="128"
+                                       placeholder="Search schema template"
+                                       autocomplete="off" />
+                                <div id="schema-template-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+
+                        <button id="btn-schema-apply" type="button" class="btn btn-sm btn-outline-primary">Load</button>
+                        <button id="btn-schema-clear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
+                        <button id="btn-schema-rename" type="button" class="btn btn-sm btn-outline-warning">Rename</button>
+                        <button id="btn-schema-delete" type="button" class="btn btn-sm btn-outline-danger">Delete</button>
+
+                        <input id="schema-template-new"
+                               type="text"
+                               class="form-control form-control-sm"
+                               maxlength="128"
+                               placeholder="Create new schema template"
+                               style="max-width: 260px;" />
+                        <button id="btn-schema-create" type="button" class="btn btn-sm btn-primary">Use New</button>
+                    </div>
+                    <div id="schema-template-error" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div id="schema-template-status" class="alert alert-light border small py-2 px-3 mb-3">
+                Preference scope:
+                <strong>@(string.IsNullOrWhiteSpace(Model.SchemaTemplate) ? "Default" : Model.SchemaTemplate)</strong>
             </div>
 
             <div class="row g-3">
@@ -118,39 +173,73 @@
                 </div>
 
                 <div class="col-lg-7">
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header fw-semibold">Columns</div>
-                        <div class="card-body p-0">
-                            @if (selectedDataFile.Columns.Any())
-                            {
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered mb-0 align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width:60px;">Order</th>
-                                                <th>Property Name</th>
-                                                <th>Label</th>
-                                                <th>Mapping Parameter</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var column in selectedDataFile.Columns.OrderBy(column => column.DisplayOrder))
-                                            {
-                                                <tr>
-                                                    <td class="text-muted small">@column.DisplayOrder</td>
-                                                    <td>@column.PropertyName</td>
-                                                    <td>@column.DefaultLabel</td>
-                                                    <td>@(string.IsNullOrWhiteSpace(column.MappingParameter) ? "-" : column.MappingParameter)</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
+                    <div class="card mb-4 shadow-sm">
+                        <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                            <span>Column Customiser</span>
+                            <span class="badge bg-secondary" style="font-size:.75rem;">drag · rename · toggle</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Drag chips to reorder &nbsp;|&nbsp;
+                                The <span class="badge bg-light text-secondary border" style="font-size:.7rem;">grey badge</span>
+                                shows the original column name &nbsp;→&nbsp; type in the box to rename it &nbsp;|&nbsp;
+                                Use the checkbox to show/hide. Toggle auto-save on/off as needed, or click <strong>Save &amp; Apply</strong>.
+                            </p>
+
+                            <ul id="sortable-columns" class="list-unstyled d-flex flex-wrap gap-2 mb-3" style="min-height:48px;">
+                                @{
+                                    var visible = Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order).ToList();
+                                    var hiddenCols = Model.AvailableColumns
+                                        .Where(sys => !visible.Any(v => v.Key == sys.Key))
+                                        .Select(sys => new DataWarehousePower.Models.ColumnDefinition
+                                        {
+                                            Key = sys.Key,
+                                            DefaultLabel = sys.DefaultLabel,
+                                            DisplayLabel = sys.DefaultLabel,
+                                            IsVisible = false,
+                                            Order = 999
+                                        });
+                                    var allChips = visible.Concat(hiddenCols).ToList();
+                                }
+                                @foreach (var col in allChips)
+                                {
+                                    <li class="chip border rounded px-2 py-1 bg-white shadow-sm d-flex align-items-center gap-2 @(col.IsVisible ? "" : "opacity-50")"
+                                        data-key="@col.Key"
+                                        data-default-label="@col.DefaultLabel"
+                                        draggable="true"
+                                        style="cursor:grab; user-select:none;">
+                                        <span class="drag-handle text-muted" style="cursor:grab;">&#9776;</span>
+                                        <span class="badge bg-light text-secondary border"
+                                              style="font-size:.7rem; white-space:nowrap;"
+                                              title="Original column name">@col.DefaultLabel</span>
+                                        <span class="text-muted" style="font-size:.8rem;">→</span>
+                                        <input type="text"
+                                               class="form-control form-control-sm label-input border-0 p-0"
+                                               style="width:110px; background:transparent;"
+                                               value="@col.DisplayLabel"
+                                               maxlength="100"
+                                               placeholder="@col.DefaultLabel"
+                                               title="Display name (original: @col.DefaultLabel)"
+                                               aria-label="Display label for @col.DefaultLabel" />
+                                        <input type="checkbox"
+                                               class="form-check-input m-0 col-visible-toggle"
+                                        @(col.IsVisible ? "checked" : "")
+                                               title="Show / hide column"
+                                               aria-label="Show @col.DefaultLabel" />
+                                    </li>
+                                }
+                            </ul>
+
+                            <div id="label-error" class="text-danger small mb-2" style="display:none;"></div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button id="btn-apply" type="button" class="btn btn-primary btn-sm">Save &amp; Apply</button>
+                                <button id="btn-reset" type="button" class="btn btn-outline-secondary btn-sm">Reset to Defaults</button>
+                                <div class="form-check form-switch align-self-center ms-2">
+                                    <input id="auto-save-toggle" class="form-check-input" type="checkbox" checked />
+                                    <label class="form-check-label small" for="auto-save-toggle">Auto-save</label>
                                 </div>
-                            }
-                            else
-                            {
-                                <div class="p-3 text-muted small">No columns are defined for this data file.</div>
-                            }
+                                <span id="save-status" class="small align-self-center ms-1"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -192,11 +281,15 @@
 {
     <script>
         (function () {
+            const reportId = @selectedDataFile.Id;
             const previewUrl = '@Url.Action("Preview", "DataFileManage")';
+            const savePreferencesUrl = '@Url.Action("SavePreferences", "DataFile", new { id = selectedDataFile.Id })';
+            const updateSchemaTemplateUrl = '@Url.Action("UpdateSchemaTemplate", "DataFile", new { id = selectedDataFile.Id })';
+            const deleteSchemaTemplateUrl = '@Url.Action("DeleteSchemaTemplate", "DataFile", new { id = selectedDataFile.Id })';
             const sourceDatabase = @Html.Raw(JsonSerializer.Serialize(selectedDataFile.SourceDatabase));
             const sourceTable = @Html.Raw(JsonSerializer.Serialize(selectedDataFile.SourceTable));
             const sourceSP = @Html.Raw(JsonSerializer.Serialize(selectedDataFile.SourceSP));
-            const columns = @Html.Raw(JsonSerializer.Serialize(
+            const previewColumns = @Html.Raw(JsonSerializer.Serialize(
                 selectedDataFile.Columns
                     .OrderBy(column => column.DisplayOrder)
                     .Select(column => new
@@ -204,6 +297,19 @@
                         propertyName = column.PropertyName,
                         defaultLabel = column.DefaultLabel,
                         mappingParameter = column.MappingParameter
+                    })
+                    .ToList()));
+            const initialSchemaTemplate = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplate));
+            const initialPreferenceId = @Html.Raw(JsonSerializer.Serialize(Model.ActivePreferenceId));
+            const schemaTemplatePreferenceIds = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplatePreferenceIds));
+            const defaultColumnState = @Html.Raw(JsonSerializer.Serialize(
+                Model.AvailableColumns
+                    .OrderBy(column => column.Order)
+                    .Select((column, index) => new
+                    {
+                        key = column.Key,
+                        defaultLabel = column.DefaultLabel,
+                        order = column.Order > 0 ? column.Order : index + 1
                     })
                     .ToList()));
 
@@ -216,44 +322,61 @@
             const emptyState = document.getElementById('preview-empty-state');
             const reportSidebarFilter = document.getElementById('report-sidebar-filter');
             const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
+            const schemaTemplateSearchInput = document.getElementById('schema-template-search');
+            const schemaTemplateDropdownToggle = document.getElementById('schema-template-dropdown-toggle');
+            const schemaTemplateOptions = document.getElementById('schema-template-options');
+            const schemaTemplateSelect = document.getElementById('schema-template-select');
+            const schemaTemplateNewInput = document.getElementById('schema-template-new');
+            const schemaApplyButton = document.getElementById('btn-schema-apply');
+            const schemaClearButton = document.getElementById('btn-schema-clear');
+            const schemaRenameButton = document.getElementById('btn-schema-rename');
+            const schemaDeleteButton = document.getElementById('btn-schema-delete');
+            const schemaCreateButton = document.getElementById('btn-schema-create');
+            const schemaTemplateError = document.getElementById('schema-template-error');
+            const schemaTemplateStatus = document.getElementById('schema-template-status');
+            const sortable = document.getElementById('sortable-columns');
+            const autoSaveToggle = document.getElementById('auto-save-toggle');
+            const saveStatus = document.getElementById('save-status');
+            const labelError = document.getElementById('label-error');
 
-            if (!button || !takeInput || !status || !tableWrap || !head || !body || !emptyState) {
-                return;
+            let activePreferenceId = initialPreferenceId;
+            let autoSaveTimer = null;
+            let isAutoSaveEnabled = true;
+            const autoSaveStorageKey = `datafile:${reportId}:columnAutoSave`;
+
+            try {
+                const persistedAutoSave = localStorage.getItem(autoSaveStorageKey);
+                if (persistedAutoSave !== null) {
+                    isAutoSaveEnabled = persistedAutoSave === 'true';
+                }
+            } catch {
+                // Ignore storage access issues and keep the default setting.
             }
 
-            function filterSidebarReports() {
-                if (!reportSidebarFilter) {
-                    return;
-                }
+            if (autoSaveToggle) {
+                autoSaveToggle.checked = isAutoSaveEnabled;
+                autoSaveToggle.addEventListener('change', () => {
+                    isAutoSaveEnabled = autoSaveToggle.checked;
 
-                const query = reportSidebarFilter.value.trim().toLocaleLowerCase();
-                const reportItems = [...document.querySelectorAll('.report-sidebar-item')];
-                let visibleCount = 0;
+                    if (!isAutoSaveEnabled && autoSaveTimer) {
+                        clearTimeout(autoSaveTimer);
+                        autoSaveTimer = null;
+                    }
 
-                reportItems.forEach(item => {
-                    const reportName = (item.getAttribute('data-report-name') || '').toLocaleLowerCase();
-                    const isVisible = !query || reportName.includes(query);
-                    item.classList.toggle('d-none', !isVisible);
-                    if (isVisible) {
-                        visibleCount += 1;
+                    try {
+                        localStorage.setItem(autoSaveStorageKey, String(isAutoSaveEnabled));
+                    } catch {
+                        // Ignore storage access issues.
                     }
                 });
-
-                if (reportSidebarEmpty) {
-                    reportSidebarEmpty.classList.toggle('d-none', visibleCount > 0);
-                }
             }
 
-            if (reportSidebarFilter) {
-                reportSidebarFilter.value = '';
-                reportSidebarFilter.addEventListener('input', filterSidebarReports);
-                filterSidebarReports();
-            }
-
-            function setPreviewStatus(message, isError) {
-                status.textContent = message;
-                status.classList.toggle('text-danger', !!isError);
-                status.classList.toggle('text-muted', !isError);
+            function esc(value) {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
             }
 
             function clearPreviewTable() {
@@ -261,6 +384,21 @@
                 body.innerHTML = '';
                 tableWrap.style.display = 'none';
                 emptyState.style.display = 'none';
+            }
+
+            function getColumnsFromChips() {
+                if (!sortable) {
+                    return [];
+                }
+
+                return [...sortable.querySelectorAll('li.chip')]
+                    .map((chip, index) => ({
+                        key: chip.dataset.key || '',
+                        isVisible: chip.querySelector('.col-visible-toggle')?.checked ?? true,
+                        order: index + 1,
+                        displayLabel: chip.querySelector('.label-input')?.value.trim() || chip.dataset.defaultLabel || ''
+                    }))
+                    .filter(column => column.key.length > 0);
             }
 
             function renderPreviewTable(columnDefinitions, rows) {
@@ -296,6 +434,331 @@
                 emptyState.style.display = (Array.isArray(rows) && rows.length === 0) ? 'block' : 'none';
             }
 
+            function renderPreviewFromCurrentState(rows) {
+                const visibleColumns = getColumnsFromChips().filter(column => column.isVisible);
+                if (!visibleColumns.length) {
+                    setPreviewStatus('No visible columns are selected in this schema template.', true);
+                    clearPreviewTable();
+                    return;
+                }
+
+                renderPreviewTable(visibleColumns.map(column => ({ key: column.key, label: column.displayLabel })), rows);
+            }
+
+            function setPreviewStatus(message, isError) {
+                status.textContent = message;
+                status.classList.toggle('text-danger', !!isError);
+                status.classList.toggle('text-muted', !isError);
+            }
+
+            function filterSidebarReports() {
+                if (!reportSidebarFilter) {
+                    return;
+                }
+
+                const query = reportSidebarFilter.value.trim().toLocaleLowerCase();
+                const reportItems = [...document.querySelectorAll('.report-sidebar-item')];
+                let visibleCount = 0;
+
+                reportItems.forEach(item => {
+                    const reportName = (item.getAttribute('data-report-name') || '').toLocaleLowerCase();
+                    const isVisible = !query || reportName.includes(query);
+                    item.classList.toggle('d-none', !isVisible);
+                    if (isVisible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (reportSidebarEmpty) {
+                    reportSidebarEmpty.classList.toggle('d-none', visibleCount > 0);
+                }
+            }
+
+            function clearSchemaTemplateError() {
+                if (!schemaTemplateError) {
+                    return;
+                }
+
+                schemaTemplateError.textContent = '';
+                schemaTemplateError.style.display = 'none';
+            }
+
+            function showSchemaTemplateError(message) {
+                if (!schemaTemplateError) {
+                    return;
+                }
+
+                schemaTemplateError.textContent = message;
+                schemaTemplateError.style.display = 'block';
+            }
+
+            function hideSchemaTemplateError() {
+                clearSchemaTemplateError();
+            }
+
+            function getPreferenceIdForSchemaTemplate(schemaTemplate) {
+                const normalized = schemaTemplate.trim();
+                if (!normalized) {
+                    return null;
+                }
+
+                const exactKey = Object.keys(schemaTemplatePreferenceIds).find(key =>
+                    key.localeCompare(normalized, undefined, { sensitivity: 'accent' }) === 0);
+
+                return typeof exactKey === 'string' ? schemaTemplatePreferenceIds[exactKey] : null;
+            }
+
+            function syncSchemaTemplateUi(value) {
+                const normalizedValue = value.trim();
+
+                if (schemaTemplateSelect) {
+                    schemaTemplateSelect.value = normalizedValue;
+                }
+                if (schemaTemplateNewInput) {
+                    schemaTemplateNewInput.value = normalizedValue;
+                }
+
+                activePreferenceId = getPreferenceIdForSchemaTemplate(normalizedValue);
+
+                if (schemaTemplateDropdownToggle) {
+                    schemaTemplateDropdownToggle.textContent = normalizedValue || 'Default';
+                }
+
+                renderSchemaTemplateOptions(schemaTemplateSearchInput?.value || '');
+
+                if (schemaTemplateStatus) {
+                    schemaTemplateStatus.innerHTML = `Preference scope: <strong>${esc(normalizedValue || 'Default')}</strong>`;
+                }
+            }
+
+            function upsertSchemaTemplateOption(value, preferenceId) {
+                const normalizedValue = value.trim();
+                if (!normalizedValue || !schemaTemplateSelect) {
+                    return;
+                }
+
+                if (typeof preferenceId === 'number') {
+                    Object.keys(schemaTemplatePreferenceIds)
+                        .filter(key => key.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0 && key !== normalizedValue)
+                        .forEach(key => delete schemaTemplatePreferenceIds[key]);
+                    schemaTemplatePreferenceIds[normalizedValue] = preferenceId;
+                }
+
+                const existingOption = [...schemaTemplateSelect.options].find(option =>
+                    option.value.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0);
+
+                if (existingOption) {
+                    existingOption.value = normalizedValue;
+                    existingOption.textContent = normalizedValue;
+                    return;
+                }
+
+                const newOption = document.createElement('option');
+                newOption.value = normalizedValue;
+                newOption.textContent = normalizedValue;
+                schemaTemplateSelect.appendChild(newOption);
+                renderSchemaTemplateOptions(schemaTemplateSearchInput?.value || '');
+            }
+
+            function removeSchemaTemplateOption(value) {
+                const normalizedValue = value.trim();
+                if (!normalizedValue || !schemaTemplateSelect) {
+                    return;
+                }
+
+                const option = [...schemaTemplateSelect.options].find(item =>
+                    item.value.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0);
+
+                if (option) {
+                    option.remove();
+                }
+            }
+
+            function renderSchemaTemplateOptions(searchValue) {
+                if (!schemaTemplateOptions || !schemaTemplateSelect) {
+                    return;
+                }
+
+                const normalizedSearch = searchValue.trim().toLocaleLowerCase();
+                const selectedValue = schemaTemplateSelect.value;
+                schemaTemplateOptions.innerHTML = '';
+
+                [...schemaTemplateSelect.options].forEach((option, index) => {
+                    const isDefault = index === 0;
+                    const isMatch = !normalizedSearch || option.text.toLocaleLowerCase().includes(normalizedSearch);
+                    const isSelected = option.value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0;
+                    if (!(isDefault || isMatch || isSelected)) {
+                        return;
+                    }
+
+                    const optionButton = document.createElement('button');
+                    optionButton.type = 'button';
+                    optionButton.className = `list-group-item list-group-item-action py-1 px-2${isSelected ? ' active' : ''}`;
+                    optionButton.textContent = option.text;
+                    optionButton.addEventListener('click', () => {
+                        hideSchemaTemplateError();
+                        schemaTemplateSelect.value = option.value;
+                        syncSchemaTemplateUi(option.value);
+                        navigateToSchemaTemplate(option.value);
+                    });
+                    schemaTemplateOptions.appendChild(optionButton);
+                });
+
+                if (!schemaTemplateOptions.children.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'text-muted small px-2 py-1';
+                    empty.textContent = 'No matches';
+                    schemaTemplateOptions.appendChild(empty);
+                }
+            }
+
+            function navigateToSchemaTemplate(value) {
+                const trimmed = value.trim();
+                const url = new URL(window.location.href);
+
+                if (trimmed) {
+                    url.searchParams.set('schemaTemplate', trimmed);
+                } else {
+                    url.searchParams.delete('schemaTemplate');
+                }
+
+                window.location.href = url.toString();
+            }
+
+            function buildColumnsFromChips(chips) {
+                return chips.map((chip, index) => ({
+                    key: chip.dataset.key,
+                    isVisible: chip.querySelector('.col-visible-toggle').checked,
+                    order: index + 1,
+                    displayLabel: chip.querySelector('.label-input').value.trim() || chip.dataset.defaultLabel
+                }));
+            }
+
+            async function saveColumnsAsync(isAutoSave) {
+                if (!sortable) {
+                    return;
+                }
+
+                labelError.style.display = 'none';
+                const activeSchemaTemplate = schemaTemplateSelect?.value.trim() || '';
+                const chips = [...sortable.querySelectorAll('li.chip')];
+
+                let hasError = false;
+                chips.forEach(chip => {
+                    const input = chip.querySelector('.label-input');
+                    const bad = chip.querySelector('.col-visible-toggle').checked && !input.value.trim();
+                    input.classList.toggle('border', bad);
+                    input.classList.toggle('border-danger', bad);
+                    if (bad) {
+                        hasError = true;
+                    }
+                });
+
+                if (hasError) {
+                    labelError.textContent = 'Column label cannot be blank.';
+                    labelError.style.display = 'block';
+                    return;
+                }
+
+                saveStatus.textContent = isAutoSave ? 'Auto-saving…' : 'Saving…';
+                saveStatus.className = 'small align-self-center ms-1 text-muted';
+
+                try {
+                    const response = await fetch(savePreferencesUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schemaTemplate: activeSchemaTemplate,
+                            preferenceId: activePreferenceId,
+                            columns: buildColumnsFromChips(chips)
+                        })
+                    });
+
+                    const json = await response.json().catch(() => ({}));
+                    if (response.ok && json.success) {
+                        if (typeof json.preferenceId === 'number') {
+                            activePreferenceId = json.preferenceId;
+                            upsertSchemaTemplateOption(activeSchemaTemplate, json.preferenceId);
+                        }
+
+                        syncSchemaTemplateUi(activeSchemaTemplate);
+                        saveStatus.textContent = isAutoSave ? '✓ Auto-saved' : '✓ Saved';
+                        saveStatus.className = 'small align-self-center ms-1 text-success';
+                        await loadPreviewData();
+                        setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+                    } else {
+                        saveStatus.textContent = '✗ ' + (json.error || 'Save failed');
+                        saveStatus.className = 'small align-self-center ms-1 text-danger';
+                    }
+                } catch {
+                    saveStatus.textContent = '✗ Network error';
+                    saveStatus.className = 'small align-self-center ms-1 text-danger';
+                }
+            }
+
+            function scheduleAutoSave() {
+                if (!isAutoSaveEnabled) {
+                    return;
+                }
+
+                if (autoSaveTimer) {
+                    clearTimeout(autoSaveTimer);
+                }
+
+                autoSaveTimer = setTimeout(async () => {
+                    autoSaveTimer = null;
+                    await saveColumnsAsync(true);
+                }, 500);
+            }
+
+            function getActiveSchemaTemplate() {
+                const newSchemaTemplate = schemaTemplateNewInput?.value.trim() || '';
+                if (newSchemaTemplate.length > 0) {
+                    return newSchemaTemplate;
+                }
+
+                return schemaTemplateSelect?.value.trim() || '';
+            }
+
+            function getPasswordValidationError(password) {
+                if (!password) {
+                    return 'Password is required.';
+                }
+
+                if (password.length < 8) {
+                    return 'Password must be at least 8 characters.';
+                }
+
+                const hasUpper = /[A-Z]/.test(password);
+                const hasLower = /[a-z]/.test(password);
+                const hasNumber = /\d/.test(password);
+                const hasSymbol = /[^A-Za-z0-9]/.test(password);
+
+                if (!(hasUpper && hasLower && hasNumber && hasSymbol)) {
+                    return 'Password must include uppercase, lowercase, number, and symbol.';
+                }
+
+                return '';
+            }
+
+            function getSelectedExportFormats() {
+                return [];
+            }
+
+            function updateColumnChipVisibility(chip) {
+                const isVisible = chip.querySelector('.col-visible-toggle').checked;
+                chip.classList.toggle('opacity-50', !isVisible);
+            }
+
+            function loadColumnStateFromDefaults() {
+                if (!sortable) {
+                    return;
+                }
+
+                const chips = [...sortable.querySelectorAll('li.chip')];
+                chips.forEach(chip => updateColumnChipVisibility(chip));
+            }
+
             async function loadPreviewData() {
                 const dbName = (sourceDatabase || '').trim();
                 const tableName = (sourceTable || '').trim();
@@ -308,7 +771,7 @@
                     return;
                 }
 
-                const previewColumns = (Array.isArray(columns) ? columns : [])
+                const previewRequestColumns = (Array.isArray(previewColumns) ? previewColumns : [])
                     .map(column => ({
                         propertyName: (column?.propertyName || '').toString().trim(),
                         defaultLabel: (column?.defaultLabel || '').toString().trim(),
@@ -316,7 +779,7 @@
                     }))
                     .filter(column => column.propertyName);
 
-                if (previewColumns.length === 0) {
+                if (previewRequestColumns.length === 0) {
                     setPreviewStatus('No columns are available for preview.', true);
                     clearPreviewTable();
                     return;
@@ -339,7 +802,7 @@
                             sourceTable: tableName,
                             sourceSP: procedureName,
                             take,
-                            columns: previewColumns.map(column => ({
+                            columns: previewRequestColumns.map(column => ({
                                 propertyName: column.propertyName,
                                 mappingParameter: column.mappingParameter
                             }))
@@ -353,23 +816,8 @@
                         return;
                     }
 
-                    const responseColumns = Array.isArray(payload?.columns) ? payload.columns : [];
                     const responseRows = Array.isArray(payload?.rows) ? payload.rows : [];
-
-                    const labelLookup = new Map(
-                        previewColumns.map(column => [
-                            column.propertyName.trim().toLowerCase(),
-                            column.defaultLabel || column.propertyName
-                        ])
-                    );
-
-                    const previewColumnDefinitions = responseColumns.map(columnName => {
-                        const key = (columnName || '').toString();
-                        const label = labelLookup.get(key.trim().toLowerCase()) || key;
-                        return { key, label };
-                    });
-
-                    renderPreviewTable(previewColumnDefinitions, responseRows);
+                    renderPreviewFromCurrentState(responseRows);
                     setPreviewStatus(`Showing ${responseRows.length} row(s).`, false);
                 } catch {
                     setPreviewStatus('Failed to load preview data.', true);
@@ -379,7 +827,350 @@
                 }
             }
 
-            button.addEventListener('click', loadPreviewData);
+            if (reportSidebarFilter) {
+                reportSidebarFilter.value = '';
+                reportSidebarFilter.addEventListener('input', filterSidebarReports);
+                filterSidebarReports();
+            }
+
+            if (schemaTemplateSearchInput) {
+                schemaTemplateSearchInput.addEventListener('input', e => {
+                    hideSchemaTemplateError();
+                    const searchValue = e.target instanceof HTMLInputElement ? e.target.value : '';
+                    renderSchemaTemplateOptions(searchValue);
+                });
+            }
+
+            if (schemaApplyButton) {
+                schemaApplyButton.addEventListener('click', () => {
+                    hideSchemaTemplateError();
+                    navigateToSchemaTemplate(getActiveSchemaTemplate());
+                });
+            }
+
+            if (schemaClearButton) {
+                schemaClearButton.addEventListener('click', () => {
+                    hideSchemaTemplateError();
+                    if (schemaTemplateSelect) {
+                        schemaTemplateSelect.value = '';
+                    }
+                    if (schemaTemplateNewInput) {
+                        schemaTemplateNewInput.value = '';
+                    }
+                    navigateToSchemaTemplate('');
+                });
+            }
+
+            if (schemaCreateButton) {
+                schemaCreateButton.addEventListener('click', async () => {
+                    hideSchemaTemplateError();
+
+                    const newSchemaTemplate = schemaTemplateNewInput?.value.trim() || '';
+                    if (!newSchemaTemplate) {
+                        showSchemaTemplateError('New schema template cannot be blank.');
+                        return;
+                    }
+
+                    const existingOption = [...schemaTemplateSelect.options].find(option =>
+                        option.value.localeCompare(newSchemaTemplate, undefined, { sensitivity: 'accent' }) === 0);
+
+                    if (existingOption) {
+                        schemaTemplateSelect.value = existingOption.value;
+                        navigateToSchemaTemplate(existingOption.value);
+                        return;
+                    }
+
+                    saveStatus.textContent = 'Creating scope…';
+                    saveStatus.className = 'small align-self-center ms-1 text-muted';
+
+                    try {
+                        const response = await fetch(savePreferencesUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ schemaTemplate: newSchemaTemplate, preferenceId: null, columns: buildColumnsFromChips([...sortable.querySelectorAll('li.chip')]) })
+                        });
+
+                        const json = await response.json().catch(() => ({}));
+                        if (!response.ok || !json.success) {
+                            showSchemaTemplateError(json.error || 'Failed to create schema template.');
+                            saveStatus.textContent = '✗ ' + (json.error || 'Create failed');
+                            saveStatus.className = 'small align-self-center ms-1 text-danger';
+                            return;
+                        }
+
+                        if (typeof json.preferenceId === 'number') {
+                            activePreferenceId = json.preferenceId;
+                        }
+
+                        upsertSchemaTemplateOption(newSchemaTemplate, activePreferenceId);
+                        syncSchemaTemplateUi(newSchemaTemplate);
+                        saveStatus.textContent = '✓ Scope created';
+                        saveStatus.className = 'small align-self-center ms-1 text-success';
+                        navigateToSchemaTemplate(newSchemaTemplate);
+                    } catch {
+                        showSchemaTemplateError('Network error while creating schema template.');
+                        saveStatus.textContent = '✗ Network error';
+                        saveStatus.className = 'small align-self-center ms-1 text-danger';
+                    }
+                });
+            }
+
+            if (schemaRenameButton) {
+                schemaRenameButton.addEventListener('click', async () => {
+                    hideSchemaTemplateError();
+
+                    if (typeof activePreferenceId !== 'number') {
+                        showSchemaTemplateError('Save this schema template first before renaming.');
+                        return;
+                    }
+
+                    const currentSchemaTemplate = schemaTemplateSelect?.value.trim() || '';
+                    const newSchemaTemplate = schemaTemplateNewInput?.value.trim() || '';
+                    if (!newSchemaTemplate) {
+                        showSchemaTemplateError('New schema template cannot be blank.');
+                        return;
+                    }
+
+                    const existingId = getPreferenceIdForSchemaTemplate(newSchemaTemplate);
+                    if (typeof existingId === 'number' && existingId !== activePreferenceId) {
+                        showSchemaTemplateError('Schema template already exists.');
+                        return;
+                    }
+
+                    saveStatus.textContent = 'Renaming…';
+                    saveStatus.className = 'small align-self-center ms-1 text-muted';
+
+                    try {
+                        const response = await fetch(updateSchemaTemplateUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ preferenceId: activePreferenceId, newSchemaTemplate: newSchemaTemplate })
+                        });
+
+                        const json = await response.json().catch(() => ({}));
+                        if (!response.ok || !json.success) {
+                            showSchemaTemplateError(json.error || 'Failed to rename schema template.');
+                            saveStatus.textContent = '✗ ' + (json.error || 'Rename failed');
+                            saveStatus.className = 'small align-self-center ms-1 text-danger';
+                            return;
+                        }
+
+                        if (currentSchemaTemplate) {
+                            delete schemaTemplatePreferenceIds[currentSchemaTemplate];
+                            removeSchemaTemplateOption(currentSchemaTemplate);
+                        }
+
+                        activePreferenceId = json.preferenceId;
+                        upsertSchemaTemplateOption(json.schemaTemplate, activePreferenceId);
+                        syncSchemaTemplateUi(json.schemaTemplate);
+                        saveStatus.textContent = '✓ Renamed';
+                        saveStatus.className = 'small align-self-center ms-1 text-success';
+                        navigateToSchemaTemplate(json.schemaTemplate);
+                    } catch {
+                        showSchemaTemplateError('Network error while renaming schema template.');
+                        saveStatus.textContent = '✗ Network error';
+                        saveStatus.className = 'small align-self-center ms-1 text-danger';
+                    }
+                });
+            }
+
+            if (schemaDeleteButton) {
+                schemaDeleteButton.addEventListener('click', async () => {
+                    hideSchemaTemplateError();
+
+                    if (typeof activePreferenceId !== 'number') {
+                        showSchemaTemplateError('No saved schema template scope selected.');
+                        return;
+                    }
+
+                    const selectedSchemaTemplate = schemaTemplateSelect?.value.trim() || '';
+                    if (!selectedSchemaTemplate) {
+                        showSchemaTemplateError('Default scope cannot be deleted.');
+                        return;
+                    }
+
+                    if (!window.confirm(`Delete preference scope "${selectedSchemaTemplate}"?`)) {
+                        return;
+                    }
+
+                    saveStatus.textContent = 'Deleting…';
+                    saveStatus.className = 'small align-self-center ms-1 text-muted';
+
+                    try {
+                        const response = await fetch(deleteSchemaTemplateUrl, {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ preferenceId: activePreferenceId })
+                        });
+
+                        const json = await response.json().catch(() => ({}));
+                        if (!response.ok || !json.success) {
+                            showSchemaTemplateError(json.error || 'Failed to delete schema template.');
+                            saveStatus.textContent = '✗ ' + (json.error || 'Delete failed');
+                            saveStatus.className = 'small align-self-center ms-1 text-danger';
+                            return;
+                        }
+
+                        delete schemaTemplatePreferenceIds[selectedSchemaTemplate];
+                        removeSchemaTemplateOption(selectedSchemaTemplate);
+                        activePreferenceId = null;
+                        saveStatus.textContent = '✓ Deleted';
+                        saveStatus.className = 'small align-self-center ms-1 text-success';
+                        navigateToSchemaTemplate('');
+                    } catch {
+                        showSchemaTemplateError('Network error while deleting schema template.');
+                        saveStatus.textContent = '✗ Network error';
+                        saveStatus.className = 'small align-self-center ms-1 text-danger';
+                    }
+                });
+            }
+
+            if (schemaTemplateNewInput) {
+                schemaTemplateNewInput.addEventListener('keydown', async e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        schemaCreateButton?.click();
+                    }
+                });
+            }
+
+            if (sortable) {
+                let dragSrc = null;
+
+                sortable.addEventListener('dragstart', e => {
+                    dragSrc = e.target.closest('li.chip');
+                    if (dragSrc) {
+                        e.dataTransfer.effectAllowed = 'move';
+                    }
+                });
+
+                sortable.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    const target = e.target.closest('li.chip');
+                    if (target && target !== dragSrc) {
+                        const mid = target.getBoundingClientRect().left + target.getBoundingClientRect().width / 2;
+                        sortable.insertBefore(dragSrc, e.clientX < mid ? target : target.nextSibling);
+                    }
+                });
+
+                sortable.addEventListener('dragend', () => {
+                    dragSrc = null;
+                    scheduleAutoSave();
+                });
+
+                sortable.addEventListener('change', e => {
+                    const chk = e.target.closest('.col-visible-toggle');
+                    if (!chk) return;
+                    chk.closest('li.chip').classList.toggle('opacity-50', !chk.checked);
+                    scheduleAutoSave();
+                });
+
+                sortable.addEventListener('input', e => {
+                    const labelInput = e.target.closest('.label-input');
+                    if (!labelInput) return;
+                    scheduleAutoSave();
+                });
+            }
+
+            document.getElementById('btn-apply')?.addEventListener('click', async () => {
+                await saveColumnsAsync(false);
+            });
+
+            document.getElementById('btn-reset')?.addEventListener('click', async () => {
+                const activeSchemaTemplate = getActiveSchemaTemplate();
+                const defaultOrderByKey = defaultColumnState.reduce((acc, column) => {
+                    acc[column.key] = column.order;
+                    return acc;
+                }, {});
+
+                const chips = [...sortable.querySelectorAll('li.chip')];
+                chips.forEach(chip => {
+                    chip.querySelector('.label-input').value = chip.dataset.defaultLabel;
+                    chip.querySelector('.col-visible-toggle').checked = true;
+                    chip.classList.remove('opacity-50');
+                    chip.querySelector('.label-input').classList.remove('border', 'border-danger');
+                });
+
+                const chipsByKey = chips.reduce((acc, chip) => {
+                    acc[chip.dataset.key] = chip;
+                    return acc;
+                }, {});
+
+                const sortedKeys = Object.keys(chipsByKey)
+                    .sort((left, right) => {
+                        const leftOrder = defaultOrderByKey[left] ?? Number.MAX_SAFE_INTEGER;
+                        const rightOrder = defaultOrderByKey[right] ?? Number.MAX_SAFE_INTEGER;
+                        return leftOrder - rightOrder;
+                    });
+
+                sortedKeys.forEach(key => {
+                    const chip = chipsByKey[key];
+                    if (chip) {
+                        sortable.appendChild(chip);
+                    }
+                });
+
+                const defaultColumns = sortedKeys.map((key, index) => {
+                    const chip = chipsByKey[key];
+                    return {
+                        key,
+                        isVisible: true,
+                        order: defaultOrderByKey[key] ?? index + 1,
+                        displayLabel: chip?.dataset.defaultLabel || key
+                    };
+                });
+
+                saveStatus.textContent = 'Resetting…';
+                saveStatus.className = 'small align-self-center ms-1 text-muted';
+
+                try {
+                    const response = await fetch(savePreferencesUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schemaTemplate: activeSchemaTemplate, preferenceId: activePreferenceId, columns: defaultColumns })
+                    });
+
+                    const json = await response.json().catch(() => ({}));
+                    if (response.ok && json.success) {
+                        if (typeof json.preferenceId === 'number') {
+                            activePreferenceId = json.preferenceId;
+                            upsertSchemaTemplateOption(activeSchemaTemplate, json.preferenceId);
+                        }
+
+                        syncSchemaTemplateUi(activeSchemaTemplate);
+                        saveStatus.textContent = '✓ Reset & saved';
+                        saveStatus.className = 'small align-self-center ms-1 text-success';
+                        await loadPreviewData();
+                        setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+                    }
+                } catch {
+                    // silent
+                }
+            });
+
+            document.getElementById('btn-preview-data')?.addEventListener('click', loadPreviewData);
+
+            if (schemaTemplateSearchInput) {
+                schemaTemplateSearchInput.addEventListener('input', e => {
+                    hideSchemaTemplateError();
+                    const searchValue = e.target instanceof HTMLInputElement ? e.target.value : '';
+                    renderSchemaTemplateOptions(searchValue);
+                });
+            }
+
+            if (reportSidebarFilter) {
+                reportSidebarFilter.value = '';
+                reportSidebarFilter.addEventListener('input', filterSidebarReports);
+                filterSidebarReports();
+            }
+
+            schemaTemplateSelect && renderSchemaTemplateOptions('');
+            syncSchemaTemplateUi(initialSchemaTemplate);
+
+            if (sortable) {
+                loadColumnStateFromDefaults();
+            }
+
             loadPreviewData();
         })();
     </script>
