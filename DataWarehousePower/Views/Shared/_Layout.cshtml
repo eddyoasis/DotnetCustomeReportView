@@ -58,16 +58,17 @@
                                     Reports
                                 </a>
                                 <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
+                                    @if (canViewReports || canManageReports)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item" asp-area="" asp-controller="Report" asp-action="List">View</a>
+                                        </li>
+                                    }
                                     @if (canManageReports)
                                     {
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage</a>
-                                        </li>
-                                    }
-                                    @if (canViewReports)
-                                    {
-                                        <li>
-                                            <a class="dropdown-item" asp-area="" asp-controller="Report" asp-action="List">View</a>
+
                                         </li>
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="Report">Scheduler</a>

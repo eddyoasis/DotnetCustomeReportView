@@ -28,23 +28,18 @@
 }
 
 <div class="row">
-    <div class="col-md-3 pe-0">
+    <div class="col-md-2 pe-0">
         <div class="card shadow-sm h-100 d-flex flex-column">
             <div class="card-header fw-semibold small">Data Files</div>
             <div class="p-2 border-bottom">
                 <form asp-action="Index" method="get" class="row g-2">
                     <div class="col-12">
-                        <input class="form-control form-control-sm" type="text" name="search" value="@Model.Filter.Search" placeholder="Filter data files" autocomplete="off" />
-                    </div>
-                    <div class="col-7">
-                        <select class="form-select form-select-sm" name="isActive">
-                            <option value="">All</option>
-                            <option value="true" selected="@(Model.Filter.IsActive == true ? "selected" : null)">Active</option>
-                            <option value="false" selected="@(Model.Filter.IsActive == false ? "selected" : null)">Inactive</option>
-                        </select>
-                    </div>
-                    <div class="col-5 d-grid">
-                        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                        <input id="report-sidebar-filter"
+                               type="text"
+                               class="form-control form-control-sm"
+                               maxlength="128"
+                               placeholder="Filter data files"
+                               autocomplete="off" />
                     </div>
                 </form>
             </div>
@@ -52,23 +47,20 @@
                 <ul class="list-group list-group-flush">
                     @foreach (var dataFile in Model.DataFiles)
                     {
-                        <li class="list-group-item list-group-item-action p-2 @(selectedDataFile?.Id == dataFile.Id ? "active" : "")">
+                        <li class="report-sidebar-item list-group-item list-group-item-action p-2 @(selectedDataFile?.Id == dataFile.Id ? "active" : "")"
+                            data-report-name="@dataFile.DataFileName">
                             <a asp-action="Index"
                                asp-route-id="@dataFile.Id"
                                asp-route-search="@Model.Filter.Search"
                                asp-route-isActive="@Model.Filter.IsActive"
-                               class="text-decoration-none d-block @(selectedDataFile?.Id == dataFile.Id ? "text-white" : "")">
-                                <div class="d-flex justify-content-between align-items-center gap-2">
-                                    <span class="fw-semibold" style="font-size:.9rem;">@dataFile.DataFileName</span>
-                                    <span class="badge @(dataFile.IsActive ? "bg-success" : "bg-secondary")">@(dataFile.IsActive ? "Active" : "Inactive")</span>
-                                </div>
-                                <div class="small @(selectedDataFile?.Id == dataFile.Id ? "text-white-50" : "text-muted")">
-                                    @(string.IsNullOrWhiteSpace(dataFile.SourceDatabase) ? "No source database" : dataFile.SourceDatabase)
-                                </div>
+                               class="text-decoration-none d-block @(selectedDataFile?.Id == dataFile.Id ? "text-white" : "")" 
+                               style="font-size:.85rem;">
+                                @dataFile.DataFileName
                             </a>
                         </li>
                     }
                 </ul>
+                <div id="report-sidebar-empty" class="text-muted small px-2 py-2 d-none">No matching data files.</div>
             </div>
         </div>
     </div>
@@ -222,9 +214,40 @@
             const head = document.getElementById('preview-table-head');
             const body = document.getElementById('preview-table-body');
             const emptyState = document.getElementById('preview-empty-state');
+            const reportSidebarFilter = document.getElementById('report-sidebar-filter');
+            const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
 
             if (!button || !takeInput || !status || !tableWrap || !head || !body || !emptyState) {
                 return;
+            }
+
+            function filterSidebarReports() {
+                if (!reportSidebarFilter) {
+                    return;
+                }
+
+                const query = reportSidebarFilter.value.trim().toLocaleLowerCase();
+                const reportItems = [...document.querySelectorAll('.report-sidebar-item')];
+                let visibleCount = 0;
+
+                reportItems.forEach(item => {
+                    const reportName = (item.getAttribute('data-report-name') || '').toLocaleLowerCase();
+                    const isVisible = !query || reportName.includes(query);
+                    item.classList.toggle('d-none', !isVisible);
+                    if (isVisible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (reportSidebarEmpty) {
+                    reportSidebarEmpty.classList.toggle('d-none', visibleCount > 0);
+                }
+            }
+
+            if (reportSidebarFilter) {
+                reportSidebarFilter.value = '';
+                reportSidebarFilter.addEventListener('input', filterSidebarReports);
+                filterSidebarReports();
             }
 
             function setPreviewStatus(message, isError) {
