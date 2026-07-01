@@ -79,11 +79,7 @@
                     <div class="text-muted small">Browse the source definition, columns, and allowed departments.</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <a asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" asp-route-schemaTemplate="@Model.SchemaTemplate" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
-                    @if (canManageReports)
-                    {
-                        <a asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-secondary btn-sm">Manage</a>
-                    }
+                    <a asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-secondary btn-sm">Manage</a>
                 </div>
             </div>
 
@@ -271,6 +267,7 @@
                                 </div>
                                 <div class="col-md-8 d-flex gap-2">
                                     <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
+                                    <a asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" asp-route-schemaTemplate="@Model.SchemaTemplate" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
                                     <span id="export-status" class="small align-self-center"></span>
                                 </div>
                             </div>
