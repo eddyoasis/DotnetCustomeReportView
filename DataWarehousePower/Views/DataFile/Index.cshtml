@@ -248,6 +248,39 @@
             <div class="row g-3">
                 <div class="col-lg-12">
                     <div class="card shadow-sm mb-3">
+                        <div class="card-header fw-semibold">Export</div>
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold" for="export-format-csv">Formats</label>
+                                    <div id="export-format" class="d-flex flex-column gap-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="export-format-csv" value="csv" checked />
+                                            <label class="form-check-label" for="export-format-csv">CSV</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="export-format-excel" value="excel" />
+                                            <label class="form-check-label" for="export-format-excel">Excel (.xlsx)</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="export-format-pdf" value="pdf" />
+                                            <label class="form-check-label" for="export-format-pdf">PDF</label>
+                                        </div>
+                                    </div>
+                                    <div class="form-text">Select one or more formats.</div>
+                                </div>
+                                <div class="col-md-8 d-flex gap-2">
+                                    <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
+                                    <span id="export-status" class="small align-self-center"></span>
+                                </div>
+                            </div>
+                            <div class="text-muted small mt-2">
+                                Choose one or more formats, set a strong password, and download the data file as a protected ZIP.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
                         <div class="card-header fw-semibold">Preview Data</div>
                         <div class="card-body">
                             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -273,10 +306,39 @@
             <form id="preview-antiforgery-form" class="d-none">
                 @Html.AntiForgeryToken()
             </form>
+
+            <div class="modal fade" id="export-password-modal" tabindex="-1" aria-labelledby="export-password-title" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="export-password-title">Export Password</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label for="export-password-input" class="form-label small fw-semibold">ZIP Password</label>
+                            <input id="export-password-input"
+                                   type="password"
+                                   class="form-control"
+                                   maxlength="128"
+                                   autocomplete="new-password"
+                                   placeholder="Enter strong password" />
+                            <div class="form-text">
+                                Minimum 8 characters with uppercase, lowercase, number, and symbol.
+                            </div>
+                            <div id="export-password-error" class="text-danger small mt-2" style="display:none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button id="btn-export-confirm" type="button" class="btn btn-success">Export</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         }
     </div>
 </div>
 
+@section Scripts {
 @if (selectedDataFile is not null)
 {
     <script>
@@ -338,6 +400,15 @@
             const autoSaveToggle = document.getElementById('auto-save-toggle');
             const saveStatus = document.getElementById('save-status');
             const labelError = document.getElementById('label-error');
+            const exportUrl = '@Url.Action("Export", "DataFile", new { id = selectedDataFile.Id })';
+            const exportButton = document.getElementById('btn-export');
+            const exportFormatContainer = document.getElementById('export-format');
+            const exportStatus = document.getElementById('export-status');
+            const exportPasswordModalElement = document.getElementById('export-password-modal');
+            const exportPasswordInput = document.getElementById('export-password-input');
+            const exportPasswordError = document.getElementById('export-password-error');
+            const exportConfirmButton = document.getElementById('btn-export-confirm');
+            const exportPasswordModal = new bootstrap.Modal(exportPasswordModalElement);
 
             let activePreferenceId = initialPreferenceId;
             let autoSaveTimer = null;
@@ -742,7 +813,82 @@
             }
 
             function getSelectedExportFormats() {
-                return [];
+                if (!exportFormatContainer) {
+                    return [];
+                }
+
+                return [...exportFormatContainer.querySelectorAll('input[type="checkbox"]:checked')]
+                    .map(input => input.value);
+            }
+
+            function showExportPasswordError(message) {
+                if (!exportPasswordError) {
+                    return;
+                }
+
+                exportPasswordError.textContent = message;
+                exportPasswordError.style.display = 'block';
+            }
+
+            function hideExportPasswordError() {
+                if (!exportPasswordError) {
+                    return;
+                }
+
+                exportPasswordError.textContent = '';
+                exportPasswordError.style.display = 'none';
+            }
+
+            async function exportDataFileAsync(formats, password) {
+                if (!exportStatus || !exportButton) {
+                    return;
+                }
+
+                exportStatus.textContent = 'Exporting...';
+                exportStatus.className = 'small align-self-center text-muted';
+                exportButton.disabled = true;
+
+                try {
+                    const response = await fetch(exportUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            format: formats[0] || null,
+                            formats,
+                            password,
+                            schemaTemplate: getActiveSchemaTemplate()
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.json().catch(() => ({}));
+                        exportStatus.textContent = 'Export failed: ' + (errorBody.error || response.statusText);
+                        exportStatus.className = 'small align-self-center text-danger';
+                        return;
+                    }
+
+                    const blob = await response.blob();
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const anchor = document.createElement('a');
+                    const contentDisposition = response.headers.get('content-disposition') || '';
+                    const fileNameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+                    const fileName = fileNameMatch ? decodeURIComponent(fileNameMatch[1]) : 'datafile_export.zip';
+
+                    anchor.href = downloadUrl;
+                    anchor.download = fileName;
+                    document.body.appendChild(anchor);
+                    anchor.click();
+                    anchor.remove();
+                    URL.revokeObjectURL(downloadUrl);
+
+                    exportStatus.textContent = `ZIP download started (${formats.length} format${formats.length === 1 ? '' : 's'}).`;
+                    exportStatus.className = 'small align-self-center text-success';
+                } catch {
+                    exportStatus.textContent = 'Network error during export.';
+                    exportStatus.className = 'small align-self-center text-danger';
+                } finally {
+                    exportButton.disabled = false;
+                }
             }
 
             function updateColumnChipVisibility(chip) {
@@ -1150,6 +1296,43 @@
 
             document.getElementById('btn-preview-data')?.addEventListener('click', loadPreviewData);
 
+            exportButton?.addEventListener('click', () => {
+                const selectedFormats = getSelectedExportFormats();
+                if (!selectedFormats.length) {
+                    exportStatus.textContent = 'Select at least one format.';
+                    exportStatus.className = 'small align-self-center text-danger';
+                    return;
+                }
+
+                hideExportPasswordError();
+                if (exportPasswordInput) {
+                    exportPasswordInput.value = '';
+                }
+                exportPasswordModal?.show();
+                exportPasswordInput?.focus();
+            });
+
+            exportConfirmButton?.addEventListener('click', async () => {
+                const password = (exportPasswordInput?.value || '').trim();
+                const passwordValidationError = getPasswordValidationError(password);
+
+                if (passwordValidationError) {
+                    showExportPasswordError(passwordValidationError);
+                    return;
+                }
+
+                hideExportPasswordError();
+                exportPasswordModal?.hide();
+                await exportDataFileAsync(getSelectedExportFormats(), password);
+            });
+
+            exportPasswordInput?.addEventListener('keydown', async e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    exportConfirmButton?.click();
+                }
+            });
+
             if (schemaTemplateSearchInput) {
                 schemaTemplateSearchInput.addEventListener('input', e => {
                     hideSchemaTemplateError();
@@ -1174,4 +1357,5 @@
             loadPreviewData();
         })();
     </script>
+}
 }

@@ -1,4 +1,5 @@
 using DataWarehousePower.Authorization;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -13,17 +14,23 @@ namespace DataWarehousePower.Controllers
         private readonly IScheduledReportJobService _scheduledReportJobService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IDepartmentService _departmentService;
+        private readonly IReportExportService _exportService;
+        private readonly ILogger<DataFileController> _logger;
 
         public DataFileController(
             IDataFileManageService service,
             IScheduledReportJobService scheduledReportJobService,
             IColumnPreferenceService prefService,
-            IDepartmentService departmentService)
+            IDepartmentService departmentService,
+            IReportExportService exportService,
+            ILogger<DataFileController> logger)
         {
             _service = service;
             _scheduledReportJobService = scheduledReportJobService;
             _prefService = prefService;
             _departmentService = departmentService;
+            _exportService = exportService;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null)
@@ -227,6 +234,135 @@ namespace DataWarehousePower.Controllers
             }
         }
 
+        [HttpPost]
+        public async Task<IActionResult> Export(int id, [FromBody] ExportReportRequest? request, CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return BadRequest(new { success = false, error = "Export request is required." });
+            }
+
+            List<string> normalizedFormats = (request.Formats ?? [])
+                .Where(format => !string.IsNullOrWhiteSpace(format))
+                .Select(format => format.Trim().ToLowerInvariant())
+                .Distinct()
+                .ToList();
+
+            if (normalizedFormats.Count == 0 && !string.IsNullOrWhiteSpace(request.Format))
+            {
+                normalizedFormats.Add(request.Format.Trim().ToLowerInvariant());
+            }
+
+            if (normalizedFormats.Count == 0)
+            {
+                return BadRequest(new { success = false, error = "At least one format is required. Use CSV, Excel, or PDF." });
+            }
+
+            if (normalizedFormats.Any(format => format is not ("csv" or "excel" or "pdf")))
+            {
+                return BadRequest(new { success = false, error = "Invalid format selection. Use CSV, Excel, or PDF." });
+            }
+
+            string? passwordValidationError = ValidatePasswordStrength(request.Password);
+            if (passwordValidationError is not null)
+            {
+                return BadRequest(new { success = false, error = passwordValidationError });
+            }
+
+            DataFileManageFormViewModel form;
+            try
+            {
+                form = await _service.GetFormViewModelAsync(id);
+            }
+            catch (InvalidOperationException)
+            {
+                return NotFound(new { success = false, error = "Data file not found." });
+            }
+
+            if (!string.IsNullOrWhiteSpace(form.SourceSP))
+            {
+                return BadRequest(new { success = false, error = "Export currently supports Source Table only for data files." });
+            }
+
+            List<ColumnDefinition> exportColumns = form.Columns
+                .Where(column => !column.IsDeleted)
+                .OrderBy(column => column.DisplayOrder)
+                .Select((column, index) => new ColumnDefinition
+                {
+                    Key = column.PropertyName,
+                    DefaultLabel = column.DefaultLabel,
+                    DisplayLabel = column.DefaultLabel,
+                    IsVisible = true,
+                    Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1
+                })
+                .ToList();
+
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string schemaTemplate = request.SchemaTemplate?.Trim() ?? string.Empty;
+            (List<ColumnDefinition> displayColumns, _) = await _prefService.LoadColumnPreferencesAsync(
+                userId,
+                id,
+                schemaTemplate,
+                exportColumns);
+
+            try
+            {
+                DataFilePreviewResult preview = await _service.GetPreviewDataAsync(new DataFilePreviewRequest
+                {
+                    SourceDatabase = form.SourceDatabase,
+                    SourceTable = form.SourceTable,
+                    SourceSP = form.SourceSP,
+                    Take = 100,
+                    Columns = form.Columns
+                        .Where(column => !column.IsDeleted)
+                        .OrderBy(column => column.DisplayOrder)
+                        .Select(column => new DataFilePreviewColumnRequest
+                        {
+                            PropertyName = column.PropertyName,
+                            MappingParameter = column.MappingParameter
+                        })
+                        .ToList()
+                });
+
+                var vm = new ReportViewModel
+                {
+                    ReportId = id,
+                    ReportName = form.DataFileName,
+                    AvailableColumns = exportColumns,
+                    DisplayColumns = displayColumns,
+                    Rows = preview.Rows
+                };
+
+                string safeName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                string zipFileName = $"{safeName}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
+                string zipSubFileName = $"{safeName}_format_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+
+                byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
+                    vm,
+                    normalizedFormats,
+                    request.Password,
+                    zipSubFileName,
+                    cancellationToken);
+
+                return File(zipBytes, "application/zip", zipFileName);
+            }
+            catch (ArgumentException argumentException)
+            {
+                _logger.LogWarning(argumentException, "Invalid data file export request for data file {DataFileId}", id);
+                return BadRequest(new { success = false, error = argumentException.Message });
+            }
+            catch (InvalidOperationException invalidOperationException)
+            {
+                _logger.LogWarning(invalidOperationException, "Data file export validation failed for data file {DataFileId}", id);
+                return BadRequest(new { success = false, error = invalidOperationException.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to export data file {DataFileId}", id);
+                return StatusCode(500, new { success = false, error = "Failed to export data file." });
+            }
+        }
+
         private async Task<Dictionary<int, string>> GetDepartmentLookupAsync()
         {
             return (await _departmentService.GetAllAsync())
@@ -242,6 +378,32 @@ namespace DataWarehousePower.Controllers
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+        private static string? ValidatePasswordStrength(string? password)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                return "Password is required.";
+            }
+
+            string trimmed = password.Trim();
+            if (trimmed.Length < 8)
+            {
+                return "Password must be at least 8 characters.";
+            }
+
+            bool hasUpper = trimmed.Any(char.IsUpper);
+            bool hasLower = trimmed.Any(char.IsLower);
+            bool hasDigit = trimmed.Any(char.IsDigit);
+            bool hasSymbol = trimmed.Any(character => !char.IsLetterOrDigit(character));
+
+            if (!hasUpper || !hasLower || !hasDigit || !hasSymbol)
+            {
+                return "Password must include uppercase, lowercase, number, and symbol.";
+            }
+
+            return null;
+        }
 
         private string? ResolveUserDepartment()
             => HttpContext.Session.GetString("UserDepartment");
