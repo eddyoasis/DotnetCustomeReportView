@@ -147,7 +147,7 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
             <span>Columns</span>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 d-none">
                 <button type="button" id="btn-auto-cols" class="btn btn-outline-secondary btn-sm">Auto Generate</button>
                 <button type="button" id="btn-add-col" class="btn btn-outline-primary btn-sm">+ Add Column</button>
             </div>
@@ -258,7 +258,7 @@
                         <option value="FilterDateFrom,FilterDateTo">FilterDateRange (From + To)</option>
                     </select>
                 </td>
-                <td>
+                <td hidden>
                     <input name="Columns[${rowIndex}].DisplayOrder"
                            type="number" min="1" max="999" value="${displayOrder}"
                            class="form-control form-control-sm" required />
@@ -1182,15 +1182,18 @@
             if ((tableInput.value || '').trim()) {
                 resetDropdownSelectionByInputId('input-source-sp');
                 loadSourceParameters();
-                syncMissingColumnsFromSource();
+                autoGenerateColumnsFromSource();
+                return;
             }
         });
 
         spInput.addEventListener('change', () => {
             if ((spInput.value || '').trim()) {
                 resetDropdownSelectionByInputId('input-source-table');
-                syncMissingColumnsFromSource();
+                autoGenerateColumnsFromSource();
+                return;
             }
+            loadSourceColumnMetadata();
             loadSourceParameters();
         });
 
@@ -1243,9 +1246,9 @@
 
         loadSourceObjects(tableInput.value);
         loadSourceProcedures(spInput.value);
-        loadSourceParameters();
-        initializeExistingColumnRowStates();
         syncMissingColumnsFromSource();
+        loadSourceParameters();
+        // initializeExistingColumnRowStates();
         refreshMappingParameterOptions();
     </script>
 }

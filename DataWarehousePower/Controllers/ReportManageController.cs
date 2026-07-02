@@ -58,7 +58,7 @@ namespace DataWarehousePower.Controllers
             {
                 Columns = new List<ReportColumnFormModel>
                 {
-                    new() { PropertyName = "", DefaultLabel = "", DisplayOrder = 1 }
+                    //new() { PropertyName = "", DefaultLabel = "", DisplayOrder = 1 }
                 }
             };
 

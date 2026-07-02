@@ -66,7 +66,7 @@
         </div>
     </div>
 
-    <div class="col-md-9">
+    <div class="col-md-10">
         @if (selectedDataFile is null)
         {
             <div class="alert alert-info">No data file is selected.</div>
@@ -137,106 +137,7 @@
                 <strong>@(string.IsNullOrWhiteSpace(Model.SchemaTemplate) ? "Default" : Model.SchemaTemplate)</strong>
             </div>
 
-            <div class="row g-3">
-                <div class="col-lg-5">
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header fw-semibold">Data File Details</div>
-                        <div class="card-body">
-                            <dl class="row mb-0 small">
-                                <dt class="col-5">Source Database</dt>
-                                <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceDatabase) ? "-" : selectedDataFile.SourceDatabase)</dd>
-
-                                <dt class="col-5">Source Table</dt>
-                                <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceTable) ? "-" : selectedDataFile.SourceTable)</dd>
-
-                                <dt class="col-5">Source SP</dt>
-                                <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceSP) ? "-" : selectedDataFile.SourceSP)</dd>
-
-                                <dt class="col-5">Departments</dt>
-                                <dd class="col-7">@GetDepartmentLabel(selectedDataFile.Departments)</dd>
-
-                                <dt class="col-5">Created</dt>
-                                <dd class="col-7">@selectedDataFile.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
-
-                                <dt class="col-5">Modified</dt>
-                                <dd class="col-7">@(selectedDataFile.ModifiedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-7">
-                    <div class="card mb-4 shadow-sm">
-                        <div class="card-header fw-semibold d-flex align-items-center gap-2">
-                            <span>Column Customiser</span>
-                            <span class="badge bg-secondary" style="font-size:.75rem;">drag · rename · toggle</span>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted small mb-3">
-                                Drag chips to reorder &nbsp;|&nbsp;
-                                The <span class="badge bg-light text-secondary border" style="font-size:.7rem;">grey badge</span>
-                                shows the original column name &nbsp;→&nbsp; type in the box to rename it &nbsp;|&nbsp;
-                                Use the checkbox to show/hide. Toggle auto-save on/off as needed, or click <strong>Save &amp; Apply</strong>.
-                            </p>
-
-                            <ul id="sortable-columns" class="list-unstyled d-flex flex-wrap gap-2 mb-3" style="min-height:48px;">
-                                @{
-                                    var visible = Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order).ToList();
-                                    var hiddenCols = Model.AvailableColumns
-                                        .Where(sys => !visible.Any(v => v.Key == sys.Key))
-                                        .Select(sys => new DataWarehousePower.Models.ColumnDefinition
-                                        {
-                                            Key = sys.Key,
-                                            DefaultLabel = sys.DefaultLabel,
-                                            DisplayLabel = sys.DefaultLabel,
-                                            IsVisible = false,
-                                            Order = 999
-                                        });
-                                    var allChips = visible.Concat(hiddenCols).ToList();
-                                }
-                                @foreach (var col in allChips)
-                                {
-                                    <li class="chip border rounded px-2 py-1 bg-white shadow-sm d-flex align-items-center gap-2 @(col.IsVisible ? "" : "opacity-50")"
-                                        data-key="@col.Key"
-                                        data-default-label="@col.DefaultLabel"
-                                        draggable="true"
-                                        style="cursor:grab; user-select:none;">
-                                        <span class="drag-handle text-muted" style="cursor:grab;">&#9776;</span>
-                                        <span class="badge bg-light text-secondary border"
-                                              style="font-size:.7rem; white-space:nowrap;"
-                                              title="Original column name">@col.DefaultLabel</span>
-                                        <span class="text-muted" style="font-size:.8rem;">→</span>
-                                        <input type="text"
-                                               class="form-control form-control-sm label-input border-0 p-0"
-                                               style="width:110px; background:transparent;"
-                                               value="@col.DisplayLabel"
-                                               maxlength="100"
-                                               placeholder="@col.DefaultLabel"
-                                               title="Display name (original: @col.DefaultLabel)"
-                                               aria-label="Display label for @col.DefaultLabel" />
-                                        <input type="checkbox"
-                                               class="form-check-input m-0 col-visible-toggle"
-                                        @(col.IsVisible ? "checked" : "")
-                                               title="Show / hide column"
-                                               aria-label="Show @col.DefaultLabel" />
-                                    </li>
-                                }
-                            </ul>
-
-                            <div id="label-error" class="text-danger small mb-2" style="display:none;"></div>
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button id="btn-apply" type="button" class="btn btn-primary btn-sm">Save &amp; Apply</button>
-                                <button id="btn-reset" type="button" class="btn btn-outline-secondary btn-sm">Reset to Defaults</button>
-                                <div class="form-check form-switch align-self-center ms-2">
-                                    <input id="auto-save-toggle" class="form-check-input" type="checkbox" checked />
-                                    <label class="form-check-label small" for="auto-save-toggle">Auto-save</label>
-                                </div>
-                                <span id="save-status" class="small align-self-center ms-1"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
 
             <div class="row g-3">
                 <div class="col-lg-12">
@@ -270,6 +171,107 @@
                             </div>
                             <div class="text-muted small mt-2">
                                 Choose one or more formats, set a strong password, and download the data file as a protected ZIP.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div hidden class="col-lg-5">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header fw-semibold">Data File Details</div>
+                                <div class="card-body">
+                                    <dl class="row mb-0 small">
+                                        <dt class="col-5">Source Database</dt>
+                                        <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceDatabase) ? "-" : selectedDataFile.SourceDatabase)</dd>
+
+                                        <dt class="col-5">Source Table</dt>
+                                        <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceTable) ? "-" : selectedDataFile.SourceTable)</dd>
+
+                                        <dt class="col-5">Source SP</dt>
+                                        <dd class="col-7">@(string.IsNullOrWhiteSpace(selectedDataFile.SourceSP) ? "-" : selectedDataFile.SourceSP)</dd>
+
+                                        <dt class="col-5">Departments</dt>
+                                        <dd class="col-7">@GetDepartmentLabel(selectedDataFile.Departments)</dd>
+
+                                        <dt class="col-5">Created</dt>
+                                        <dd class="col-7">@selectedDataFile.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+
+                                        <dt class="col-5">Modified</dt>
+                                        <dd class="col-7">@(selectedDataFile.ModifiedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-12">
+                            <div class="card mb-4 shadow-sm">
+                                <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                                    <span>Column Customiser</span>
+                                    <span class="badge bg-secondary" style="font-size:.75rem;">drag · rename · toggle</span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted small mb-3">
+                                        Drag chips to reorder &nbsp;|&nbsp;
+                                        The <span class="badge bg-light text-secondary border" style="font-size:.7rem;">grey badge</span>
+                                        shows the original column name &nbsp;→&nbsp; type in the box to rename it &nbsp;|&nbsp;
+                                        Use the checkbox to show/hide. Toggle auto-save on/off as needed, or click <strong>Save &amp; Apply</strong>.
+                                    </p>
+
+                                    <ul id="sortable-columns" class="list-unstyled d-flex flex-wrap gap-2 mb-3" style="min-height:48px;">
+                                        @{
+                                            var visible = Model.DisplayColumns.Where(c => c.IsVisible).OrderBy(c => c.Order).ToList();
+                                            var hiddenCols = Model.AvailableColumns
+                                            .Where(sys => !visible.Any(v => v.Key == sys.Key))
+                                            .Select(sys => new DataWarehousePower.Models.ColumnDefinition
+                                            {
+                                                Key = sys.Key,
+                                                DefaultLabel = sys.DefaultLabel,
+                                                DisplayLabel = sys.DefaultLabel,
+                                                IsVisible = false,
+                                                Order = 999
+                                            });
+                                            var allChips = visible.Concat(hiddenCols).ToList();
+                                        }
+                                        @foreach (var col in allChips)
+                                        {
+                                            <li class="chip border rounded px-2 py-1 bg-white shadow-sm d-flex align-items-center gap-2 @(col.IsVisible ? "" : "opacity-50")"
+                                                data-key="@col.Key"
+                                                data-default-label="@col.DefaultLabel"
+                                                draggable="true"
+                                                style="cursor:grab; user-select:none;">
+                                                <span class="drag-handle text-muted" style="cursor:grab;">&#9776;</span>
+                                                <span class="badge bg-light text-secondary border"
+                                                      style="font-size:.7rem; white-space:nowrap;"
+                                                      title="Original column name">@col.DefaultLabel</span>
+                                                <span class="text-muted" style="font-size:.8rem;">→</span>
+                                                <input type="text"
+                                                       class="form-control form-control-sm label-input border-0 p-0"
+                                                       style="width:110px; background:transparent;"
+                                                       value="@col.DisplayLabel"
+                                                       maxlength="100"
+                                                       placeholder="@col.DefaultLabel"
+                                                       title="Display name (original: @col.DefaultLabel)"
+                                                       aria-label="Display label for @col.DefaultLabel" />
+                                                <input type="checkbox"
+                                                       class="form-check-input m-0 col-visible-toggle"
+                                                @(col.IsVisible ? "checked" : "")
+                                                       title="Show / hide column"
+                                                       aria-label="Show @col.DefaultLabel" />
+                                            </li>
+                                        }
+                                    </ul>
+
+                                    <div id="label-error" class="text-danger small mb-2" style="display:none;"></div>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button id="btn-apply" type="button" class="btn btn-primary btn-sm">Save &amp; Apply</button>
+                                        <button id="btn-reset" type="button" class="btn btn-outline-secondary btn-sm">Reset to Defaults</button>
+                                        <div class="form-check form-switch align-self-center ms-2">
+                                            <input id="auto-save-toggle" class="form-check-input" type="checkbox" />
+                                            <label class="form-check-label small" for="auto-save-toggle">Auto-save</label>
+                                        </div>
+                                        <span id="save-status" class="small align-self-center ms-1"></span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
