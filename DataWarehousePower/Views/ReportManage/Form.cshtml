@@ -635,6 +635,51 @@
                 .replace(/\b\w/g, c => c.toUpperCase());
         }
 
+        function normalizeSourceColumnMetadata(items) {
+            if (!Array.isArray(items)) {
+                return [];
+            }
+
+            return items
+                .map(item => {
+                    if (typeof item === 'string') {
+                        return { name: item, dataType: '' };
+                    }
+
+                    return {
+                        name: (item?.name || item?.Name || '').toString().trim(),
+                        dataType: (item?.dataType || item?.DataType || '').toString().trim()
+                    };
+                })
+                .filter(item => item.name);
+        }
+
+        async function loadSourceColumnMetadata() {
+            const dbName = (databaseInput.value || '').trim();
+            const sourceTable = (tableInput.value || '').trim();
+            const sourceSP = (spInput.value || '').trim();
+
+            if (!dbName || ((!sourceTable && !sourceSP) || (sourceTable && sourceSP))) {
+                return [];
+            }
+
+            try {
+                const response = await fetch(
+                    `${sourceColumnsUrl}?sourceDatabase=${encodeURIComponent(dbName)}&sourceTable=${encodeURIComponent(sourceTable)}&sourceSP=${encodeURIComponent(sourceSP)}`,
+                    { cache: 'no-store' }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Failed to load source columns');
+                }
+
+                const payload = await response.json();
+                return normalizeSourceColumnMetadata(payload);
+            } catch {
+                return [];
+            }
+        }
+
         function markAllRowsAsDeleted() {
             document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
                 const deletedInput = tr.querySelector('.is-deleted-input');
@@ -1077,6 +1122,56 @@
             }
         }
 
+        async function syncMissingColumnsFromSource() {
+            const metadataItems = await loadSourceColumnMetadata();
+            if (!Array.isArray(metadataItems) || metadataItems.length === 0) {
+                return;
+            }
+
+            const existingNames = new Set(
+                [...document.querySelectorAll('#columns-body tr.col-row input[name$=".PropertyName"]')]
+                    .map(input => (input.value || '').trim().toLowerCase())
+                    .filter(Boolean)
+            );
+
+            const missingColumns = metadataItems.filter(col => !existingNames.has(col.name.toLowerCase()));
+            if (missingColumns.length === 0) {
+                return;
+            }
+
+            const maxDisplayOrder = Math.max(
+                0,
+                ...[...document.querySelectorAll('#columns-body tr.col-row input[name$=".DisplayOrder"]')]
+                    .map(input => Number.parseInt(input.value, 10) || 0)
+            );
+
+            missingColumns.forEach((column, index) => {
+                addColumnRow({
+                    propertyName: column.name,
+                    defaultLabel: toDefaultLabel(column.name),
+                    displayOrder: maxDisplayOrder + index + 1,
+                    columnType: column.dataType
+                });
+
+                const newRow = document.querySelector(`#columns-body tr.col-row[data-index="${rowIndex - 1}"]`);
+                if (newRow) {
+                    const deletedInput = newRow.querySelector('.is-deleted-input');
+                    if (deletedInput) deletedInput.value = 'true';
+                    newRow.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                    newRow.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.setAttribute('disabled', 'disabled'));
+                    newRow.classList.add('disabled-row');
+                    newRow.style.opacity = '0.45';
+                    syncRowDragHandleState(newRow);
+                    const btn = newRow.querySelector('.btn-remove-col');
+                    if (btn) {
+                        btn.textContent = 'Enable';
+                        btn.classList.remove('btn-outline-warning');
+                        btn.classList.add('btn-outline-success');
+                    }
+                }
+            });
+        }
+
         databaseInput.addEventListener('change', () => {
             loadSourceObjects('');
             loadSourceProcedures('');
@@ -1087,14 +1182,14 @@
             if ((tableInput.value || '').trim()) {
                 resetDropdownSelectionByInputId('input-source-sp');
                 loadSourceParameters();
-                autoGenerateColumnsFromSource();
+                syncMissingColumnsFromSource();
             }
         });
 
         spInput.addEventListener('change', () => {
             if ((spInput.value || '').trim()) {
                 resetDropdownSelectionByInputId('input-source-table');
-                autoGenerateColumnsFromSource();
+                syncMissingColumnsFromSource();
             }
             loadSourceParameters();
         });
@@ -1150,6 +1245,7 @@
         loadSourceProcedures(spInput.value);
         loadSourceParameters();
         initializeExistingColumnRowStates();
+        syncMissingColumnsFromSource();
         refreshMappingParameterOptions();
     </script>
 }
