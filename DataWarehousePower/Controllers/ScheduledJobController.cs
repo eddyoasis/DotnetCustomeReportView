@@ -34,6 +34,7 @@ public sealed class ScheduledJobController(
         ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         viewModel.RequiresSchemaTemplateAndClientCode = !isDataFile;
         await PopulateDataFileOptionsAsync(viewModel, userId, userDepartment);
+
         viewModel.ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
         if (reportDefinitionId.HasValue && reportDefinitionId.Value > 0)
@@ -462,9 +463,9 @@ public sealed class ScheduledJobController(
     {
         if (!form.RequiresSchemaTemplateAndClientCode)
         {
-            form.SchemaTemplate = null;
+            //form.SchemaTemplate = null;
             form.ClientCode = null;
-            ModelState.Remove(nameof(form.SchemaTemplate));
+            //ModelState.Remove(nameof(form.SchemaTemplate));
             ModelState.Remove(nameof(form.ClientCode));
             return;
         }

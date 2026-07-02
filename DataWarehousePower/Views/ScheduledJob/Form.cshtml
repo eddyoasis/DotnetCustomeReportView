@@ -769,15 +769,15 @@
                     return;
                 }
 
-                if (!requiresSchemaAndClientCode()) {
-                    clientCodeSelect.innerHTML = '';
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = '';
-                    defaultOption.textContent = 'Default';
-                    clientCodeSelect.appendChild(defaultOption);
-                    syncClientCodeUi('');
-                    return;
-                }
+                // if (!requiresSchemaAndClientCode()) {
+                //     clientCodeSelect.innerHTML = '';
+                //     const defaultOption = document.createElement('option');
+                //     defaultOption.value = '';
+                //     defaultOption.textContent = 'Default';
+                //     clientCodeSelect.appendChild(defaultOption);
+                //     syncClientCodeUi('');
+                //     return;
+                // }
 
                 const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
                 const reportSchemaTemplates = Number.isFinite(selectedReportId)

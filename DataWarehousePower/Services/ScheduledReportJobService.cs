@@ -12,6 +12,7 @@ namespace DataWarehousePower.Services;
 public sealed class ScheduledReportJobService(
     IScheduledReportJobRepository scheduledJobRepository,
     IReportRepository reportRepository,
+    IDataFileManageRepository dataFileManageRepository,
     IDataFileManageService dataFileManageService,
     IColumnPreferenceRepository columnPreferenceRepository,
     IRecurringJobManager recurringJobManager,
@@ -149,10 +150,33 @@ public sealed class ScheduledReportJobService(
 
     public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId, string? userDepartment = null)
     {
-        List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
         List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
         List<string> availableClientCodeFolders = await reportRepository.GetClientCodeFoldersByUserIdAsync(userId);
-        Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
+
+        List<ReportDefinitionLookupItem> availableReports = new List<ReportDefinitionLookupItem>();
+        Dictionary<int, List<string>> availableSchemaTemplatesByReportId = new Dictionary<int, List<string>>();
+
+        var dataFiles = await GetDataFileLookupAsync(userId, userDepartment);
+        availableReports.AddRange(dataFiles);
+        var dataFileSchemaTemplates = await GetDataFileSchemaTemplatesLookupAsync(userId, availableReports);
+
+        var reports = await GetReportLookupAsync(userDepartment);
+        availableReports.AddRange(reports);
+        var reportSchemaTemplates = await GetClientCodesLookupAsync(userId, availableReports);
+
+        availableSchemaTemplatesByReportId =
+            availableSchemaTemplatesByReportId
+            .Concat(dataFileSchemaTemplates)
+            .Concat(reportSchemaTemplates)
+            .GroupBy(kvp => kvp.Key)
+            .ToDictionary(g => g.Key, g => g.First().Value);
+
+        //availableSchemaTemplatesByReportId =
+        //    availableSchemaTemplatesByReportId
+        //    .Concat(dataFileSchemaTemplates)
+        //    .Concat(reportSchemaTemplates)
+        //    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =
             await BuildParameterLookupByReportIdAsync(availableReports, userDepartment);
 
@@ -170,7 +194,8 @@ public sealed class ScheduledReportJobService(
             CronExpression = "0 8 * * *",
             ExportLocation = null,
             ExportToLocalFolder = false,
-            AvailableReports = availableReports,
+            //AvailableReports = availableReports,
+            AvailableReports = reports,
             AvailableClientCodes = availableClientCodes,
             AvailableClientCodeFolders = availableClientCodeFolders,
             AvailableSchemaTemplatesByReportId = availableSchemaTemplatesByReportId,
@@ -399,6 +424,14 @@ public sealed class ScheduledReportJobService(
             .ToList();
     }
 
+    private async Task<List<ReportDefinitionLookupItem>> GetDataFileLookupAsync(string userId, string? userDepartment)
+    {
+        List<DataFileDefinition> reports = await dataFileManageRepository.GetAllWithColumnsAsync(userId, userDepartment);
+        return reports
+            .Select(report => new ReportDefinitionLookupItem { Id = report.Id, ReportName = report.DataFileName })
+            .ToList();
+    }
+
     private async Task<ReportDefinition> GetReportDefinitionAsync(int reportDefinitionId, string userDepartment)
     {
         List<ReportDefinition> reports = await reportRepository.GetAllReportsAsync(userDepartment);
@@ -425,6 +458,20 @@ public sealed class ScheduledReportJobService(
         foreach (ReportDefinitionLookupItem report in reports)
         {
             clientCodesByReportId[report.Id] = await columnPreferenceRepository.GetSchemaTemplatesAsync(userId, report.Id);
+        }
+
+        return clientCodesByReportId;
+    }
+
+    private async Task<Dictionary<int, List<string>>> GetDataFileSchemaTemplatesLookupAsync(
+        string userId,
+        IEnumerable<ReportDefinitionLookupItem> reports)
+    {
+        Dictionary<int, List<string>> clientCodesByReportId = [];
+
+        foreach (ReportDefinitionLookupItem report in reports)
+        {
+            clientCodesByReportId[report.Id] = await columnPreferenceRepository.GetDataFileSchemaTemplatesAsync(userId, report.Id);
         }
 
         return clientCodesByReportId;

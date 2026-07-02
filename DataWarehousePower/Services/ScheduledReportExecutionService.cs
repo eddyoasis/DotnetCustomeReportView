@@ -53,11 +53,13 @@ public sealed class ScheduledReportExecutionService(
         else if (job.DataFileDefinitionId.HasValue)
         {
             reportViewModel = await BuildDataFileReportViewModelAsync(
-                job.DataFileDefinitionId.Value,
-                job.ClientCode,
-                effectiveDateFrom,
-                effectiveDateTo,
-                jobParameters);
+                dataFileDefinitionId: job.DataFileDefinitionId.Value,
+                userId: job.CreatedByUserId,
+                schemaTemplate: job.SchemaTemplate,
+                clientCode: job.ClientCode,
+                dateFrom: effectiveDateFrom,
+                dateTo: effectiveDateTo,
+                parameterValues: jobParameters);
         }
         else
         {
@@ -139,11 +141,16 @@ public sealed class ScheduledReportExecutionService(
 
     private async Task<ReportViewModel?> BuildDataFileReportViewModelAsync(
         int dataFileDefinitionId,
-        string? clientCode,
-        DateTime? dateFrom,
-        DateTime? dateTo,
-        IReadOnlyDictionary<string, string?> parameterValues)
+        string userId,
+        string? userDepartment = null,
+        string? schemaTemplate = null,
+        string? clientCode = null,
+        DateTime? dateFrom = null,
+        DateTime? dateTo = null,
+        IReadOnlyDictionary<string, string?>? parameterValues = null)
     {
+        string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
+
         DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync();
         DataFileDefinition? dataFile = dataFileList.DataFiles
             .FirstOrDefault(candidate => candidate.Id == dataFileDefinitionId && candidate.IsActive);
@@ -153,7 +160,7 @@ public sealed class ScheduledReportExecutionService(
             return null;
         }
 
-        List<ColumnDefinition> displayColumns = dataFile.Columns
+        List<ColumnDefinition> systemColumns = dataFile.Columns
             .OrderBy(column => column.DisplayOrder)
             .Select(column => new ColumnDefinition
             {
@@ -164,6 +171,10 @@ public sealed class ScheduledReportExecutionService(
                 Order = column.DisplayOrder
             })
             .ToList();
+
+        // Apply user preferences
+        (List<ColumnDefinition> displayColumns, int? activePreferenceId) =
+            await reportService.LoadDataFileColumnPreferencesAsync(userId, dataFileDefinitionId, normalizedSchemaTemplate, systemColumns);
 
         List<Dictionary<string, object?>> rows;
         if (!string.IsNullOrWhiteSpace(dataFile.SourceSP))
@@ -592,4 +603,7 @@ public sealed class ScheduledReportExecutionService(
         public string Name { get; set; } = string.Empty;
         public string? Value { get; set; }
     }
+
+    private static string NormalizeSchemaTemplate(string? schemaTemplate)
+            => schemaTemplate?.Trim() ?? string.Empty;
 }
