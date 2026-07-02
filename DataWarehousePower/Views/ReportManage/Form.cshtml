@@ -169,14 +169,14 @@
                 <tbody id="columns-body">
                     @for (int i = 0; i < Model.Columns.Count; i++)
                     {
-                        <tr class="col-row" data-index="@i">
+                        <tr class="col-row @(Model.Columns[i].IsDeleted ? "disabled-row" : "")" data-index="@i">
                             <td class="text-center align-middle">
                                 <span class="drag-handle text-muted" draggable="true" title="Drag to reorder">::</span>
                             </td>
                             <td class="text-center text-muted small row-num align-middle">@(i + 1)</td>
                             <td>
                                 <input type="hidden" name="Columns[@i].Id" value="@Model.Columns[i].Id" />
-                                <input type="hidden" name="Columns[@i].IsDeleted" value="false" class="is-deleted-input" />
+                                <input type="hidden" name="Columns[@i].IsDeleted" value="@(Model.Columns[i].IsDeleted ? "true" : "false")" class="is-deleted-input" />
                                 <input readonly name="Columns[@i].PropertyName"
                                        value="@Model.Columns[i].PropertyName"
                                        class="form-control form-control-sm"
@@ -205,7 +205,7 @@
                                 <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
                             </td>
                             <td class="text-center align-middle">
-                                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
+                                <button type="button" class="btn btn-outline-warning btn-sm btn-remove-col">Disable</button>
                             </td>
                         </tr>
                     }
@@ -234,7 +234,7 @@
             const tr = document.createElement('tr');
             tr.className = 'col-row';
             tr.dataset.index = rowIndex;
-            const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row)').length;
+            const currentVisibleRows = body.querySelectorAll('tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             const displayOrder = seed?.displayOrder ?? (currentVisibleRows + 1);
             tr.innerHTML = `
                 <td class="text-center align-middle">
@@ -264,10 +264,7 @@
                            class="form-control form-control-sm" required />
                 </td>
                 <td class="text-center align-middle">
-                    <button type="button" class="btn btn-outline-primary btn-sm btn-add-col-inline" aria-label="Add column">+</button>
-                </td>
-                <td class="text-center align-middle">
-                    <button type="button" class="btn btn-outline-danger btn-sm btn-remove-col">✕</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm btn-remove-col">Disable</button>
                 </td>`;
             body.appendChild(tr);
 
@@ -301,24 +298,35 @@
             refreshMappingParameterOptions();
         });
 
-        // ── Remove column row ─────────────────────────────────────────────────────────
+        // ── Disable/enable column row ─────────────────────────────────────────────────
         document.getElementById('columns-body').addEventListener('click', e => {
             const btn = e.target.closest('.btn-remove-col');
             if (!btn) return;
             const tr = btn.closest('tr');
             const deletedInput = tr.querySelector('.is-deleted-input');
+            const isCurrentlyDisabled = tr.classList.contains('disabled-row');
 
-            if (deletedInput && deletedInput.value === 'false') {
-                // Mark as deleted — hide row, set flag, remove required so form submits
-                deletedInput.value = 'true';
-                tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
-                tr.classList.add('deleted-row');
-                tr.style.display = 'none';
-                syncRowDragHandleState(tr);
+            if (isCurrentlyDisabled) {
+                if (deletedInput) deletedInput.value = 'false';
+                tr.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.removeAttribute('disabled'));
+                tr.querySelectorAll('input[name$=".PropertyName"], input[name$=".DefaultLabel"], input[name$=".DisplayOrder"]').forEach(i => i.setAttribute('required', ''));
+                tr.classList.remove('disabled-row');
+                tr.style.opacity = '';
+                btn.textContent = 'Disable';
+                btn.classList.remove('btn-outline-success');
+                btn.classList.add('btn-outline-warning');
             } else {
-                // New row (Id=0) — just remove from DOM entirely
-                tr.remove();
+                if (deletedInput) deletedInput.value = 'true';
+                tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                tr.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.setAttribute('disabled', 'disabled'));
+                tr.classList.add('disabled-row');
+                tr.style.opacity = '0.45';
+                btn.textContent = 'Enable';
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-outline-success');
             }
+
+            syncRowDragHandleState(tr);
             refreshRowNumbers();
             toggleNoColsMessage();
             refreshMappingParameterOptions();
@@ -331,15 +339,47 @@
                 return;
             }
 
-            const reorderable = !tr.classList.contains('deleted-row');
+            const reorderable = !tr.classList.contains('deleted-row') && !tr.classList.contains('disabled-row');
             handle.setAttribute('draggable', reorderable ? 'true' : 'false');
             handle.style.cursor = reorderable ? 'grab' : 'not-allowed';
             handle.classList.toggle('opacity-50', !reorderable);
         }
 
+        function initializeExistingColumnRowStates() {
+            document.querySelectorAll('#columns-body tr.col-row').forEach(tr => {
+                const deletedInput = tr.querySelector('.is-deleted-input');
+                const btn = tr.querySelector('.btn-remove-col');
+                const isDisabled = (deletedInput?.value || '').toLowerCase() === 'true';
+
+                if (isDisabled) {
+                    tr.classList.add('disabled-row');
+                    tr.style.opacity = '0.45';
+                    tr.querySelectorAll('input[required]').forEach(i => i.removeAttribute('required'));
+                    tr.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.setAttribute('disabled', 'disabled'));
+                    if (btn) {
+                        btn.textContent = 'Enable';
+                        btn.classList.remove('btn-outline-warning');
+                        btn.classList.add('btn-outline-success');
+                    }
+                } else {
+                    tr.classList.remove('disabled-row');
+                    tr.style.opacity = '';
+                    tr.querySelectorAll('input:not([type="hidden"]), select').forEach(i => i.removeAttribute('disabled'));
+                    tr.querySelectorAll('input[name$=".PropertyName"], input[name$=".DefaultLabel"], input[name$=".DisplayOrder"]').forEach(i => i.setAttribute('required', ''));
+                    if (btn) {
+                        btn.textContent = 'Disable';
+                        btn.classList.remove('btn-outline-success');
+                        btn.classList.add('btn-outline-warning');
+                    }
+                }
+
+                syncRowDragHandleState(tr);
+            });
+        }
+
         function refreshRowNumbers() {
             let n = 1;
-            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').forEach(tr => {
+            document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').forEach(tr => {
                 tr.querySelector('.row-num').textContent = n++;
 
                 const displayOrderInput = tr.querySelector('input[name$=".DisplayOrder"]');
@@ -350,12 +390,12 @@
         }
 
         function toggleNoColsMessage() {
-            const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+            const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             document.getElementById('no-cols-msg').style.display = visible === 0 ? 'block' : 'none';
         }
 
         function getVisibleMappingSelects() {
-            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row) select[name$=".MappingParameter"]')];
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) select[name$=".MappingParameter"]')];
         }
 
         function refreshMappingParameterOptions() {
@@ -614,7 +654,8 @@
         function isRowReorderable(tr) {
             return !!tr &&
                 tr.classList.contains('col-row') &&
-                !tr.classList.contains('deleted-row');
+                !tr.classList.contains('deleted-row') &&
+                !tr.classList.contains('disabled-row');
         }
 
         columnsBody.addEventListener('dragstart', e => {
@@ -995,7 +1036,7 @@
                 return;
             }
 
-            const visibleRows = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row)').length;
+            const visibleRows = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             if (visibleRows > 0) {
                 const shouldReplace = confirm('Auto-generate will replace current visible column rows. Continue?');
                 if (!shouldReplace) {
@@ -1108,7 +1149,7 @@
         loadSourceObjects(tableInput.value);
         loadSourceProcedures(spInput.value);
         loadSourceParameters();
-        document.querySelectorAll('#columns-body tr.col-row').forEach(syncRowDragHandleState);
+        initializeExistingColumnRowStates();
         refreshMappingParameterOptions();
     </script>
 }
