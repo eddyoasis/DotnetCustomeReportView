@@ -473,9 +473,7 @@
                     }
                 }
 
-                if (!isRequired && clientCodeHiddenInput) {
-                    clientCodeHiddenInput.value = '';
-                }
+                // Preserve SchemaTemplate value for round-trip scenarios even when source mode is datafile.
             }
 
             function updateScheduleFields() {

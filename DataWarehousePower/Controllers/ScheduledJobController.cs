@@ -42,7 +42,7 @@ public sealed class ScheduledJobController(
             viewModel.ReportDefinitionId = reportDefinitionId.Value;
         }
 
-        if (viewModel.RequiresSchemaTemplateAndClientCode && !string.IsNullOrWhiteSpace(schemaTemplate))
+        if (!string.IsNullOrWhiteSpace(schemaTemplate))
         {
             viewModel.SchemaTemplate = schemaTemplate.Trim();
         }
