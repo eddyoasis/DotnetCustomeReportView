@@ -78,8 +78,9 @@ else
                 {
                     <tr class="@(dataFile.IsActive ? "" : "table-secondary text-muted")">
                         <td class="text-muted small">@dataFile.Id</td>
-                        <td>
-                            <a asp-action="Edit" asp-route-id="@dataFile.Id" class="fw-semibold text-decoration-none">@dataFile.DataFileName</a>
+                        <td>                            
+                            <a asp-controller="DataFile" asp-action="Index" asp-route-id="@dataFile.Id"
+                               class="fw-semibold text-decoration-none">@dataFile.DataFileName</a>
                         </td>
                         <td>@(string.IsNullOrEmpty(dataFile.SourceDatabase) ? "-" : dataFile.SourceDatabase)</td>
                         <td>@(string.IsNullOrEmpty(dataFile.SourceTable) ? "-" : dataFile.SourceTable)</td>

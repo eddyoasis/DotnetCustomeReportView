@@ -299,7 +299,7 @@ namespace DataWarehousePower.Controllers
 
             string userId = _prefService.ResolveUserId(HttpContext);
             string schemaTemplate = request.SchemaTemplate?.Trim() ?? string.Empty;
-            (List<ColumnDefinition> displayColumns, _) = await _prefService.LoadColumnPreferencesAsync(
+            (List<ColumnDefinition> displayColumns, _) = await _prefService.LoadDataFileColumnPreferencesAsync(
                 userId,
                 id,
                 schemaTemplate,
