@@ -73,9 +73,9 @@
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="Report">Scheduler</a>
                                         </li>
-                                       @*  <li>
+                                        <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report Folder</a>
-                                        </li> *@
+                                        </li>
                                     }
                                 </ul>
                             </li>
@@ -142,6 +142,9 @@
                                 <ul class="dropdown-menu" aria-labelledby="adminDropdown">
                                     <li class="nav-item">
                                         <a class="nav-link text-dark" asp-area="" asp-controller="Department" asp-action="Index">Departments</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link text-dark" asp-area="" asp-controller="ReportConnectionString" asp-action="Index">Report Connection</a>
                                     </li>
                                 </ul>
                             </li>

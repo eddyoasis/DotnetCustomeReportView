@@ -39,6 +39,7 @@ builder.Services.AddScoped<IScheduledReportJobRepository, ScheduledReportJobRepo
 builder.Services.AddScoped<IDepartmentRepository,       DepartmentRepository>();
 builder.Services.AddScoped<IDataFileColumnRepository,   DataFileColumnRepository>();
 builder.Services.AddScoped<IDataFileManageRepository, DataFileManageRepository>();
+builder.Services.AddScoped<IReportConnectionStringRepository, ReportConnectionStringRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
@@ -55,6 +56,7 @@ builder.Services.AddScoped<IScheduledReportEmailService, ScheduledReportEmailSer
 builder.Services.AddScoped<IDepartmentService,       DepartmentService>();
 builder.Services.AddScoped<IDataFileColumnService,   DataFileColumnService>();
 builder.Services.AddScoped<IDataFileManageService, DataFileManageService>();
+builder.Services.AddScoped<IReportConnectionStringService, ReportConnectionStringService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
