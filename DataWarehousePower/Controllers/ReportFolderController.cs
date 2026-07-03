@@ -1,16 +1,19 @@
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Options;
 using System.IO.Compression;
 
 namespace DataWarehousePower.Controllers;
 
 [Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
 public sealed class ReportFolderController(
+    IOptionsSnapshot<RemoteFolderExportLocationAppSetting> remoteFolderExportLocationAppSetting,
     IConfiguration configuration,
     IColumnPreferenceService columnPreferenceService,
     ILogger<ReportFolderController> logger) : Controller
@@ -124,7 +127,8 @@ public sealed class ReportFolderController(
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         string userPathSegment = SanitizePathSegment(userId);
         string virtualDirectoryName = NormalizeVirtualDirectoryName(configuration[IisVirtualDirectoryReportFolderNameSettingKey]);
-        string physicalBasePath = NormalizeBasePath(configuration[ReportFolderPhysicalPathSettingKey]);
+        //string physicalBasePath = NormalizeBasePath(configuration[ReportFolderPhysicalPathSettingKey]);
+        string physicalBasePath = NormalizeBasePath(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath);
         string folderPhysicalPath = string.IsNullOrWhiteSpace(physicalBasePath)
             ? string.Empty
             : BuildFolderPhysicalPath(physicalBasePath, userPathSegment, effectiveDate);

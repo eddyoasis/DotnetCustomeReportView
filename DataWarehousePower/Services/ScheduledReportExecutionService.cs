@@ -1,6 +1,8 @@
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace DataWarehousePower.Services;
@@ -14,12 +16,15 @@ public sealed class ScheduledReportExecutionService(
     IScheduledReportEmailService scheduledReportEmailService,
     IHangfireDataProtectionService dataProtectionService,
     IConfiguration configuration,
+    IOptionsSnapshot<RemoteFolderExportLocationAppSetting> remoteFolderExportLocationAppSetting,
     ILogger<ScheduledReportExecutionService> logger) : IScheduledReportExecutionService
 {
     private const string LocalExportBasePathSection = "ScheduledJob:LocalExportBasePath";
 
     public async Task ExecuteAsync(int scheduledJobId)
     {
+        
+
         ScheduledReportJob? job = await scheduledJobRepository.GetByIdAsync(scheduledJobId);
         if (job is null)
         {
@@ -37,6 +42,9 @@ public sealed class ScheduledReportExecutionService(
         string password = dataProtectionService.Unprotect(job.EncryptedPassword);
         (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
         Dictionary<string, string?> jobParameters = ParseJobParameters(job.Parameters);
+        //var userRemoteFolderExportLocation = $"{remoteFolderExportLocation.UserReportFolderPhysicalPath}{job.CreatedByUserId}\\";
+        var remoteFolderExportLocation = remoteFolderExportLocationAppSetting.Value;
+        var userRemoteFolderExportLocation = Path.Combine(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath, job.CreatedByUserId);
 
         ReportViewModel? reportViewModel;
         if (job.ReportDefinitionId.HasValue)
@@ -94,7 +102,7 @@ public sealed class ScheduledReportExecutionService(
             zipSubFileName);
 
         string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
-        string? localDirectory = ResolveLocalExportDirectory(job, configuration);
+        string? localDirectory = ResolveLocalExportDirectory(job, userRemoteFolderExportLocation);
         List<string> targetDirectories = [primaryDirectory];
 
         if (!string.IsNullOrWhiteSpace(localDirectory) &&
@@ -490,7 +498,7 @@ public sealed class ScheduledReportExecutionService(
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, normalizedExportLocation));
     }
 
-    private static string? ResolveLocalExportDirectory(ScheduledReportJob job, IConfiguration configuration)
+    private static string? ResolveLocalExportDirectory(ScheduledReportJob job, string remoteFolderExportLocation)
     {
         if (!job.ExportToLocalFolder)
         {
@@ -503,7 +511,7 @@ public sealed class ScheduledReportExecutionService(
             return null;
         }
 
-        string configuredBasePath = configuration[LocalExportBasePathSection] ?? "%temp%";
+        string configuredBasePath = remoteFolderExportLocation;
         string expandedBasePath = Environment.ExpandEnvironmentVariables(configuredBasePath).Trim();
         if (string.IsNullOrWhiteSpace(expandedBasePath))
         {
