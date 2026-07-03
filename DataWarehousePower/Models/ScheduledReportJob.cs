@@ -53,6 +53,11 @@ public class ScheduledReportJob
 
     public DateTime? DateTo { get; set; }
 
+    [MaxLength(16)]
+    public string? AutoDateIntervalUnit { get; set; }
+
+    public int? AutoDateIntervalValue { get; set; }
+
     public bool IsCustom { get; set; } = true;
 
     [Required]

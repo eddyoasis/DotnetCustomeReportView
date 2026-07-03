@@ -668,13 +668,14 @@ namespace DataWarehousePower.Services
             if (dateFrom.HasValue &&
                 TryGetMappedColumns(columnsByParameter, _dateFromParameterAliases, out List<string> dateFromColumns))
             {
-                filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateFromColumns, dateFrom.Value.Date, isLowerBound: true));
+                //filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateFromColumns, dateFrom.Value.Date, isLowerBound: true));
+                filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateFromColumns, dateFrom.Value, isLowerBound: true));
             }
 
             if (dateTo.HasValue &&
                 TryGetMappedColumns(columnsByParameter, _dateToParameterAliases, out List<string> dateToColumns))
             {
-                filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateToColumns, dateTo.Value.Date, isLowerBound: false));
+                filteredRows = filteredRows.Where(row => RowMatchesMappedDate(row, dateToColumns, dateTo.Value, isLowerBound: false));
             }
 
             foreach ((string parameterName, string parameterValue) in parameterValues)
@@ -780,7 +781,8 @@ namespace DataWarehousePower.Services
                     continue;
                 }
 
-                if (isLowerBound ? valueDate.Date >= boundary : valueDate.Date <= boundary)
+                //if (isLowerBound ? valueDate.Date >= boundary : valueDate.Date <= boundary)
+                if (isLowerBound ? valueDate >= boundary : valueDate <= boundary)
                 {
                     return true;
                 }

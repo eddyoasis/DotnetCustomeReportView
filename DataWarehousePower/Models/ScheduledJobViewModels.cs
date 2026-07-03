@@ -54,6 +54,12 @@ public sealed class ScheduledJobFormViewModel
     public const string ScheduleTypeDailyTime = "daily-time";
     public const string ScheduleTypeCustomDays = "custom-days";
     public const string ScheduleTypeAdvancedCron = "advanced-cron";
+    public const string AutoDateIntervalMinutely = "minutely";
+    public const string AutoDateIntervalHourly = "hourly";
+    public const string AutoDateIntervalDaily = "daily";
+    public const string AutoDateIntervalWeekly = "weekly";
+    public const string AutoDateIntervalMonthly = "monthly";
+    public const string AutoDateIntervalYearly = "yearly";
 
     public int Id { get; set; }
 
@@ -140,6 +146,14 @@ public sealed class ScheduledJobFormViewModel
 
     [Display(Name = "Use Custom Date Range")]
     public bool IsCustom { get; set; } = true;
+
+    [MaxLength(16)]
+    [Display(Name = "Auto Date Interval")]
+    public string AutoDateIntervalUnit { get; set; } = AutoDateIntervalDaily;
+
+    [Range(1, int.MaxValue)]
+    [Display(Name = "Interval Value")]
+    public int? AutoDateIntervalValue { get; set; } = 1;
 
     [Display(Name = "Password")]
     public string Password { get; set; } = string.Empty;

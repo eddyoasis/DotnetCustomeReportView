@@ -21,6 +21,15 @@ public sealed class ScheduledReportJobService(
     ILogger<ScheduledReportJobService> logger) : IScheduledReportJobService
 {
     private static readonly string[] SupportedExportFormats = ["csv", "excel", "pdf"];
+    private static readonly string[] SupportedAutoDateIntervalUnits =
+    [
+        ScheduledJobFormViewModel.AutoDateIntervalMinutely,
+        ScheduledJobFormViewModel.AutoDateIntervalHourly,
+        ScheduledJobFormViewModel.AutoDateIntervalDaily,
+        ScheduledJobFormViewModel.AutoDateIntervalWeekly,
+        ScheduledJobFormViewModel.AutoDateIntervalMonthly,
+        ScheduledJobFormViewModel.AutoDateIntervalYearly
+    ];
     private static readonly int[] OrderedCronWeekdays = [1, 2, 3, 4, 5, 6, 0];
     private static readonly Dictionary<int, string> WeekdayDisplayNames = new()
     {
@@ -184,6 +193,8 @@ public sealed class ScheduledReportJobService(
         {
             IsActive = true,
             IsCustom = false,
+            AutoDateIntervalUnit = ScheduledJobFormViewModel.AutoDateIntervalDaily,
+            AutoDateIntervalValue = 1,
             Formats = ["csv"],
             JobAction = ScheduledJobActions.ExportFile,
             ScheduleType = ScheduledJobFormViewModel.ScheduleTypeDailyTime,
@@ -234,6 +245,8 @@ public sealed class ScheduledReportJobService(
             DateFrom = entity.DateFrom,
             DateTo = entity.DateTo,
             IsCustom = entity.IsCustom,
+            AutoDateIntervalUnit = NormalizeAutoDateIntervalUnit(entity.AutoDateIntervalUnit) ?? ScheduledJobFormViewModel.AutoDateIntervalDaily,
+            AutoDateIntervalValue = entity.AutoDateIntervalValue is > 0 ? entity.AutoDateIntervalValue : 1,
             ExistingPassword = dataProtectionService.Unprotect(entity.EncryptedPassword),
             IsActive = entity.IsActive,
             RequiresSchemaTemplateAndClientCode =
@@ -291,6 +304,8 @@ public sealed class ScheduledReportJobService(
             ExportToLocalFolder = form.ExportToLocalFolder,
             DateFrom = form.IsCustom ? form.DateFrom?.Date : null,
             DateTo = form.IsCustom ? form.DateTo?.Date : null,
+            AutoDateIntervalUnit = form.IsCustom ? null : NormalizeAutoDateIntervalUnit(form.AutoDateIntervalUnit),
+            AutoDateIntervalValue = form.IsCustom ? null : form.AutoDateIntervalValue,
             IsCustom = form.IsCustom,
             EncryptedPassword = dataProtectionService.Protect(form.Password),
             IsActive = form.IsActive,
@@ -345,6 +360,8 @@ public sealed class ScheduledReportJobService(
         entity.ExportToLocalFolder = form.ExportToLocalFolder;
         entity.DateFrom = form.IsCustom ? form.DateFrom?.Date : null;
         entity.DateTo = form.IsCustom ? form.DateTo?.Date : null;
+        entity.AutoDateIntervalUnit = form.IsCustom ? null : NormalizeAutoDateIntervalUnit(form.AutoDateIntervalUnit);
+        entity.AutoDateIntervalValue = form.IsCustom ? null : form.AutoDateIntervalValue;
         entity.IsCustom = form.IsCustom;
         entity.IsActive = form.IsActive;
         entity.UpdatedByUserId = userId;
@@ -852,6 +869,33 @@ public sealed class ScheduledReportJobService(
         {
             throw new InvalidOperationException("Date From cannot be later than Date To.");
         }
+
+        if (!form.IsCustom)
+        {
+            string? normalizedAutoDateIntervalUnit = NormalizeAutoDateIntervalUnit(form.AutoDateIntervalUnit);
+            if (normalizedAutoDateIntervalUnit is null)
+            {
+                throw new InvalidOperationException("Auto Date Interval must be one of Minutely, Hourly, Daily, Weekly, Monthly, or Yearly.");
+            }
+
+            if (!form.AutoDateIntervalValue.HasValue || form.AutoDateIntervalValue.Value < 1)
+            {
+                throw new InvalidOperationException("Interval Value must be greater than 0.");
+            }
+        }
+    }
+
+    private static string? NormalizeAutoDateIntervalUnit(string? value)
+    {
+        string normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        return SupportedAutoDateIntervalUnits.Contains(normalized, StringComparer.Ordinal)
+            ? normalized
+            : null;
     }
 
     private static List<string> ParseRecipientEmails(string? value)

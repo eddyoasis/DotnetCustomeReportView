@@ -311,7 +311,32 @@
                         <input asp-for="IsCustom" class="form-check-input" id="isCustomToggle" />
                         <label asp-for="IsCustom" class="form-check-label"></label>
                     </div>
-                    <div class="form-text">When disabled, both Date From and Date To are auto-set to the previous business day (Monday/weekend runs use Friday).</div>
+                    <div class="form-text">When disabled, Date From and Date To are computed at runtime using the interval settings below.</div>
+                </div>
+
+                <div class="col-md-4" id="autoDateIntervalUnitGroup">
+                    <label asp-for="AutoDateIntervalUnit" class="form-label"></label>
+                    <select asp-for="AutoDateIntervalUnit" class="form-select" id="autoDateIntervalUnitSelect">
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalMinutely">Minutely</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalHourly">Hourly</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalDaily">Daily</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalWeekly">Weekly</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalMonthly">Monthly</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalYearly">Yearly</option>
+                    </select>
+                    <span asp-validation-for="AutoDateIntervalUnit" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-2" id="autoDateIntervalValueGroup">
+                    <label asp-for="AutoDateIntervalValue" class="form-label"></label>
+                    <input asp-for="AutoDateIntervalValue" type="number" min="1" step="1" class="form-control" id="autoDateIntervalValueInput" />
+                    <span asp-validation-for="AutoDateIntervalValue" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6" id="autoDateIntervalHintGroup">
+                    <div class="form-text mt-4">
+                        Examples: Minutely 5 = from 5 minutes ago to now, Hourly 1 = from 1 hour ago to now.
+                    </div>
                 </div>
 
                 <div class="col-md-6" id="dateFromGroup">
@@ -373,6 +398,11 @@
             const dateToGroup = document.getElementById('dateToGroup');
             const dateFromInput = document.getElementById('DateFrom');
             const dateToInput = document.getElementById('DateTo');
+            const autoDateIntervalUnitGroup = document.getElementById('autoDateIntervalUnitGroup');
+            const autoDateIntervalValueGroup = document.getElementById('autoDateIntervalValueGroup');
+            const autoDateIntervalHintGroup = document.getElementById('autoDateIntervalHintGroup');
+            const autoDateIntervalUnitSelect = document.getElementById('autoDateIntervalUnitSelect');
+            const autoDateIntervalValueInput = document.getElementById('autoDateIntervalValueInput');
             const exportLocationHiddenInput = document.getElementById('ExportLocation');
             const exportLocationSubfolderHiddenInput = document.getElementById('ExportLocationSubfolder');
             const exportLocationBasePathSelect = document.getElementById('exportLocationBasePathSelect');
@@ -544,6 +574,28 @@
 
                 if (dateToInput) {
                     dateToInput.disabled = !isCustom;
+                }
+
+                if (autoDateIntervalUnitGroup) {
+                    autoDateIntervalUnitGroup.style.display = isCustom ? 'none' : '';
+                }
+
+                if (autoDateIntervalValueGroup) {
+                    autoDateIntervalValueGroup.style.display = isCustom ? 'none' : '';
+                }
+
+                if (autoDateIntervalHintGroup) {
+                    autoDateIntervalHintGroup.style.display = isCustom ? 'none' : '';
+                }
+
+                if (autoDateIntervalUnitSelect) {
+                    autoDateIntervalUnitSelect.disabled = isCustom;
+                    autoDateIntervalUnitSelect.required = !isCustom;
+                }
+
+                if (autoDateIntervalValueInput) {
+                    autoDateIntervalValueInput.disabled = isCustom;
+                    autoDateIntervalValueInput.required = !isCustom;
                 }
             }
 

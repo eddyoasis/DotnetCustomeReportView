@@ -79,9 +79,7 @@ public sealed class ScheduledReportExecutionService(
             return;
         }
 
-        var reportDate = effectiveDateFrom == effectiveDateTo ?
-                $"{effectiveDateFrom:yyyy-MM-dd}" :
-                $"{effectiveDateFrom:yyyy-MM-dd}_{effectiveDateTo:yyyy-MM-dd}";
+        string reportDate = BuildReportDateSegment(effectiveDateFrom, effectiveDateTo);
 
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
         string clientCodeSegment = string.IsNullOrWhiteSpace(job.ClientCode) ? "all" : job.ClientCode.Trim();
@@ -539,6 +537,27 @@ public sealed class ScheduledReportExecutionService(
             return (job.DateFrom?.Date, job.DateTo?.Date);
         }
 
+        if (job.AutoDateIntervalValue is > 0)
+        {
+            DateTime now = DateTimeHelper.GetCurrentLocalTime();
+            string normalizedIntervalUnit = (job.AutoDateIntervalUnit ?? string.Empty).Trim().ToLowerInvariant();
+            DateTime? intervalDateFrom = normalizedIntervalUnit switch
+            {
+                ScheduledJobFormViewModel.AutoDateIntervalMinutely => now.AddMinutes(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalHourly => now.AddHours(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalDaily => now.AddDays(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalWeekly => now.AddDays(-(7 * job.AutoDateIntervalValue.Value)),
+                ScheduledJobFormViewModel.AutoDateIntervalMonthly => now.AddMonths(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalYearly => now.AddYears(-job.AutoDateIntervalValue.Value),
+                _ => null
+            };
+
+            if (intervalDateFrom.HasValue)
+            {
+                return (intervalDateFrom.Value, now);
+            }
+        }
+
         DateTime today = DateTimeHelper.GetCurrentLocalTime().Date;
         DateTime effectiveDate = today.DayOfWeek switch
         {
@@ -549,6 +568,30 @@ public sealed class ScheduledReportExecutionService(
         };
 
         return (effectiveDate, effectiveDate);
+    }
+
+    private static string BuildReportDateSegment(DateTime? dateFrom, DateTime? dateTo)
+    {
+        if (!dateFrom.HasValue && !dateTo.HasValue)
+        {
+            return "no-date-filter";
+        }
+
+        if (dateFrom.HasValue && dateTo.HasValue)
+        {
+            bool includesTime =
+                dateFrom.Value.TimeOfDay != TimeSpan.Zero ||
+                dateTo.Value.TimeOfDay != TimeSpan.Zero;
+
+            string format = includesTime ? "yyyy-MM-dd_HHmm" : "yyyy-MM-dd";
+            return dateFrom.Value == dateTo.Value
+                ? dateFrom.Value.ToString(format)
+                : $"{dateFrom.Value.ToString(format)}_{dateTo.Value.ToString(format)}";
+        }
+
+        DateTime singleDate = dateFrom ?? dateTo!.Value;
+        string singleFormat = singleDate.TimeOfDay == TimeSpan.Zero ? "yyyy-MM-dd" : "yyyy-MM-dd_HHmm";
+        return singleDate.ToString(singleFormat);
     }
 
     private static List<string> ParseJobFormats(string? value)
