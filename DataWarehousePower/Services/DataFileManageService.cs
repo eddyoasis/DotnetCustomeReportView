@@ -83,11 +83,20 @@ namespace DataWarehousePower.Services
             };
         }
 
+        public Task<List<string>> GetSourceDatabaseOptionsAsync(string dbConnectionString)
+            => _repository.GetSourceDatabaseOptionsAsync(dbConnectionString);
+
         public Task<List<string>> GetSourceDatabaseOptionsAsync()
             => _repository.GetSourceDatabaseOptionsAsync();
 
+        public Task<List<string>> GetSourceTableOptionsAsync(string dbConnectionString, string? sourceDatabase)
+            => _repository.GetSourceTableOptionsAsync(dbConnectionString, sourceDatabase);
+
         public Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase)
             => _repository.GetSourceTableOptionsAsync(sourceDatabase);
+
+        public Task<List<string>> GetSourceStoredProcedureOptionsAsync(string dbConnectionString, string? sourceDatabase)
+            => _repository.GetSourceStoredProcedureOptionsAsync(dbConnectionString, sourceDatabase);
 
         public Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase)
             => _repository.GetSourceStoredProcedureOptionsAsync(sourceDatabase);

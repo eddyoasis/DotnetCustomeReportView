@@ -4,6 +4,7 @@ namespace DataWarehousePower.Services
 {
     public interface IDepartmentConnectionService
     {
+        Task<string> GetConnectionStringByUserDepartmentAsync(string userDepartment);
         Task<List<DepartmentConnection>> GetAllAsync();
         Task<DepartmentConnection?> GetByIdAsync(int id);
         Task<DepartmentConnection> CreateAsync(DepartmentConnection departmentConnection);

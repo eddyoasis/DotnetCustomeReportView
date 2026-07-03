@@ -4,6 +4,7 @@ namespace DataWarehousePower.Repositories
 {
     public interface IDepartmentRepository
     {
+        Task<int?> GetByUserDepartmentAsync(string userDepartment);
         Task<List<Department>> GetAllAsync();
         Task<Department?> GetByIdAsync(int id);
         Task<Department> CreateAsync(Department department);

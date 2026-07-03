@@ -3,13 +3,19 @@ using DataWarehousePower.Repositories;
 
 namespace DataWarehousePower.Services
 {
-    public class DepartmentConnectionService : IDepartmentConnectionService
+    public class DepartmentConnectionService(
+        IDepartmentConnectionRepository repository,
+        IDepartmentRepository departmentRepository
+        ) : IDepartmentConnectionService
     {
-        private readonly IDepartmentConnectionRepository _repository;
+        private readonly IDepartmentConnectionRepository _repository = repository;
+        private readonly IDepartmentRepository _departmentRepository = departmentRepository;
 
-        public DepartmentConnectionService(IDepartmentConnectionRepository repository)
+        public async Task<string> GetConnectionStringByUserDepartmentAsync(string userDepartment)
         {
-            _repository = repository;
+            var departmentId = await _departmentRepository.GetByUserDepartmentAsync(userDepartment);
+            var departmentConnection = await _repository.GetByDepartmentIdAsync(departmentId);
+            return departmentConnection?.ReportConnectionString?.ConnectionString ?? string.Empty;
         }
 
         public Task<List<DepartmentConnection>> GetAllAsync()

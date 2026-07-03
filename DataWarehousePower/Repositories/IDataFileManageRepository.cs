@@ -4,8 +4,11 @@ namespace DataWarehousePower.Repositories
 {
     public interface IDataFileManageRepository
     {
+        Task<List<string>> GetSourceDatabaseOptionsAsync(string dbConnectionString);
         Task<List<string>> GetSourceDatabaseOptionsAsync();
+        Task<List<string>> GetSourceTableOptionsAsync(string dbConnectionString, string? sourceDatabase);
         Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase);
+        Task<List<string>> GetSourceStoredProcedureOptionsAsync(string dbConnectionString, string? sourceDatabase);
         Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
         Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);

@@ -20,7 +20,6 @@ namespace DataWarehousePower.Models
         public string? Description { get; set; }
 
         [Required]
-        [MaxLength(100)]
         public string ConnectionString { get; set; } = string.Empty;
 
         [Required]

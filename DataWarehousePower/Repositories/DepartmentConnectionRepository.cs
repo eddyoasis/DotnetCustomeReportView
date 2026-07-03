@@ -31,6 +31,13 @@ namespace DataWarehousePower.Repositories
                 .Include(item => item.ReportConnectionString)
                 .FirstOrDefaultAsync(item => item.Id == id);
 
+        public async Task<DepartmentConnection?> GetByDepartmentIdAsync(int? departmentId)
+            => await _context.Set<DepartmentConnection>()
+                .AsNoTracking()
+                .Include(item => item.Department)
+                .Include(item => item.ReportConnectionString)
+                .FirstOrDefaultAsync(item => item.DepartmentId == departmentId);
+
         public async Task<DepartmentConnection> CreateAsync(DepartmentConnection departmentConnection)
         {
             _context.Set<DepartmentConnection>().Add(departmentConnection);

@@ -19,6 +19,7 @@ namespace DataWarehousePower.Controllers
         private readonly IDataFileManageService _service;
         private readonly IScheduledReportJobService _scheduledReportJobService;
         private readonly IDepartmentService _departmentService;
+        private readonly IDepartmentConnectionService _departmentConnectionService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<DataFileManageController> _logger;
@@ -27,6 +28,7 @@ namespace DataWarehousePower.Controllers
             IDataFileManageService service,
             IScheduledReportJobService scheduledReportJobService,
             IDepartmentService departmentService,
+            IDepartmentConnectionService departmentConnectionService,
             IColumnPreferenceService prefService,
             IAuditLogService auditLogService,
             ILogger<DataFileManageController> logger)
@@ -34,6 +36,7 @@ namespace DataWarehousePower.Controllers
             _service = service;
             _scheduledReportJobService = scheduledReportJobService;
             _departmentService = departmentService;
+            _departmentConnectionService = departmentConnectionService;
             _prefService = prefService;
             _auditLogService = auditLogService;
             _logger = logger;
@@ -70,9 +73,12 @@ namespace DataWarehousePower.Controllers
                 }
             };
 
-            await PopulateSourceDatabaseOptionsAsync(vm);
-            await PopulateSourceTableOptionsAsync(vm);
-            await PopulateSourceSPOptionsAsync(vm);
+            var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+            var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+
+            await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+            await PopulateSourceTableOptionsAsync(vm, departmentConnection);
+            await PopulateSourceSPOptionsAsync(vm, departmentConnection);
             await PopulateDepartmentOptionsAsync(vm);
             return View("Form", vm);
         }
@@ -82,10 +88,13 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
+                var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+
                 var vm = await _service.GetFormViewModelAsync(id);
-                await PopulateSourceDatabaseOptionsAsync(vm);
-                await PopulateSourceTableOptionsAsync(vm);
-                await PopulateSourceSPOptionsAsync(vm);
+                await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+                await PopulateSourceTableOptionsAsync(vm, departmentConnection);
+                await PopulateSourceSPOptionsAsync(vm, departmentConnection);
                 await PopulateDepartmentOptionsAsync(vm);
                 return View("Form", vm);
             }
@@ -424,14 +433,29 @@ namespace DataWarehousePower.Controllers
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
         }
 
+        private async Task PopulateSourceDatabaseOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
+        {
+            vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync(dbConnectionString);
+        }
+
         private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm)
         {
             vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
         }
 
+        private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
+        {
+            vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(dbConnectionString, vm.SourceDatabase);
+        }
+
         private async Task PopulateSourceSPOptionsAsync(DataFileManageFormViewModel vm)
         {
             vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(vm.SourceDatabase);
+        }
+
+        private async Task PopulateSourceSPOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
+        {
+            vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(dbConnectionString, vm.SourceDatabase);
         }
 
         private async Task PopulateDepartmentOptionsAsync(DataFileManageFormViewModel vm)

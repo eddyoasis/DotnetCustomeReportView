@@ -17,6 +17,34 @@ namespace DataWarehousePower.Repositories
             _context = context;
         }
 
+        public async Task<List<string>> GetSourceDatabaseOptionsAsync(string dbConnectionString)
+        {
+            await using var conn = new SqlConnection(dbConnectionString);
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name " +
+                "FROM sys.databases " +
+                "WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 " +
+                "ORDER BY name";
+
+            var items = new List<string>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (!reader.IsDBNull(0))
+                {
+                    items.Add(reader.GetString(0));
+                }
+            }
+
+            return items;
+        }
+
         public async Task<List<string>> GetSourceDatabaseOptionsAsync()
         {
             var conn = _context.Database.GetDbConnection();
@@ -45,6 +73,48 @@ namespace DataWarehousePower.Repositories
             return items;
         }
 
+        public async Task<List<string>> GetSourceTableOptionsAsync(string dbConnectionString, string? sourceDatabase)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+            {
+                return new();
+            }
+
+            await using var conn = new SqlConnection(dbConnectionString);
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            var escapedDatabase = EscapeSqlIdentifier(sourceDatabase.Trim());
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT DISTINCT TABLE_NAME " +
+                "FROM [" + escapedDatabase + "].INFORMATION_SCHEMA.TABLES " +
+                "WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW') " +
+                "ORDER BY TABLE_NAME";
+
+            var items = new List<string>();
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                    {
+                        items.Add(reader.GetString(0));
+                    }
+                }
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911)
+            {
+                return new();
+            }
+
+            return items;
+        }
+
         public async Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase)
         {
             if (string.IsNullOrWhiteSpace(sourceDatabase))
@@ -66,6 +136,48 @@ namespace DataWarehousePower.Repositories
                 "FROM [" + escapedDatabase + "].INFORMATION_SCHEMA.TABLES " +
                 "WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW') " +
                 "ORDER BY TABLE_NAME";
+
+            var items = new List<string>();
+            try
+            {
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                    {
+                        items.Add(reader.GetString(0));
+                    }
+                }
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911)
+            {
+                return new();
+            }
+
+            return items;
+        }
+
+        public async Task<List<string>> GetSourceStoredProcedureOptionsAsync(string dbConnectionString, string? sourceDatabase)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+            {
+                return new();
+            }
+
+            await using var conn = new SqlConnection(dbConnectionString);
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            var escapedDatabase = EscapeSqlIdentifier(sourceDatabase.Trim());
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name " +
+                "FROM [" + escapedDatabase + "].sys.procedures " +
+                "WHERE is_ms_shipped = 0 " +
+                "ORDER BY name";
 
             var items = new List<string>();
             try

@@ -1,7 +1,6 @@
 using DataWarehousePower.Data;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
-using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataWarehousePower.Repositories
@@ -13,6 +12,23 @@ namespace DataWarehousePower.Repositories
         public DepartmentRepository(AppDbContext context)
         {
             _context = context;
+        }
+
+        public async Task<int?> GetByUserDepartmentAsync(string userDepartment)
+        {
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                return null;
+            }
+
+            string normalizedUserDepartment = userDepartment.Trim();
+
+            return await _context.Departments
+                .AsNoTracking()
+                .Where(department => department.IsActive)
+                .Where(department => department.Name == normalizedUserDepartment)
+                .Select(department => (int?)department.Id)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<List<Department>> GetAllAsync()
