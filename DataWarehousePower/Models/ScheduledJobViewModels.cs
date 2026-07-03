@@ -127,7 +127,7 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Export Subfolder")]
     public string? ExportLocationSubfolder { get; set; }
 
-    [Display(Name = "Export to Local Folder")]
+    [Display(Name = "Export to Share Drive")]
     public bool ExportToLocalFolder { get; set; }
 
     public List<ExportLocationBasePathOptionViewModel> AvailableExportLocationBasePathOptions { get; set; } = [];

@@ -44,7 +44,7 @@ public sealed class ScheduledReportExecutionService(
         Dictionary<string, string?> jobParameters = ParseJobParameters(job.Parameters);
         //var userRemoteFolderExportLocation = $"{remoteFolderExportLocation.UserReportFolderPhysicalPath}{job.CreatedByUserId}\\";
         var remoteFolderExportLocation = remoteFolderExportLocationAppSetting.Value;
-        var userRemoteFolderExportLocation = Path.Combine(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath, job.CreatedByUserId);
+        var userRemoteFolderExportLocation = Path.Combine(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath, job.CreatedByUserId, $"{DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd}");
 
         ReportViewModel? reportViewModel;
         if (job.ReportDefinitionId.HasValue)
@@ -505,25 +505,27 @@ public sealed class ScheduledReportExecutionService(
             return null;
         }
 
-        string subfolder = ExtractExportSubfolder(job.ExportLocation);
-        if (string.IsNullOrWhiteSpace(subfolder))
-        {
-            return null;
-        }
+        return remoteFolderExportLocation;
 
-        string configuredBasePath = remoteFolderExportLocation;
-        string expandedBasePath = Environment.ExpandEnvironmentVariables(configuredBasePath).Trim();
-        if (string.IsNullOrWhiteSpace(expandedBasePath))
-        {
-            expandedBasePath = Path.GetTempPath();
-        }
+        //string subfolder = ExtractExportSubfolder(job.ExportLocation);
+        //if (string.IsNullOrWhiteSpace(subfolder))
+        //{
+        //    return null;
+        //}
 
-        if (!Path.IsPathRooted(expandedBasePath))
-        {
-            expandedBasePath = Path.GetFullPath(Path.Combine(Path.GetTempPath(), expandedBasePath));
-        }
+        //string configuredBasePath = remoteFolderExportLocation;
+        //string expandedBasePath = Environment.ExpandEnvironmentVariables(configuredBasePath).Trim();
+        //if (string.IsNullOrWhiteSpace(expandedBasePath))
+        //{
+        //    expandedBasePath = Path.GetTempPath();
+        //}
 
-        return Path.Combine(expandedBasePath, subfolder);
+        //if (!Path.IsPathRooted(expandedBasePath))
+        //{
+        //    expandedBasePath = Path.GetFullPath(Path.Combine(Path.GetTempPath(), expandedBasePath));
+        //}
+
+        //return Path.Combine(expandedBasePath, subfolder);
     }
 
     private static string ExtractExportSubfolder(string? exportLocation)

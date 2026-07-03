@@ -57,7 +57,8 @@ public sealed class ReportFolderController(
 
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
         string userPathSegment = SanitizePathSegment(userId);
-        string physicalBasePath = NormalizeBasePath(configuration[ReportFolderPhysicalPathSettingKey]);
+        //string physicalBasePath = NormalizeBasePath(configuration[ReportFolderPhysicalPathSettingKey]);
+        string physicalBasePath = NormalizeBasePath(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath);
 
         if (string.IsNullOrWhiteSpace(physicalBasePath))
         {
