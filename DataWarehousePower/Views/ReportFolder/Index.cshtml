@@ -6,7 +6,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-9">
-        <h2 class="mb-3">Report Folder</h2>
+        <h2 class="mb-3">Report/Data File Folder</h2>
 
         @if (TempData["Success"] is string successMessage)
         {
@@ -42,7 +42,7 @@
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label for="searchText" class="form-label">Filter by file name</label>
                             <input id="searchText"
                                    name="searchText"
@@ -51,7 +51,7 @@
                                    value="@Model.SearchText"
                                    placeholder="Type part of a file name" />
                         </div>
-                        <div class="col-md-6">
+                        <div hidden class="col-md-6">
                             <label for="selectedType" class="form-label">Filter by type</label>
                             <select id="selectedType" name="selectedType" class="form-select">
                                 <option value="">All types</option>

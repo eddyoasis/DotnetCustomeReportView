@@ -73,9 +73,6 @@
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="Report">Scheduler</a>
                                         </li>
-                                        <li>
-                                            <a class="dropdown-item" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report Folder</a>
-                                        </li>
                                     }
                                 </ul>
                             </li>
@@ -103,6 +100,12 @@
                                         </li>
                                     }
                                 </ul>
+                            </li>
+                        }
+                        @if (canViewReports)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report/Data File Folder</a>
                             </li>
                         }
                         @if (canViewReports || canViewJobDashboard)
