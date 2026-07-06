@@ -99,7 +99,7 @@ namespace DataWarehousePower.Repositories
                     PropertyName = c.PropertyName,
                     MappingParameter = c.MappingParameter
                 }).ToList(),
-                Take = 10000
+                IsExport = true
             };
             var result = await _dataFileManageRepository.GetPreviewDataAsync(req);
             return result.Rows;

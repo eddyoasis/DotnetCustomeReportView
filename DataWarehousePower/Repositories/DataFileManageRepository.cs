@@ -1,8 +1,10 @@
 using DataWarehousePower.Data;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Data;
 using System.Globalization;
 
@@ -11,10 +13,16 @@ namespace DataWarehousePower.Repositories
     public class DataFileManageRepository : IDataFileManageRepository
     {
         private readonly AppDbContext _context;
+        private readonly ScheduledJob _scheduledJob;
 
-        public DataFileManageRepository(AppDbContext context)
+
+        public DataFileManageRepository(
+            IOptionsSnapshot<ScheduledJob> scheduledJob,
+            AppDbContext context)
         {
             _context = context;
+            _scheduledJob = scheduledJob.Value;
+
         }
 
         public async Task<List<string>> GetSourceDatabaseAsync(string dbConnectionString)
@@ -302,9 +310,16 @@ namespace DataWarehousePower.Repositories
             }
 
             int take = request.Take;
-            if (take != 10 && take != 50 && take != 100 && take != 10000)
+            if (request.IsExport)
             {
-                take = 10;
+                take = _scheduledJob.ExportSplit.MaxTotalRecord;
+            }
+            else 
+            {
+                if (take != 10 && take != 50 && take != 100 && take != 200000)
+                {
+                    take = 10;
+                }
             }
 
             var metadata = await GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, null);

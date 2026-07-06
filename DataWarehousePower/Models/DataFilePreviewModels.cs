@@ -12,6 +12,7 @@ namespace DataWarehousePower.Models
         public string? SourceTable { get; set; }
         public string? SourceSP { get; set; }
         public int Take { get; set; } = 10;
+        public bool IsExport { get; set; } = false;
         public List<DataFilePreviewColumnRequest> Columns { get; set; } = new();
     }
 
