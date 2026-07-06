@@ -63,6 +63,7 @@ namespace DataWarehousePower.Repositories
             dataFileColumn.PropertyName = dataFileColumnRequest.PropertyName;
             dataFileColumn.DefaultLabel = dataFileColumnRequest.DefaultLabel;
             dataFileColumn.MappingParameter = dataFileColumnRequest.MappingParameter;
+            dataFileColumn.MappingParameterFilter = dataFileColumnRequest.MappingParameterFilter;
             dataFileColumn.DisplayOrder = dataFileColumnRequest.DisplayOrder;
 
             await _context.SaveChangesAsync();

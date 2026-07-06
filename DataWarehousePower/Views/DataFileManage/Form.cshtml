@@ -159,6 +159,7 @@
                         <th>Property Name <span class="text-muted small">(DB column)</span></th>
                         <th>Default Label <span class="text-muted small">(UI header)</span></th>
                         <th>Mapping Parameter <span class="text-muted small">(optional filter key)</span></th>
+                        <th>Mapping Parameter Filter <span class="text-muted small">(optional filter value)</span></th>
                         @* <th style="width:110px;">Display Order</th> *@
                         @* <th style="width:70px;"></th> *@
                         <th style="width:70px;"></th>
@@ -192,6 +193,12 @@
                                        type="hidden"
                                        class="mapping-parameter-input" />
                                 <div class="mapping-parameter-editor"></div>
+                            </td>
+                            <td>
+                                <input name="Columns[@i].MappingParameterFilter"
+                                       value="@Model.Columns[i].MappingParameterFilter"
+                                       class="form-control form-control-sm"
+                                       placeholder="e.g. Active" />
                             </td>
                             <td hidden>
                                 <input name="Columns[@i].DisplayOrder"
@@ -283,6 +290,9 @@
                            type="hidden" />
                     <div class="mapping-parameter-editor"></div>
                 </td>
+                <td>
+                    <input name="Columns[${rowIndex}].MappingParameterFilter" class="form-control form-control-sm" placeholder="e.g. Active" />
+                </td>
                 <td hidden>
                     <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
                 </td>
@@ -294,10 +304,12 @@
             const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
             const labelInput = tr.querySelector('input[name$=".DefaultLabel"]');
             const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
+            const mappingFilterInput = tr.querySelector('input[name$=".MappingParameterFilter"]');
             if (propertyInput && seed?.propertyName) propertyInput.value = seed.propertyName;
             if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
             if (seed?.columnType) tr.dataset.columnType = seed.columnType;
             if (mappingInput && seed?.mappingParameter) mappingInput.value = seed.mappingParameter;
+            if (mappingFilterInput && seed?.mappingParameterFilter) mappingFilterInput.value = seed.mappingParameterFilter;
             syncRowDragHandleState(tr);
 
             rowIndex++;

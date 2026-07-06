@@ -1008,6 +1008,7 @@ namespace DataWarehousePower.Repositories
                         existingColumn.PropertyName = column.PropertyName;
                         existingColumn.DefaultLabel = column.DefaultLabel;
                         existingColumn.MappingParameter = column.MappingParameter;
+                        existingColumn.MappingParameterFilter = column.MappingParameterFilter;
                         existingColumn.DisplayOrder = column.DisplayOrder;
                     }
                 }

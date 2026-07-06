@@ -59,6 +59,9 @@ namespace DataWarehousePower.Services
             dataFileColumn.MappingParameter = string.IsNullOrWhiteSpace(dataFileColumn.MappingParameter)
                 ? null
                 : dataFileColumn.MappingParameter.Trim();
+            dataFileColumn.MappingParameterFilter = string.IsNullOrWhiteSpace(dataFileColumn.MappingParameterFilter)
+                ? null
+                : dataFileColumn.MappingParameterFilter.Trim();
         }
     }
 }

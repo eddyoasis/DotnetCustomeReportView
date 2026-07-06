@@ -166,6 +166,7 @@ namespace DataWarehousePower.Services
                     PropertyName = column.PropertyName,
                     DefaultLabel = column.DefaultLabel,
                     MappingParameter = column.MappingParameter,
+                    MappingParameterFilter = column.MappingParameterFilter,
                     DisplayOrder = column.DisplayOrder
                 }).ToList()
             };
@@ -197,6 +198,7 @@ namespace DataWarehousePower.Services
                     PropertyName = column.PropertyName.Trim(),
                     DefaultLabel = column.DefaultLabel.Trim(),
                     MappingParameter = string.IsNullOrWhiteSpace(column.MappingParameter) ? null : column.MappingParameter.Trim(),
+                    MappingParameterFilter = string.IsNullOrWhiteSpace(column.MappingParameterFilter) ? null : column.MappingParameterFilter.Trim(),
                     DisplayOrder = column.DisplayOrder
                 })
                 .ToList();

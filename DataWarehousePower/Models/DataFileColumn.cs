@@ -25,6 +25,9 @@ namespace DataWarehousePower.Models
         [MaxLength(200)]
         public string? MappingParameter { get; set; }
 
+        [MaxLength(200)]
+        public string? MappingParameterFilter { get; set; }
+
         public int DisplayOrder { get; set; } = 1;
     }
 }

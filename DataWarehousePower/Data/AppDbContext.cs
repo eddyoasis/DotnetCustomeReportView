@@ -143,6 +143,14 @@ namespace DataWarehousePower.Data
                 .HasForeignKey(c => c.DataFileDefinitionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<DataFileColumn>(e =>
+            {
+                e.Property(column => column.PropertyName).HasMaxLength(100);
+                e.Property(column => column.DefaultLabel).HasMaxLength(100);
+                e.Property(column => column.MappingParameter).HasMaxLength(200);
+                e.Property(column => column.MappingParameterFilter).HasMaxLength(200);
+            });
+
             modelBuilder.Entity<ScheduledReportJob>(e =>
             {
                 e.HasKey(job => job.Id);

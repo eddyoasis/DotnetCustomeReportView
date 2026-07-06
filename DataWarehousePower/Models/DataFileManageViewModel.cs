@@ -78,6 +78,10 @@ namespace DataWarehousePower.Models
         [Display(Name = "Mapping Parameter")]
         public string? MappingParameter { get; set; }
 
+        [MaxLength(200)]
+        [Display(Name = "Mapping Parameter Filter")]
+        public string? MappingParameterFilter { get; set; }
+
         [Range(1, 999)]
         [Display(Name = "Display Order")]
         public int DisplayOrder { get; set; } = 1;
