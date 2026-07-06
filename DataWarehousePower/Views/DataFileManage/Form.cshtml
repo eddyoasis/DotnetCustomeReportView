@@ -29,7 +29,7 @@
                 <label asp-for="SourceDatabase" class="form-label"></label>
                 <div class="dropdown searchable-source-dropdown" id="source-database-dropdown" data-bs-auto-close="outside">
                     <input asp-for="SourceDatabase" type="hidden" class="source-input" id="input-source-database" />
-                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-database">
+                    <button disabled="@(!Model.IsITDepartment)" class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-source-database">
                         -- Select database --
                     </button>
                     <div class="dropdown-menu p-2 w-100" aria-labelledby="btn-source-database">

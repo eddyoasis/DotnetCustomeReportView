@@ -19,6 +19,7 @@ XmlConfigurator.Configure(new FileInfo(Path.Combine(AppContext.BaseDirectory, "l
 
 builder.Services.Configure<SmtpAppSetting>(builder.Configuration.GetSection("SmtpAppSettings"));
 builder.Services.Configure<RemoteFolderExportLocationAppSetting>(builder.Configuration.GetSection("RemoteFolderExportLocationAppSettings"));
+builder.Services.Configure<GeneralAppSetting>(builder.Configuration.GetSection("GeneralAppSettings"));
 builder.Services.Configure<ClientCodeLookupOptions>(
     builder.Configuration.GetSection(ClientCodeLookupOptions.SectionName));
 builder.Services.Configure<ClientCodeFolderLookupOptions>(

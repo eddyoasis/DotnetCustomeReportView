@@ -83,6 +83,9 @@ namespace DataWarehousePower.Services
             };
         }
 
+        public Task<List<string>> GetSourceDatabaseAsync(string dbConnectionString)
+            => _repository.GetSourceDatabaseAsync(dbConnectionString);
+
         public Task<List<string>> GetSourceDatabaseOptionsAsync(string dbConnectionString)
             => _repository.GetSourceDatabaseOptionsAsync(dbConnectionString);
 

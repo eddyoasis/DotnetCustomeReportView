@@ -4,6 +4,7 @@ namespace DataWarehousePower.Services
 {
     public interface IDataFileManageService
     {
+        Task<List<string>> GetSourceDatabaseAsync(string dbConnectionString);
         Task<List<string>> GetSourceDatabaseOptionsAsync(string dbConnectionString);
         Task<List<string>> GetSourceDatabaseOptionsAsync();
         Task<List<string>> GetSourceTableOptionsAsync(string dbConnectionString, string? sourceDatabase);

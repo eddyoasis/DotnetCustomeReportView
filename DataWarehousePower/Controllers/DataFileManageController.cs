@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using DataWarehousePower.Helper;
+using DataWarehousePower.Models.AppSettings;
+using Microsoft.Extensions.Options;
+using System.Linq;
 
 namespace DataWarehousePower.Controllers
 {
@@ -23,6 +26,7 @@ namespace DataWarehousePower.Controllers
         private readonly IColumnPreferenceService _prefService;
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<DataFileManageController> _logger;
+        private readonly GeneralAppSetting _generalAppSetting;
 
         public DataFileManageController(
             IDataFileManageService service,
@@ -31,6 +35,7 @@ namespace DataWarehousePower.Controllers
             IDepartmentConnectionService departmentConnectionService,
             IColumnPreferenceService prefService,
             IAuditLogService auditLogService,
+            IOptionsSnapshot<GeneralAppSetting> generalAppSetting,
             ILogger<DataFileManageController> logger)
         {
             _service = service;
@@ -40,6 +45,7 @@ namespace DataWarehousePower.Controllers
             _prefService = prefService;
             _auditLogService = auditLogService;
             _logger = logger;
+            _generalAppSetting = generalAppSetting.Value;
         }
 
         // GET /DataFileManage
@@ -65,18 +71,29 @@ namespace DataWarehousePower.Controllers
         // GET /DataFileManage/Create
         public async Task<IActionResult> Create()
         {
+            var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+            var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+            var isITDepartment = _generalAppSetting.InformationTechnologyDepartments.Contains(userDepartment);
+
             var vm = new DataFileManageFormViewModel
             {
+                IsITDepartment = isITDepartment,
                 Columns = new List<DataFileColumnFormModel>
                 {
                     //new() { PropertyName = "", DefaultLabel = "", DisplayOrder = 1 }
                 }
             };
 
-            var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
-            var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+            if (isITDepartment)
+            {
+                await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
 
-            await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+            }
+            else
+            {
+                await PopulateSourceDatabaseAsync(vm, departmentConnection);
+
+            }
             await PopulateSourceTableOptionsAsync(vm, departmentConnection);
             await PopulateSourceSPOptionsAsync(vm, departmentConnection);
             await PopulateDepartmentOptionsAsync(vm);
@@ -90,9 +107,22 @@ namespace DataWarehousePower.Controllers
             {
                 var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
                 var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+                var isITDepartment = _generalAppSetting.InformationTechnologyDepartments.Contains(userDepartment);
 
                 var vm = await _service.GetFormViewModelAsync(id);
-                await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+                vm.IsITDepartment = isITDepartment;
+
+                if (isITDepartment)
+                {
+                    await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+
+                }
+                else
+                {
+                    await PopulateSourceDatabaseAsync(vm, departmentConnection);
+
+                }
+
                 await PopulateSourceTableOptionsAsync(vm, departmentConnection);
                 await PopulateSourceSPOptionsAsync(vm, departmentConnection);
                 await PopulateDepartmentOptionsAsync(vm);
@@ -431,6 +461,12 @@ namespace DataWarehousePower.Controllers
         private async Task PopulateSourceDatabaseOptionsAsync(DataFileManageFormViewModel vm)
         {
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
+        }
+
+        private async Task PopulateSourceDatabaseAsync(DataFileManageFormViewModel vm, string dbConnectionString)
+        {
+            vm.SourceDatabaseOptions = await _service.GetSourceDatabaseAsync(dbConnectionString);
+            vm.SourceDatabase = vm.SourceDatabaseOptions.FirstOrDefault();
         }
 
         private async Task PopulateSourceDatabaseOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)

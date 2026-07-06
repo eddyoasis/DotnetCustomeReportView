@@ -17,6 +17,34 @@ namespace DataWarehousePower.Repositories
             _context = context;
         }
 
+        public async Task<List<string>> GetSourceDatabaseAsync(string dbConnectionString)
+        {
+            await using var conn = new SqlConnection(dbConnectionString);
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name " +
+                "FROM sys.databases " +
+                "WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 " +
+                "ORDER BY name";
+
+            var items = new List<string>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (!reader.IsDBNull(0))
+                {
+                    items.Add(reader.GetString(0));
+                }
+            }
+
+            return items.Where(x => x == conn.Database).ToList();
+        }
+
         public async Task<List<string>> GetSourceDatabaseOptionsAsync(string dbConnectionString)
         {
             await using var conn = new SqlConnection(dbConnectionString);
