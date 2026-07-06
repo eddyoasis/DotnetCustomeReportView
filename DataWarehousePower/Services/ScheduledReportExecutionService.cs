@@ -205,9 +205,11 @@ public sealed class ScheduledReportExecutionService(
             rows = await reportRepository.GetDataFileDataFromTableAsync(
                 dataFile.SourceTable,
                 dataFile.Columns,
-                dataFile.SourceDatabase);
+                dataFile.SourceDatabase,
+                dateFrom,
+                dateTo);
 
-            rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
+            //rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
         }
         else
         {

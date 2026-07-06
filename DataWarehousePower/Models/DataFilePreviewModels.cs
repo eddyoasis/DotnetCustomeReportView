@@ -4,6 +4,7 @@ namespace DataWarehousePower.Models
     {
         public string PropertyName { get; set; } = string.Empty;
         public string? MappingParameter { get; set; }
+        public string? MappingParameterFilter { get; set; }
     }
 
     public class DataFilePreviewRequest
