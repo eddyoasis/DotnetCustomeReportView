@@ -169,18 +169,27 @@ namespace DataWarehousePower.Services
             else if (!string.IsNullOrWhiteSpace(report.SourceTable))
             {
                 var columnNames = report.Columns.Select(c => c.PropertyName);
+
                 rows = await _reportRepo.GetReportDataFromTableAsync(
                     report.SourceTable,
-                    columnNames,
-                    report.SourceDatabase);
-
-                rows = ApplyMappedTableFilters(
-                    rows,
                     report.Columns,
+                    report.SourceDatabase,
                     normalizedClientCode,
                     dateFrom,
-                    dateTo,
-                    activeParameterValues);
+                    dateTo);
+
+                //rows = await _reportRepo.GetReportDataFromTableAsync(
+                //    report.SourceTable,
+                //    columnNames,
+                //    report.SourceDatabase);
+
+                //rows = ApplyMappedTableFilters(
+                //    rows,
+                //    report.Columns,
+                //    normalizedClientCode,
+                //    dateFrom,
+                //    dateTo,
+                //    activeParameterValues);
             }
             else
             {

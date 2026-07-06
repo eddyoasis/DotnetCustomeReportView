@@ -13,6 +13,14 @@ namespace DataWarehousePower.Repositories
             IEnumerable<DataFileColumn> columnNames,
             string? sourceDatabase = null);
 
+        Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
+            string sourceTable,
+            IEnumerable<ReportColumn> columns,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo);
+
         /// <summary>
         /// Fetches data by querying a table/view directly (SourceTable mode).
         /// Column names are whitelisted against INFORMATION_SCHEMA before use.
