@@ -33,7 +33,7 @@ namespace DataWarehousePower.Controllers
             _logger = logger;
         }
 
-        public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null)
+        public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null, DateTime? dateFrom = null, DateTime? dateTo = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -84,6 +84,8 @@ namespace DataWarehousePower.Controllers
                 Filter = listViewModel.Filter,
                 DataFiles = listViewModel.DataFiles,
                 SelectedDataFile = selectedDataFile,
+                FilterDateFrom = dateFrom,
+                FilterDateTo = dateTo,
                 SchemaTemplate = normalizedSchemaTemplate,
                 ActivePreferenceId = activePreferenceId,
                 AvailableSchemaTemplates = availableSchemaTemplates,
@@ -93,7 +95,7 @@ namespace DataWarehousePower.Controllers
             });
         }
 
-        public async Task<IActionResult> List(string? search = null, bool? isActive = null)
+        public async Task<IActionResult> List(string? search = null, bool? isActive = null, DateTime? dateFrom = null, DateTime? dateTo = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -116,7 +118,9 @@ namespace DataWarehousePower.Controllers
             {
                 id = listViewModel.DataFiles[0].Id,
                 search,
-                isActive
+                isActive,
+                dateFrom,
+                dateTo
             });
         }
 
@@ -312,6 +316,8 @@ namespace DataWarehousePower.Controllers
                     SourceDatabase = form.SourceDatabase,
                     SourceTable = form.SourceTable,
                     SourceSP = form.SourceSP,
+                    DateFrom = request.DateFrom,
+                    DateTo = request.DateTo,
                     Take = 100,
                     Columns = form.Columns
                         .Where(column => !column.IsDeleted)
@@ -328,6 +334,8 @@ namespace DataWarehousePower.Controllers
                 {
                     ReportId = id,
                     ReportName = form.DataFileName,
+                    FilterDateFrom = request.DateFrom,
+                    FilterDateTo = request.DateTo,
                     AvailableColumns = exportColumns,
                     DisplayColumns = displayColumns,
                     Rows = preview.Rows

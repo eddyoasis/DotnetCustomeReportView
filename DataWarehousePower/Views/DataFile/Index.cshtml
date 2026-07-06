@@ -1,3 +1,4 @@
+@using Microsoft.AspNetCore.WebUtilities
 @using DataWarehousePower.Authorization
 @using Microsoft.AspNetCore.Authorization
 @using System.Text.Json
@@ -8,6 +9,43 @@
     var departmentLookup = ViewData["DepartmentLookup"] as Dictionary<int, string> ?? new Dictionary<int, string>();
     var selectedDataFile = Model.SelectedDataFile;
     var canManageReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportManageAccess)).Succeeded;
+
+    string BuildDataFileUrl(int dataFileId, string? overrideSchemaTemplate = null, bool includeFilters = true)
+    {
+        string baseUrl = Url.Action("Index", "DataFile", new { id = dataFileId }) ?? $"/DataFile/Index/{dataFileId}";
+
+        Dictionary<string, string?> queryValues = new(StringComparer.OrdinalIgnoreCase);
+        string schemaTemplate = overrideSchemaTemplate ?? Model.SchemaTemplate;
+        if (!string.IsNullOrWhiteSpace(schemaTemplate))
+        {
+            queryValues["schemaTemplate"] = schemaTemplate;
+        }
+
+        if (includeFilters)
+        {
+            if (!string.IsNullOrWhiteSpace(Model.Filter.Search))
+            {
+                queryValues["search"] = Model.Filter.Search;
+            }
+
+            if (Model.Filter.IsActive.HasValue)
+            {
+                queryValues["isActive"] = Model.Filter.IsActive.Value.ToString().ToLowerInvariant();
+            }
+
+            if (Model.FilterDateFrom.HasValue)
+            {
+                queryValues["dateFrom"] = Model.FilterDateFrom.Value.ToString("yyyy-MM-dd");
+            }
+
+            if (Model.FilterDateTo.HasValue)
+            {
+                queryValues["dateTo"] = Model.FilterDateTo.Value.ToString("yyyy-MM-dd");
+            }
+        }
+
+        return queryValues.Count == 0 ? baseUrl : QueryHelpers.AddQueryString(baseUrl, queryValues);
+    }
 
     string GetDepartmentLabel(string? departments)
     {
@@ -49,11 +87,7 @@
                     {
                         <li class="report-sidebar-item list-group-item list-group-item-action p-2 @(selectedDataFile?.Id == dataFile.Id ? "active" : "")"
                             data-report-name="@dataFile.DataFileName">
-                            <a asp-action="Index"
-                               asp-route-id="@dataFile.Id"
-                               asp-route-search="@Model.Filter.Search"
-                               asp-route-isActive="@Model.Filter.IsActive"
-                                         asp-route-schemaTemplate="@Model.SchemaTemplate"
+                            <a href="@BuildDataFileUrl(dataFile.Id)"
                                class="text-decoration-none d-block @(selectedDataFile?.Id == dataFile.Id ? "text-white" : "")" 
                                style="font-size:.85rem;">
                                 @dataFile.DataFileName
@@ -137,7 +171,47 @@
                 <strong>@(string.IsNullOrWhiteSpace(Model.SchemaTemplate) ? "Default" : Model.SchemaTemplate)</strong>
             </div>
 
-            
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header fw-semibold">Date Filters</div>
+                <div class="card-body">
+                    <form id="datafile-filter-form" method="get" action="@Url.Action("Index", "DataFile", new { id = selectedDataFile.Id })" class="row g-3 align-items-end">
+                        <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
+                        @if (!string.IsNullOrWhiteSpace(Model.Filter.Search))
+                        {
+                            <input type="hidden" name="search" value="@Model.Filter.Search" />
+                        }
+                        @if (Model.Filter.IsActive.HasValue)
+                        {
+                            <input type="hidden" name="isActive" value="@Model.Filter.IsActive.Value.ToString().ToLowerInvariant()" />
+                        }
+
+                        <div class="col-md-4 d-flex flex-column gap-1">
+                            <label for="filter-date-from" class="form-label small fw-semibold">DateFrom</label>
+                            <input id="filter-date-from"
+                                   name="dateFrom"
+                                   type="date"
+                                   class="form-control form-control-sm"
+                                   value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="col-md-4 d-flex flex-column gap-1">
+                            <label for="filter-date-to" class="form-label small fw-semibold">DateTo</label>
+                            <input id="filter-date-to"
+                                   name="dateTo"
+                                   type="date"
+                                   class="form-control form-control-sm"
+                                   value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="col-md-4 d-flex gap-2 align-self-end">
+                            <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
+                            <a class="btn btn-sm btn-outline-secondary w-100"
+                               href="@BuildDataFileUrl(selectedDataFile.Id, null, false)">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
 
             <div class="row g-3">
                 <div class="col-lg-12">
@@ -165,7 +239,7 @@
                                 </div>
                                 <div class="col-md-8 d-flex gap-2">
                                     <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
-                                    <a asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" asp-route-schemaTemplate="@Model.SchemaTemplate" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
+                                    <a id="schedule-datafile-link" asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" asp-route-schemaTemplate="@Model.SchemaTemplate" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
                                     <span id="export-status" class="small align-self-center"></span>
                                 </div>
                             </div>
@@ -400,6 +474,9 @@
             const exportButton = document.getElementById('btn-export');
             const exportFormatContainer = document.getElementById('export-format');
             const exportStatus = document.getElementById('export-status');
+            const filterDateFromInput = document.getElementById('filter-date-from');
+            const filterDateToInput = document.getElementById('filter-date-to');
+            const scheduleDataFileLink = document.getElementById('schedule-datafile-link');
             const exportPasswordModalElement = document.getElementById('export-password-modal');
             const exportPasswordInput = document.getElementById('export-password-input');
             const exportPasswordError = document.getElementById('export-password-error');
@@ -692,6 +769,30 @@
                 window.location.href = url.toString();
             }
 
+            function syncScheduleLink() {
+                if (!scheduleDataFileLink) {
+                    return;
+                }
+
+                const scheduleUrl = new URL(scheduleDataFileLink.href, window.location.origin);
+                const returnUrl = new URL(window.location.href);
+
+                if (filterDateFromInput?.value) {
+                    returnUrl.searchParams.set('dateFrom', filterDateFromInput.value);
+                } else {
+                    returnUrl.searchParams.delete('dateFrom');
+                }
+
+                if (filterDateToInput?.value) {
+                    returnUrl.searchParams.set('dateTo', filterDateToInput.value);
+                } else {
+                    returnUrl.searchParams.delete('dateTo');
+                }
+
+                scheduleUrl.searchParams.set('returnUrl', `${returnUrl.pathname}${returnUrl.search}`);
+                scheduleDataFileLink.href = scheduleUrl.toString();
+            }
+
             function buildColumnsFromChips(chips) {
                 return chips.map((chip, index) => ({
                     key: chip.dataset.key,
@@ -852,7 +953,9 @@
                             format: formats[0] || null,
                             formats,
                             password,
-                            schemaTemplate: getActiveSchemaTemplate()
+                            schemaTemplate: getActiveSchemaTemplate(),
+                            dateFrom: filterDateFromInput?.value || null,
+                            dateTo: filterDateToInput?.value || null
                         })
                     });
 
@@ -943,6 +1046,8 @@
                             sourceDatabase: dbName,
                             sourceTable: tableName,
                             sourceSP: procedureName,
+                            dateFrom: filterDateFromInput?.value || null,
+                            dateTo: filterDateToInput?.value || null,
                             take,
                             columns: previewRequestColumns.map(column => ({
                                 propertyName: column.propertyName,
@@ -1332,6 +1437,9 @@
                 }
             });
 
+            filterDateFromInput?.addEventListener('change', syncScheduleLink);
+            filterDateToInput?.addEventListener('change', syncScheduleLink);
+
             if (schemaTemplateSearchInput) {
                 schemaTemplateSearchInput.addEventListener('input', e => {
                     hideSchemaTemplateError();
@@ -1348,6 +1456,7 @@
 
             schemaTemplateSelect && renderSchemaTemplateOptions('');
             syncSchemaTemplateUi(initialSchemaTemplate);
+            syncScheduleLink();
 
             if (sortable) {
                 loadColumnStateFromDefaults();

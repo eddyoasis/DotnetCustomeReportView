@@ -110,8 +110,8 @@ namespace DataWarehousePower.Services
         public Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
             => _repository.GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP);
 
-        public Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request)
-            => _repository.GetPreviewDataAsync(request);
+        public Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request, DateTime? dateFrom = null, DateTime? dateTo = null)
+            => _repository.GetPreviewDataAsync(request, dateFrom ?? request.DateFrom, dateTo ?? request.DateTo);
 
         public Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
             => _repository.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
