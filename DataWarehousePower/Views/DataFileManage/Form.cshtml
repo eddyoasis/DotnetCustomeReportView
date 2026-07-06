@@ -195,11 +195,18 @@
                                 <div class="mapping-parameter-editor"></div>
                             </td>
                             <td>
+                                <select name="Columns[@i].MappingParameterFilter" class="form-select form-select-sm">
+                                    <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameterFilter) ? "selected" : null)">-- None --</option>
+                                    @* <option value="ClientCode" selected="@(Model.Columns[i].MappingParameterFilter == "ClientCode" ? "selected" : null)">ClientCode</option> *@
+                                    <option value="FilterDateFrom,FilterDateTo" selected="@(Model.Columns[i].MappingParameterFilter == "FilterDateFrom,FilterDateTo" ? "selected" : null)">FilterDateRange (From + To)</option>
+                                </select>
+                            </td>
+                            @* <td>
                                 <input name="Columns[@i].MappingParameterFilter"
                                        value="@Model.Columns[i].MappingParameterFilter"
                                        class="form-control form-control-sm"
                                        placeholder="e.g. Active" />
-                            </td>
+                            </td> *@
                             <td hidden>
                                 <input name="Columns[@i].DisplayOrder"
                                        value="@Model.Columns[i].DisplayOrder"
@@ -291,7 +298,10 @@
                     <div class="mapping-parameter-editor"></div>
                 </td>
                 <td>
-                    <input name="Columns[${rowIndex}].MappingParameterFilter" class="form-control form-control-sm" placeholder="e.g. Active" />
+                    <select name="Columns[${rowIndex}].MappingParameterFilter" class="form-select form-select-sm">
+                        <option value="" selected>-- None --</option>
+                        <option value="FilterDateFrom,FilterDateTo">FilterDateRange (From + To)</option>
+                    </select>
                 </td>
                 <td hidden>
                     <input name="Columns[${rowIndex}].DisplayOrder" type="number" min="1" max="999" value="${displayOrder}" class="form-control form-control-sm" required />
@@ -304,7 +314,7 @@
             const propertyInput = tr.querySelector('input[name$=".PropertyName"]');
             const labelInput = tr.querySelector('input[name$=".DefaultLabel"]');
             const mappingInput = tr.querySelector('input[name$=".MappingParameter"]');
-            const mappingFilterInput = tr.querySelector('input[name$=".MappingParameterFilter"]');
+            const mappingFilterInput = tr.querySelector('[name$=".MappingParameterFilter"]');
             if (propertyInput && seed?.propertyName) propertyInput.value = seed.propertyName;
             if (labelInput && seed?.defaultLabel) labelInput.value = seed.defaultLabel;
             if (seed?.columnType) tr.dataset.columnType = seed.columnType;
@@ -316,9 +326,37 @@
             refreshRowNumbers();
             toggleNoColsMessage();
             refreshMappingParameterInputTypes();
+            syncMappingParameterFilterOptions();
             if (!seed) {
                 tr.querySelector('input[name$=".PropertyName"]').focus();
             }
+        }
+
+        function getVisibleMappingParameterFilterSelects() {
+            return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) select[name$=".MappingParameterFilter"]')];
+        }
+
+        function syncMappingParameterFilterOptions() {
+            const selects = getVisibleMappingParameterFilterSelects();
+            const selectedValues = new Set(
+                selects
+                    .map(select => (select.value || '').trim())
+                    .filter(Boolean)
+            );
+
+            selects.forEach(select => {
+                const currentValue = (select.value || '').trim();
+
+                [...select.options].forEach(option => {
+                    const value = (option.value || '').trim();
+                    if (!value) {
+                        option.disabled = false;
+                        return;
+                    }
+
+                    option.disabled = value !== currentValue && selectedValues.has(value);
+                });
+            });
         }
 
         document.getElementById('btn-add-col').addEventListener('click', addColumnRow);
@@ -332,6 +370,12 @@
             if (!(e.target instanceof HTMLInputElement)) return;
             if (!e.target.matches('input[name$=".PropertyName"]')) return;
             refreshMappingParameterInputTypes();
+        });
+
+        document.getElementById('columns-body').addEventListener('change', e => {
+            if (!(e.target instanceof HTMLSelectElement)) return;
+            if (!e.target.matches('select[name$=".MappingParameterFilter"]')) return;
+            syncMappingParameterFilterOptions();
         });
 
         document.getElementById('columns-body').addEventListener('click', e => {
@@ -368,6 +412,7 @@
             refreshRowNumbers();
             toggleNoColsMessage();
             refreshMappingParameterInputTypes();
+            syncMappingParameterFilterOptions();
         });
 
         function syncRowDragHandleState(tr) {
@@ -1723,5 +1768,6 @@
         loadSourceParameters();
         document.querySelectorAll('#columns-body tr.col-row').forEach(syncRowDragHandleState);
         refreshMappingParameterInputTypes();
+        syncMappingParameterFilterOptions();
     </script>
 }
