@@ -1494,6 +1494,9 @@
 
                 const previewColumns = Array.isArray(payload?.columns) ? payload.columns : [];
                 const previewRows = Array.isArray(payload?.rows) ? payload.rows : [];
+                const totalCount = Number.isFinite(Number(payload?.count))
+                    ? Number(payload.count)
+                    : previewRows.length;
                 const labelLookup = new Map(
                     columns
                         .filter(column => (column.propertyName || '').trim())
@@ -1510,7 +1513,7 @@
                 });
 
                 renderPreviewTable(previewColumnDefinitions, previewRows);
-                setPreviewStatus(`Showing ${previewRows.length} row(s).`, false);
+                setPreviewStatus(`Showing ${previewRows.length} of ${totalCount} row(s).`, false);
             } catch {
                 setPreviewStatus('Failed to load preview data.', true);
                 clearPreviewTable();

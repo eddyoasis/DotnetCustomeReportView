@@ -436,7 +436,7 @@ namespace DataWarehousePower.Controllers
                 {
                     columns = preview.Columns,
                     rows = preview.Rows,
-                    count = preview.Rows.Count
+                    count = preview.TotalRowCount
                 });
             }
             catch (ArgumentException ex)

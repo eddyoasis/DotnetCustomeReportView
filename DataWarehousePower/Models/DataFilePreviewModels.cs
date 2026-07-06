@@ -18,6 +18,7 @@ namespace DataWarehousePower.Models
 
     public class DataFilePreviewResult
     {
+        public int TotalRowCount { get; set; }
         public List<string> Columns { get; set; } = new();
         public List<Dictionary<string, object?>> Rows { get; set; } = new();
     }

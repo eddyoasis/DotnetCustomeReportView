@@ -959,8 +959,11 @@
                     }
 
                     const responseRows = Array.isArray(payload?.rows) ? payload.rows : [];
+                    const totalCount = Number.isFinite(Number(payload?.count))
+                        ? Number(payload.count)
+                        : responseRows.length;
                     renderPreviewFromCurrentState(responseRows);
-                    setPreviewStatus(`Showing ${responseRows.length} row(s).`, false);
+                    setPreviewStatus(`Showing ${responseRows.length} of ${totalCount} row(s).`, false);
                 } catch {
                     setPreviewStatus('Failed to load preview data.', true);
                     clearPreviewTable();

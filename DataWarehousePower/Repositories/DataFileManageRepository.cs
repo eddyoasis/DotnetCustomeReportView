@@ -316,7 +316,7 @@ namespace DataWarehousePower.Repositories
             }
             else 
             {
-                if (take != 10 && take != 50 && take != 100 && take != 200000)
+                if (take != 10 && take != 50 && take != 100)
                 {
                     take = 10;
                 }
@@ -461,15 +461,27 @@ namespace DataWarehousePower.Repositories
                 ? " WHERE " + string.Join(" AND ", whereClauses)
                 : string.Empty;
 
+            string fromSql = $"FROM [{escapedDatabase}]..[{escapedTable}]";
+
             cmd.CommandText =
-                $"SELECT TOP ({take}) {selectList} " +
-                $"FROM [{escapedDatabase}]..[{escapedTable}]" +
+                "SELECT COUNT(1) " +
+                fromSql +
                 whereSql;
 
             var result = new DataFilePreviewResult
             {
                 Columns = selectedColumns
             };
+
+            object? totalCountObj = await cmd.ExecuteScalarAsync();
+            result.TotalRowCount = totalCountObj is null || totalCountObj == DBNull.Value
+                ? 0
+                : Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
+
+            cmd.CommandText =
+                $"SELECT TOP ({take}) {selectList} " +
+                fromSql +
+                whereSql;
 
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
