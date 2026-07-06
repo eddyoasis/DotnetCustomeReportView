@@ -111,7 +111,7 @@
                         <input asp-for="ExportToLocalFolder" class="form-check-input" id="exportToLocalFolderToggle" />
                         <label asp-for="ExportToLocalFolder" class="form-check-label"></label>
                     </div>
-                    <div id="exportToLocalFolderHint" class="form-text">If enabled, an extra copy will be saved to the Share Drive and can be opened via Report > Report Folder.</div>
+                    <div id="exportToLocalFolderHint" class="form-text">If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.</div>
                     
                       <button hidden id="openExportLocationButton" type="button" class="btn btn-outline-secondary btn-sm mt-2" disabled>Open</button>
                     <input asp-for="ExportLocation" type="hidden" />
@@ -663,7 +663,7 @@
                         exportLocationSubfolderError.classList.add('d-none');
                     }
                     if (exportToLocalFolderHint) {
-                        exportToLocalFolderHint.textContent = 'If enabled, an extra copy will be saved to the Share Drive and can be opened via Report > Report Folder.';
+                        exportToLocalFolderHint.textContent = 'If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.';
                     }
                     updateOpenExportLocationButtonState();
                     return;
@@ -686,8 +686,8 @@
                 if (exportToLocalFolderHint) {
                     exportToLocalFolderHint.textContent = normalizedSubfolder
                         // ? `When enabled, an additional copy is saved to: %temp%\\${normalizedSubfolder}`
-                        ? 'If enabled, an extra copy will be saved to the Share Drive and can be opened via Report > Report Folder.'
-                        : 'If enabled, an extra copy will be saved to the Share Drive and can be opened via Report > Report Folder.';
+                        ? 'If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.'
+                        : 'If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.';
                 }
 
                 updateOpenExportLocationButtonState();
