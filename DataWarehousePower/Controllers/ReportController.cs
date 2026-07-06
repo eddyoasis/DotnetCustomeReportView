@@ -279,6 +279,7 @@ namespace DataWarehousePower.Controllers
                     normalizedFormats,
                     request.Password,
                     zipSubFileName,
+                    null,
                     cancellationToken);
 
                 await _auditLogService.LogExportAsync("ExportSucceeded", userId, username, correlationId, id, vm.ReportName, normalizedFormatsAuditValue, request.SchemaTemplate, request.ClientCode, request.DateFrom, request.DateTo, "ZIP generated and returned.", cancellationToken);

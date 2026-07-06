@@ -94,12 +94,14 @@ public sealed class ScheduledReportExecutionService(
         //string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}.zip";
         string fileName = $"{safeReportName}_{clientCodeSegment}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
         string zipSubFileName = $"{safeReportName}_format_{clientCodeSegment}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+        CsvExportSplitOptions? csvSplitOptions = ResolveCsvSplitOptions(configuration, logger, scheduledJobId);
 
         byte[] zipBytes = await reportExportService.BuildPasswordProtectedZipAsync(
             reportViewModel,
             normalizedFormats,
             password,
-            zipSubFileName);
+            zipSubFileName,
+            csvSplitOptions);
 
         string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
         string? localDirectory = ResolveLocalExportDirectory(job, userRemoteFolderExportLocation);
@@ -200,9 +202,9 @@ public sealed class ScheduledReportExecutionService(
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            rows = await reportRepository.GetReportDataFromTableAsync(
+            rows = await reportRepository.GetDataFileDataFromTableAsync(
                 dataFile.SourceTable,
-                columnNames,
+                dataFile.Columns,
                 dataFile.SourceDatabase);
 
             rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
@@ -620,6 +622,41 @@ public sealed class ScheduledReportExecutionService(
             .ToList();
 
         return parsedFormats.Count > 0 ? parsedFormats : ["csv"];
+    }
+
+    private static CsvExportSplitOptions? ResolveCsvSplitOptions(
+        IConfiguration configuration,
+        ILogger logger,
+        int scheduledJobId)
+    {
+        int? maxRowsPerFile = configuration.GetValue<int?>("ScheduledJob:CsvSplit:MaxRowsPerFile");
+        long? maxBytesPerFile = configuration.GetValue<long?>("ScheduledJob:CsvSplit:MaxBytesPerFile");
+        int? maxFileSizeMb = configuration.GetValue<int?>("ScheduledJob:CsvSplit:MaxFileSizeMb");
+
+        if (!maxBytesPerFile.HasValue && maxFileSizeMb is > 0)
+        {
+            maxBytesPerFile = maxFileSizeMb.Value * 1024L * 1024L;
+        }
+
+        int? normalizedRows = maxRowsPerFile is > 0 ? maxRowsPerFile : null;
+        long? normalizedBytes = maxBytesPerFile is > 0 ? maxBytesPerFile : null;
+
+        if (!normalizedRows.HasValue && !normalizedBytes.HasValue)
+        {
+            return null;
+        }
+
+        logger.LogInformation(
+            "Scheduled export job {ScheduledJobId} enabled CSV splitting with MaxRowsPerFile={MaxRowsPerFile}, MaxBytesPerFile={MaxBytesPerFile}.",
+            scheduledJobId,
+            normalizedRows,
+            normalizedBytes);
+
+        return new CsvExportSplitOptions
+        {
+            MaxRowsPerFile = normalizedRows,
+            MaxBytesPerFile = normalizedBytes
+        };
     }
 
     private static Dictionary<string, string?> ParseJobParameters(string? json)

@@ -342,6 +342,7 @@ namespace DataWarehousePower.Controllers
                     normalizedFormats,
                     request.Password,
                     zipSubFileName,
+                    null,
                     cancellationToken);
 
                 return File(zipBytes, "application/zip", zipFileName);

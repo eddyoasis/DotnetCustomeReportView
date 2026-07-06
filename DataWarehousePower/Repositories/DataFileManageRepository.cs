@@ -302,7 +302,7 @@ namespace DataWarehousePower.Repositories
             }
 
             int take = request.Take;
-            if (take != 10 && take != 50 && take != 100)
+            if (take != 10 && take != 50 && take != 100 && take != 10000)
             {
                 take = 10;
             }

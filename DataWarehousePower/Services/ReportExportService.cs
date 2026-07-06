@@ -18,6 +18,7 @@ namespace DataWarehousePower.Services
             IReadOnlyCollection<string> formats,
             string password,
             string zipSubFileName,
+            CsvExportSplitOptions? csvSplitOptions = null,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(password))
@@ -65,16 +66,34 @@ namespace DataWarehousePower.Services
             foreach (string normalizedFormat in normalizedFormats)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                string baseFileName = BuildSafeFileName(zipSubFileName, normalizedFormat);
+
+                if (normalizedFormat == "csv")
+                {
+                    IReadOnlyList<CsvExportChunk> csvChunks = BuildCsvChunks(report.Rows, visibleColumns, csvSplitOptions);
+                    if (csvChunks.Count == 1)
+                    {
+                        exportFiles.Add(($"{baseFileName}.csv", csvChunks[0].Bytes));
+                    }
+                    else
+                    {
+                        for (int chunkIndex = 0; chunkIndex < csvChunks.Count; chunkIndex++)
+                        {
+                            CsvExportChunk chunk = csvChunks[chunkIndex];
+                            exportFiles.Add(($"{baseFileName}_part{chunk.PartNumber:D3}.csv", chunk.Bytes));
+                        }
+                    }
+
+                    continue;
+                }
 
                 (byte[] fileBytes, string extension) exportPayload = normalizedFormat switch
                 {
-                    "csv" => (BuildCsv(report.Rows, visibleColumns), "csv"),
                     "excel" => (BuildExcel(report.Rows, visibleColumns), "xlsx"),
                     "pdf" => (BuildPdf(report, visibleColumns), "pdf"),
                     _ => throw new ArgumentOutOfRangeException(nameof(formats), "Supported formats are CSV, Excel, and PDF.")
                 };
 
-                string baseFileName = BuildSafeFileName(zipSubFileName, normalizedFormat);
                 exportFiles.Add(($"{baseFileName}.{exportPayload.extension}", exportPayload.fileBytes));
             }
 
@@ -83,7 +102,73 @@ namespace DataWarehousePower.Services
             return Task.FromResult(zipBytes);
         }
 
-        private static byte[] BuildCsv(
+        private static IReadOnlyList<CsvExportChunk> BuildCsvChunks(
+            IReadOnlyList<Dictionary<string, object?>> rows,
+            IReadOnlyList<ColumnDefinition> visibleColumns,
+            CsvExportSplitOptions? csvSplitOptions)
+        {
+            string header = string.Join(",", visibleColumns.Select(column => EscapeCsv(column.DisplayLabel)));
+            string headerLine = $"{header}{Environment.NewLine}";
+            int headerBytes = Encoding.UTF8.GetByteCount(headerLine);
+
+            int? maxRowsPerFile = csvSplitOptions?.MaxRowsPerFile is > 0
+                ? csvSplitOptions.MaxRowsPerFile
+                : null;
+            long? maxBytesPerFile = csvSplitOptions?.MaxBytesPerFile is > 0
+                ? csvSplitOptions.MaxBytesPerFile
+                : null;
+
+            bool splitByRowCount = maxRowsPerFile.HasValue;
+            bool splitByFileSize = maxBytesPerFile.HasValue;
+
+            if (!splitByRowCount && !splitByFileSize)
+            {
+                return [new CsvExportChunk(1, BuildSingleCsv(rows, visibleColumns))];
+            }
+
+            List<CsvExportChunk> chunks = [];
+            StringBuilder csvBuilder = new();
+            csvBuilder.Append(headerLine);
+            int rowsInChunk = 0;
+            long bytesInChunk = headerBytes;
+            int partNumber = 1;
+
+            foreach (Dictionary<string, object?> row in rows)
+            {
+                List<string> cells = [];
+                foreach (ColumnDefinition column in visibleColumns)
+                {
+                    object? value = ResolveCellValue(row, column.Key);
+                    cells.Add(EscapeCsv(value?.ToString() ?? string.Empty));
+                }
+
+                string rowLine = $"{string.Join(",", cells)}{Environment.NewLine}";
+                long rowBytes = Encoding.UTF8.GetByteCount(rowLine);
+
+                bool reachedRowLimit = splitByRowCount && rowsInChunk >= maxRowsPerFile;
+                bool wouldExceedSizeLimit = splitByFileSize && rowsInChunk > 0 && bytesInChunk + rowBytes > maxBytesPerFile;
+
+                if (reachedRowLimit || wouldExceedSizeLimit)
+                {
+                    chunks.Add(new CsvExportChunk(partNumber, Encoding.UTF8.GetBytes(csvBuilder.ToString())));
+                    partNumber++;
+                    csvBuilder.Clear();
+                    csvBuilder.Append(headerLine);
+                    rowsInChunk = 0;
+                    bytesInChunk = headerBytes;
+                }
+
+                csvBuilder.Append(rowLine);
+                rowsInChunk++;
+                bytesInChunk += rowBytes;
+            }
+
+            chunks.Add(new CsvExportChunk(partNumber, Encoding.UTF8.GetBytes(csvBuilder.ToString())));
+
+            return chunks;
+        }
+
+        private static byte[] BuildSingleCsv(
             IReadOnlyList<Dictionary<string, object?>> rows,
             IReadOnlyList<ColumnDefinition> visibleColumns)
         {
@@ -228,6 +313,8 @@ namespace DataWarehousePower.Services
         {
             return zipSubFileName.Replace("format", format);
         }
+
+        private sealed record CsvExportChunk(int PartNumber, byte[] Bytes);
 
         //private static string BuildSafeFileName(string reportName, string format)
         //{

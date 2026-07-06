@@ -9,6 +9,7 @@ namespace DataWarehousePower.Services
             IReadOnlyCollection<string> formats,
             string password,
             string zipSubFileName,
+            CsvExportSplitOptions? csvSplitOptions = null,
             CancellationToken cancellationToken = default);
     }
 }
