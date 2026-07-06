@@ -18,7 +18,7 @@ namespace DataWarehousePower.Services
             IReadOnlyCollection<string> formats,
             string password,
             string zipSubFileName,
-            CsvExportSplitOptions? csvSplitOptions = null,
+            CsvExportSplitOptions? exportSplitOptions = null,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(password))
@@ -70,7 +70,7 @@ namespace DataWarehousePower.Services
 
                 if (normalizedFormat == "csv")
                 {
-                    IReadOnlyList<CsvExportChunk> csvChunks = BuildCsvChunks(report.Rows, visibleColumns, csvSplitOptions);
+                    IReadOnlyList<CsvExportChunk> csvChunks = BuildCsvChunks(report.Rows, visibleColumns, exportSplitOptions);
                     if (csvChunks.Count == 1)
                     {
                         exportFiles.Add(($"{baseFileName}.csv", csvChunks[0].Bytes));
@@ -87,10 +87,54 @@ namespace DataWarehousePower.Services
                     continue;
                 }
 
+                if (normalizedFormat == "excel")
+                {
+                    IReadOnlyList<BinaryExportChunk> excelChunks = BuildBinaryChunks(
+                        report.Rows,
+                        exportSplitOptions,
+                        chunkRows => BuildExcel(chunkRows, visibleColumns),
+                        "Excel");
+
+                    if (excelChunks.Count == 1)
+                    {
+                        exportFiles.Add(($"{baseFileName}.xlsx", excelChunks[0].Bytes));
+                    }
+                    else
+                    {
+                        foreach (BinaryExportChunk chunk in excelChunks)
+                        {
+                            exportFiles.Add(($"{baseFileName}_part{chunk.PartNumber:D3}.xlsx", chunk.Bytes));
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (normalizedFormat == "pdf")
+                {
+                    IReadOnlyList<BinaryExportChunk> pdfChunks = BuildBinaryChunks(
+                        report.Rows,
+                        exportSplitOptions,
+                        chunkRows => BuildPdf(report.ReportName, chunkRows, visibleColumns),
+                        "PDF");
+
+                    if (pdfChunks.Count == 1)
+                    {
+                        exportFiles.Add(($"{baseFileName}.pdf", pdfChunks[0].Bytes));
+                    }
+                    else
+                    {
+                        foreach (BinaryExportChunk chunk in pdfChunks)
+                        {
+                            exportFiles.Add(($"{baseFileName}_part{chunk.PartNumber:D3}.pdf", chunk.Bytes));
+                        }
+                    }
+
+                    continue;
+                }
+
                 (byte[] fileBytes, string extension) exportPayload = normalizedFormat switch
                 {
-                    "excel" => (BuildExcel(report.Rows, visibleColumns), "xlsx"),
-                    "pdf" => (BuildPdf(report, visibleColumns), "pdf"),
                     _ => throw new ArgumentOutOfRangeException(nameof(formats), "Supported formats are CSV, Excel, and PDF.")
                 };
 
@@ -105,17 +149,17 @@ namespace DataWarehousePower.Services
         private static IReadOnlyList<CsvExportChunk> BuildCsvChunks(
             IReadOnlyList<Dictionary<string, object?>> rows,
             IReadOnlyList<ColumnDefinition> visibleColumns,
-            CsvExportSplitOptions? csvSplitOptions)
+            CsvExportSplitOptions? exportSplitOptions)
         {
             string header = string.Join(",", visibleColumns.Select(column => EscapeCsv(column.DisplayLabel)));
             string headerLine = $"{header}{Environment.NewLine}";
             int headerBytes = Encoding.UTF8.GetByteCount(headerLine);
 
-            int? maxRowsPerFile = csvSplitOptions?.MaxRowsPerFile is > 0
-                ? csvSplitOptions.MaxRowsPerFile
+            int? maxRowsPerFile = exportSplitOptions?.MaxRowsPerFile is > 0
+                ? exportSplitOptions.MaxRowsPerFile
                 : null;
-            long? maxBytesPerFile = csvSplitOptions?.MaxBytesPerFile is > 0
-                ? csvSplitOptions.MaxBytesPerFile
+            long? maxBytesPerFile = exportSplitOptions?.MaxBytesPerFile is > 0
+                ? exportSplitOptions.MaxBytesPerFile
                 : null;
 
             bool splitByRowCount = maxRowsPerFile.HasValue;
@@ -221,8 +265,127 @@ namespace DataWarehousePower.Services
             return memoryStream.ToArray();
         }
 
+        private IReadOnlyList<BinaryExportChunk> BuildBinaryChunks(
+            IReadOnlyList<Dictionary<string, object?>> rows,
+            CsvExportSplitOptions? exportSplitOptions,
+            Func<IReadOnlyList<Dictionary<string, object?>>, byte[]> buildFileBytes,
+            string formatName)
+        {
+            int? maxRowsPerFile = exportSplitOptions?.MaxRowsPerFile is > 0
+                ? exportSplitOptions.MaxRowsPerFile
+                : null;
+            long? maxBytesPerFile = exportSplitOptions?.MaxBytesPerFile is > 0
+                ? exportSplitOptions.MaxBytesPerFile
+                : null;
+
+            bool splitByRowCount = maxRowsPerFile.HasValue;
+            bool splitByFileSize = maxBytesPerFile.HasValue;
+
+            if (!splitByRowCount && !splitByFileSize)
+            {
+                return [new BinaryExportChunk(1, buildFileBytes(rows))];
+            }
+
+            if (rows.Count == 0)
+            {
+                return [new BinaryExportChunk(1, buildFileBytes(rows))];
+            }
+
+            List<BinaryExportChunk> chunks = [];
+            int rowStartIndex = 0;
+            int partNumber = 1;
+
+            while (rowStartIndex < rows.Count)
+            {
+                int remainingRows = rows.Count - rowStartIndex;
+                int candidateRowCount = splitByRowCount
+                    ? Math.Min(maxRowsPerFile!.Value, remainingRows)
+                    : remainingRows;
+
+                if (splitByFileSize)
+                {
+                    candidateRowCount = FindMaxRowCountWithinByteLimit(
+                        rows,
+                        rowStartIndex,
+                        candidateRowCount,
+                        maxBytesPerFile!.Value,
+                        buildFileBytes);
+                }
+
+                IReadOnlyList<Dictionary<string, object?>> chunkRows = SliceRows(rows, rowStartIndex, candidateRowCount);
+                byte[] chunkBytes = buildFileBytes(chunkRows);
+
+                if (splitByFileSize && chunkBytes.LongLength > maxBytesPerFile!.Value && candidateRowCount == 1)
+                {
+                    _logger.LogWarning(
+                        "{FormatName} export part {PartNumber} is {ActualSize} bytes and exceeds MaxBytesPerFile={MaxBytesPerFile}. A single row cannot be split further.",
+                        formatName,
+                        partNumber,
+                        chunkBytes.LongLength,
+                        maxBytesPerFile.Value);
+                }
+
+                chunks.Add(new BinaryExportChunk(partNumber, chunkBytes));
+                rowStartIndex += candidateRowCount;
+                partNumber++;
+            }
+
+            return chunks;
+        }
+
+        private static int FindMaxRowCountWithinByteLimit(
+            IReadOnlyList<Dictionary<string, object?>> rows,
+            int rowStartIndex,
+            int maxCandidateRowCount,
+            long maxBytesPerFile,
+            Func<IReadOnlyList<Dictionary<string, object?>>, byte[]> buildFileBytes)
+        {
+            if (maxCandidateRowCount <= 1)
+            {
+                return 1;
+            }
+
+            int low = 1;
+            int high = maxCandidateRowCount;
+            int bestCount = 1;
+
+            while (low <= high)
+            {
+                int mid = low + ((high - low) / 2);
+                IReadOnlyList<Dictionary<string, object?>> testRows = SliceRows(rows, rowStartIndex, mid);
+                long byteCount = buildFileBytes(testRows).LongLength;
+
+                if (byteCount <= maxBytesPerFile)
+                {
+                    bestCount = mid;
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            return bestCount;
+        }
+
+        private static IReadOnlyList<Dictionary<string, object?>> SliceRows(
+            IReadOnlyList<Dictionary<string, object?>> rows,
+            int startIndex,
+            int count)
+        {
+            List<Dictionary<string, object?>> slicedRows = new(count);
+            for (int index = startIndex; index < startIndex + count; index++)
+            {
+                slicedRows.Add(rows[index]);
+            }
+
+            return slicedRows;
+        }
+
         private static byte[] BuildPdf(
-            ReportViewModel report,
+            string reportName,
+            IReadOnlyList<Dictionary<string, object?>> rows,
             IReadOnlyList<ColumnDefinition> visibleColumns)
         {
             QuestPDF.Settings.License = LicenseType.Community;
@@ -235,7 +398,7 @@ namespace DataWarehousePower.Services
                     page.Size(PageSizes.A4.Landscape());
                     page.DefaultTextStyle(textStyle => textStyle.FontSize(10));
 
-                    page.Header().Text(report.ReportName).SemiBold().FontSize(14);
+                    page.Header().Text(reportName).SemiBold().FontSize(14);
 
                     page.Content().Table(table =>
                     {
@@ -255,7 +418,7 @@ namespace DataWarehousePower.Services
                             }
                         });
 
-                        foreach (Dictionary<string, object?> row in report.Rows)
+                        foreach (Dictionary<string, object?> row in rows)
                         {
                             foreach (ColumnDefinition column in visibleColumns)
                             {
@@ -315,6 +478,7 @@ namespace DataWarehousePower.Services
         }
 
         private sealed record CsvExportChunk(int PartNumber, byte[] Bytes);
+        private sealed record BinaryExportChunk(int PartNumber, byte[] Bytes);
 
         //private static string BuildSafeFileName(string reportName, string format)
         //{
