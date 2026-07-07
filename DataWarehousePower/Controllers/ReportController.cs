@@ -1,3 +1,4 @@
+using Azure.Core;
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
@@ -49,6 +50,9 @@ namespace DataWarehousePower.Controllers
             int page = 1,
             int pageSize = 50)
         {
+            if (dateTo.HasValue)
+                dateTo = dateTo.Value.AddDays(1).AddSeconds(-1);
+
             var userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
             Dictionary<string, string?> runtimeParameters = ResolveRuntimeParameters(Request.Query);
@@ -215,6 +219,9 @@ namespace DataWarehousePower.Controllers
                 await _auditLogService.LogExportAsync("ExportRejected", userId, username, correlationId, id, null, "unknown", null, null, null, null, "Request body is missing.", cancellationToken);
                 return BadRequest(new { success = false, error = "Export request is required." });
             }
+
+            if (request.DateTo.HasValue)
+                request.DateTo = request.DateTo.Value.AddDays(1).AddSeconds(-1);
 
             List<string> normalizedFormats = (request.Formats ?? [])
                 .Where(format => !string.IsNullOrWhiteSpace(format))

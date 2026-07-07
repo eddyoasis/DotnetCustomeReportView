@@ -431,6 +431,9 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
+                if(request.DateTo.HasValue)
+                    request.DateTo = request.DateTo.Value.AddDays(1).AddSeconds(-1);
+
                 DataFilePreviewResult preview = await _service.GetPreviewDataAsync(request);
                 return Json(new
                 {

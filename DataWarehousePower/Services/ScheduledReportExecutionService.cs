@@ -23,8 +23,6 @@ public sealed class ScheduledReportExecutionService(
 
     public async Task ExecuteAsync(int scheduledJobId)
     {
-        
-
         ScheduledReportJob? job = await scheduledJobRepository.GetByIdAsync(scheduledJobId);
         if (job is null)
         {
@@ -42,7 +40,6 @@ public sealed class ScheduledReportExecutionService(
         string password = dataProtectionService.Unprotect(job.EncryptedPassword);
         (DateTime? effectiveDateFrom, DateTime? effectiveDateTo) = ResolveEffectiveDateRange(job);
         Dictionary<string, string?> jobParameters = ParseJobParameters(job.Parameters);
-        //var userRemoteFolderExportLocation = $"{remoteFolderExportLocation.UserReportFolderPhysicalPath}{job.CreatedByUserId}\\";
         var remoteFolderExportLocation = remoteFolderExportLocationAppSetting.Value;
         var userRemoteFolderExportLocation = Path.Combine(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath, job.CreatedByUserId, $"{DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd}");
 

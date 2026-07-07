@@ -246,6 +246,9 @@ namespace DataWarehousePower.Controllers
                 return BadRequest(new { success = false, error = "Export request is required." });
             }
 
+            if (request.DateTo.HasValue)
+                request.DateTo = request.DateTo.Value.AddDays(1).AddSeconds(-1);
+
             List<string> normalizedFormats = (request.Formats ?? [])
                 .Where(format => !string.IsNullOrWhiteSpace(format))
                 .Select(format => format.Trim().ToLowerInvariant())
@@ -318,16 +321,17 @@ namespace DataWarehousePower.Controllers
                     SourceSP = form.SourceSP,
                     DateFrom = request.DateFrom,
                     DateTo = request.DateTo,
-                    Take = 100,
                     Columns = form.Columns
                         .Where(column => !column.IsDeleted)
                         .OrderBy(column => column.DisplayOrder)
                         .Select(column => new DataFilePreviewColumnRequest
                         {
                             PropertyName = column.PropertyName,
-                            MappingParameter = column.MappingParameter
+                            MappingParameter = column.MappingParameter,
+                            MappingParameterFilter = column.MappingParameterFilter
                         })
-                        .ToList()
+                        .ToList(),
+                    IsExport = true
                 });
 
                 var vm = new ReportViewModel

@@ -428,7 +428,8 @@
                     {
                         propertyName = column.PropertyName,
                         defaultLabel = column.DefaultLabel,
-                        mappingParameter = column.MappingParameter
+                        mappingParameter = column.MappingParameter,
+                        mappingParameterFilter = column.MappingParameterFilter
                     })
                     .ToList()));
             const initialSchemaTemplate = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplate));
@@ -1020,7 +1021,8 @@
                     .map(column => ({
                         propertyName: (column?.propertyName || '').toString().trim(),
                         defaultLabel: (column?.defaultLabel || '').toString().trim(),
-                        mappingParameter: (column?.mappingParameter || '').toString().trim()
+                        mappingParameter: (column?.mappingParameter || '').toString().trim(),
+                        mappingParameterFilter: (column?.mappingParameterFilter || '').toString().trim()
                     }))
                     .filter(column => column.propertyName);
 
@@ -1051,7 +1053,8 @@
                             take,
                             columns: previewRequestColumns.map(column => ({
                                 propertyName: column.propertyName,
-                                mappingParameter: column.mappingParameter
+                                mappingParameter: column.mappingParameter,
+                                    mappingParameterFilter: column.mappingParameterFilter
                             }))
                         })
                     });
