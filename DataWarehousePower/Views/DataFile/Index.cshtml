@@ -1066,6 +1066,11 @@
                         return;
                     }
 
+                    if (!payload.canExport) {
+                            exportButton.setAttribute("disabled", "true");
+                            // exportButton.style.pointerEvents = "none"; // prevents mouse interaction
+                    }
+
                     const responseRows = Array.isArray(payload?.rows) ? payload.rows : [];
                     const totalCount = Number.isFinite(Number(payload?.count))
                         ? Number(payload.count)

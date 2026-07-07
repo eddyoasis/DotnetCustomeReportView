@@ -258,7 +258,7 @@
                         <div class="form-text">Select one or more formats.</div>
                     </div>
                     <div class="col-md-8 d-flex gap-2">
-                        <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
+                        <button id="btn-export" type="button" class="btn btn-sm btn-success" disabled="@(!Model.CanExport)">Export as Password ZIP</button>
                         <button id="btn-schedule-report" type="button" class="btn btn-sm btn-outline-primary">Schedule Report</button>
                         <span id="export-status" class="small align-self-center"></span>
                     </div>

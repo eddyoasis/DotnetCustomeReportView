@@ -1,9 +1,11 @@
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace DataWarehousePower.Controllers
 {
@@ -16,8 +18,10 @@ namespace DataWarehousePower.Controllers
         private readonly IDepartmentService _departmentService;
         private readonly IReportExportService _exportService;
         private readonly ILogger<DataFileController> _logger;
+        private readonly ScheduledJob _scheduledJobAppSetting;
 
         public DataFileController(
+            IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
             IDataFileManageService service,
             IScheduledReportJobService scheduledReportJobService,
             IColumnPreferenceService prefService,
@@ -25,6 +29,7 @@ namespace DataWarehousePower.Controllers
             IReportExportService exportService,
             ILogger<DataFileController> logger)
         {
+            _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _service = service;
             _scheduledReportJobService = scheduledReportJobService;
             _prefService = prefService;

@@ -27,8 +27,10 @@ namespace DataWarehousePower.Controllers
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<DataFileManageController> _logger;
         private readonly GeneralAppSetting _generalAppSetting;
+        private readonly ScheduledJob _scheduledJobAppSetting;
 
         public DataFileManageController(
+            IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
             IDataFileManageService service,
             IScheduledReportJobService scheduledReportJobService,
             IDepartmentService departmentService,
@@ -38,6 +40,7 @@ namespace DataWarehousePower.Controllers
             IOptionsSnapshot<GeneralAppSetting> generalAppSetting,
             ILogger<DataFileManageController> logger)
         {
+            _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _service = service;
             _scheduledReportJobService = scheduledReportJobService;
             _departmentService = departmentService;
@@ -439,7 +442,8 @@ namespace DataWarehousePower.Controllers
                 {
                     columns = preview.Columns,
                     rows = preview.Rows,
-                    count = preview.TotalRowCount
+                    count = preview.TotalRowCount,
+                    canExport = preview.TotalRowCount > 0 && preview.TotalRowCount <= _scheduledJobAppSetting.ExportSplit.MaxExportRecord
                 });
             }
             catch (ArgumentException ex)

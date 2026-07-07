@@ -58,6 +58,9 @@ namespace DataWarehousePower.Models
         public List<int> SelectedDepartmentIds { get; set; } = new();
 
         public List<DataFileColumnFormModel> Columns { get; set; } = new();
+
+        public bool CanExport { get; set; } = false;
+
     }
 
     public class DataFileColumnFormModel

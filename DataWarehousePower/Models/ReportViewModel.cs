@@ -50,6 +50,7 @@ namespace DataWarehousePower.Models
 
         /// <summary>All registered reports for the navigation sidebar.</summary>
         public List<ReportDefinition> AllReports { get; set; } = new();
+        public bool CanExport { get; set; } = false;
     }
 
     public class ReportRuntimeParameter

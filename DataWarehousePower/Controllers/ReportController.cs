@@ -2,11 +2,13 @@ using Azure.Core;
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Services;
 using Hangfire.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace DataWarehousePower.Controllers
 {
@@ -22,8 +24,10 @@ namespace DataWarehousePower.Controllers
         private readonly IScheduledReportJobService _scheduledReportJobService;
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<ReportController> _logger;
+        private readonly ScheduledJob _scheduledJobAppSetting;
 
         public ReportController(
+            IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
             IReportService reportService,
             IColumnPreferenceService prefService,
             IReportExportService exportService,
@@ -31,6 +35,7 @@ namespace DataWarehousePower.Controllers
             IAuditLogService auditLogService,
             ILogger<ReportController> logger)
         {
+            _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _reportService = reportService;
             _prefService   = prefService;
             _exportService = exportService;
@@ -79,6 +84,7 @@ namespace DataWarehousePower.Controllers
             vm.Rows = vm.HasAppliedFilters
                 ? vm.Rows.Skip((page - 1) * pageSize).Take(pageSize).ToList()
                 : new List<Dictionary<string, object?>>();
+            vm.CanExport = vm.TotalRows > 0 && vm.TotalRows <= _scheduledJobAppSetting.ExportSplit.MaxExportRecord;
 
             return View(vm);
         }
