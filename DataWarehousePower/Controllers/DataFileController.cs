@@ -345,9 +345,13 @@ namespace DataWarehousePower.Controllers
                     Rows = preview.Rows
                 };
 
-                string safeName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-                string zipFileName = $"{safeName}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
-                string zipSubFileName = $"{safeName}_format_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+                var dataFileDate = request.DateFrom == request.DateTo ?
+                  $"{request.DateFrom:yyyy-MM-dd}" :
+                  $"{request.DateFrom:yyyy-MM-dd}_{request.DateTo:yyyy-MM-dd}";
+
+                string dataFileName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                string zipFileName = $"{dataFileName}_{request.ClientCode}_{dataFileDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
+                string zipSubFileName = $"{dataFileName}_format_{request.ClientCode}_{dataFileDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
 
                 byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
                     vm,
