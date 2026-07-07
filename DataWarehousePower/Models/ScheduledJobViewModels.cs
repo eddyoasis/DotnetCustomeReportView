@@ -60,6 +60,9 @@ public sealed class ScheduledJobFormViewModel
     public const string AutoDateIntervalWeekly = "weekly";
     public const string AutoDateIntervalMonthly = "monthly";
     public const string AutoDateIntervalYearly = "yearly";
+    public const string AutoDateIntervalLastDay = "last-day";
+    public const string AutoDateIntervalLastMonth = "last-month";
+    public const string AutoDateIntervalLastYear = "last-year";
 
     public int Id { get; set; }
 

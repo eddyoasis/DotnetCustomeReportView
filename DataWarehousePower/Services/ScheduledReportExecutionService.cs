@@ -563,12 +563,23 @@ public sealed class ScheduledReportExecutionService(
                 ScheduledJobFormViewModel.AutoDateIntervalWeekly => now.AddDays(-(7 * job.AutoDateIntervalValue.Value)),
                 ScheduledJobFormViewModel.AutoDateIntervalMonthly => now.AddMonths(-job.AutoDateIntervalValue.Value),
                 ScheduledJobFormViewModel.AutoDateIntervalYearly => now.AddYears(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalLastDay => now.Date.AddDays(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalLastMonth => new DateTime(now.Year, now.Month, 1).AddMonths(-job.AutoDateIntervalValue.Value),
+                ScheduledJobFormViewModel.AutoDateIntervalLastYear => new DateTime(now.Year, 1, 1).AddYears(-job.AutoDateIntervalValue.Value),
                 _ => null
+            };
+
+            DateTime? intervalDateTo = normalizedIntervalUnit switch
+            {
+                ScheduledJobFormViewModel.AutoDateIntervalLastDay => now.Date.AddSeconds(-1),
+                ScheduledJobFormViewModel.AutoDateIntervalLastMonth => new DateTime(now.Year, now.Month, 1).AddSeconds(-1),
+                ScheduledJobFormViewModel.AutoDateIntervalLastYear => new DateTime(now.Year, 1, 1).AddSeconds(-1),
+                _ => now
             };
 
             if (intervalDateFrom.HasValue)
             {
-                return (intervalDateFrom.Value, now);
+                return (intervalDateFrom.Value, intervalDateTo.Value);
             }
         }
 

@@ -460,6 +460,8 @@ namespace DataWarehousePower.Repositories
                 }
             }
 
+            string orderBySql = string.Empty;
+
             foreach (var column in requestedColumns.Where(x => !string.IsNullOrEmpty(x.MappingParameterFilter)))
             {
                 string parameterName = $"@f{parameterIndex++}";
@@ -480,6 +482,7 @@ namespace DataWarehousePower.Repositories
                         AddParameter(cmd, endParameterName, dateTo);
 
                     }
+                    orderBySql = $" ORDER BY {escapedColumnName}";
                 }
             }
 
@@ -507,7 +510,8 @@ namespace DataWarehousePower.Repositories
             cmd.CommandText =
                 $"SELECT TOP ({take}) {selectList} " +
                 fromSql +
-                whereSql;
+                whereSql +
+                orderBySql;
 
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())

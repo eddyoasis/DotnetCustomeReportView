@@ -28,7 +28,10 @@ public sealed class ScheduledReportJobService(
         ScheduledJobFormViewModel.AutoDateIntervalDaily,
         ScheduledJobFormViewModel.AutoDateIntervalWeekly,
         ScheduledJobFormViewModel.AutoDateIntervalMonthly,
-        ScheduledJobFormViewModel.AutoDateIntervalYearly
+        ScheduledJobFormViewModel.AutoDateIntervalYearly,
+        ScheduledJobFormViewModel.AutoDateIntervalLastDay,
+        ScheduledJobFormViewModel.AutoDateIntervalLastMonth,
+        ScheduledJobFormViewModel.AutoDateIntervalLastYear
     ];
     private static readonly int[] OrderedCronWeekdays = [1, 2, 3, 4, 5, 6, 0];
     private static readonly Dictionary<int, string> WeekdayDisplayNames = new()
