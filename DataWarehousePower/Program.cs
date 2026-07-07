@@ -311,7 +311,7 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 // Root "/" → redirect to /Report/List which picks the first report
-app.MapGet("/", () => Results.Redirect("/Report/List"));
+//app.MapGet("/", () => Results.Redirect("/Report/List"));
 
 // /Report/List  → picks the first available report
 app.MapControllerRoute(
@@ -345,7 +345,7 @@ app.MapControllerRoute(
 // Fallback default route
 app.MapControllerRoute(
     name: "default",
-pattern: "{controller=Home}/{action=Index}/{id?}");
-//pattern: "{controller=Dashboard}/{action=Index}/{id?}");
+//pattern: "{controller=Home}/{action=Index}/{id?}");
+pattern: "{controller=Dashboard}/{action=Index}/{id?}");
 
 app.Run();
