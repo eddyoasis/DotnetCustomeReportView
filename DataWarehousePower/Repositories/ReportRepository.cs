@@ -174,6 +174,8 @@ namespace DataWarehousePower.Repositories
             
             Dictionary<string, object?> parameters = new Dictionary<string, object?>();
 
+            string orderBySql = string.Empty;
+
             foreach (var column in columns.Where(x => !string.IsNullOrEmpty(x.MappingParameter)))
             {
                 string parameterName = $"@f{parameterIndex++}";
@@ -198,6 +200,7 @@ namespace DataWarehousePower.Repositories
                         whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
                         parameters.Add(endParameterName, dateTo);
                     }
+                    orderBySql = $" ORDER BY {escapedColumnName}";
                 }
             }
 
@@ -207,7 +210,7 @@ namespace DataWarehousePower.Repositories
 
             var colList = string.Join(", ", safeCols.Select(c => $"[{c}]"));
             var escapedDb = EscapeSqlIdentifier(safeDatabase);
-            var sql = $"SELECT {colList} FROM [{escapedDb}]..[{safeTable}] WITH(NOLOCK) {whereSql} ";
+            var sql = $"SELECT {colList} FROM [{escapedDb}]..[{safeTable}] WITH(NOLOCK) {whereSql} {orderBySql}";
 
             return await ExecuteReaderAsync(conn, sql, CommandType.Text, parameters);
         }

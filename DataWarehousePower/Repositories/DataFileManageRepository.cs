@@ -490,7 +490,7 @@ namespace DataWarehousePower.Repositories
                 ? " WHERE " + string.Join(" AND ", whereClauses)
                 : string.Empty;
 
-            string fromSql = $"FROM [{escapedDatabase}]..[{escapedTable}]";
+            string fromSql = $"FROM [{escapedDatabase}]..[{escapedTable}] WITH(NOLOCK)";
 
             cmd.CommandText =
                 "SELECT COUNT(1) " +
