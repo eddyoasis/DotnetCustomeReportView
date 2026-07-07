@@ -44,6 +44,7 @@ builder.Services.AddScoped<IDataFileColumnRepository,   DataFileColumnRepository
 builder.Services.AddScoped<IDataFileManageRepository, DataFileManageRepository>();
 builder.Services.AddScoped<IReportConnectionStringRepository, ReportConnectionStringRepository>();
 builder.Services.AddScoped<IDepartmentConnectionRepository, DepartmentConnectionRepository>();
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
@@ -62,6 +63,7 @@ builder.Services.AddScoped<IDataFileColumnService,   DataFileColumnService>();
 builder.Services.AddScoped<IDataFileManageService, DataFileManageService>();
 builder.Services.AddScoped<IReportConnectionStringService, ReportConnectionStringService>();
 builder.Services.AddScoped<IDepartmentConnectionService, DepartmentConnectionService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
@@ -343,6 +345,7 @@ app.MapControllerRoute(
 // Fallback default route
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+pattern: "{controller=Home}/{action=Index}/{id?}");
+//pattern: "{controller=Dashboard}/{action=Index}/{id?}");
 
 app.Run();

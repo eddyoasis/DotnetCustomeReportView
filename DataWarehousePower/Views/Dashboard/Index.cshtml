@@ -1,0 +1,198 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h4 class="mb-0">User Dashboard</h4>
+        <div class="text-muted small">User: @Model.UserId | Department: @(string.IsNullOrWhiteSpace(Model.UserDepartment) ? "N/A" : Model.UserDepartment)</div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Reports</div>
+                <div class="display-6 fw-semibold">@Model.TotalReports</div>
+                <div class="small text-muted">Active: @Model.ActiveReports</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Data Files</div>
+                <div class="display-6 fw-semibold">@Model.TotalDataFiles</div>
+                <div class="small text-muted">Active: @Model.ActiveDataFiles</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Data Files</div>
+                <div class="display-6 fw-semibold">@Model.TotalScheduledJobs</div>
+                <div class="small text-muted">Active: @Model.ActiveScheduledJobs</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Reports</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Reports.Any())
+                {
+                    <div class="p-3 text-muted">No reports found for your access.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th style="width: 110px;">Status</th>
+                                    <th style="width: 90px;">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (DashboardReportItem report in Model.Reports)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@report.Name</div>
+                                            <div class="small text-muted">Departments: @(string.IsNullOrWhiteSpace(report.Departments) ? "All" : report.Departments)</div>
+                                        </td>
+                                        <td>
+                                            @if (report.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-primary" asp-controller="Report" asp-action="Index" asp-route-id="@report.Id">View</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Data Files</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.DataFiles.Any())
+                {
+                    <div class="p-3 text-muted">No data files found for your access.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th style="width: 110px;">Status</th>
+                                    <th style="width: 90px;">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (DashboardDataFileItem dataFile in Model.DataFiles)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@dataFile.Name</div>
+                                            <div class="small text-muted">Departments: @(string.IsNullOrWhiteSpace(dataFile.Departments) ? "All" : dataFile.Departments)</div>
+                                        </td>
+                                        <td>
+                                            @if (dataFile.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-primary" asp-controller="DataFile" asp-action="Index" asp-route-id="@dataFile.Id">View</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Scheduled Jobs</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.ScheduledJobs.Any())
+                {
+                    <div class="p-3 text-muted">No scheduled jobs found for your access.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th style="width: 110px;">Status</th>
+                                    <th style="width: 90px;">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (DashboardScheduledJobItem scheduledJob in Model.ScheduledJobs)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@scheduledJob.Name</div>
+                                        </td>
+                                        <td>
+                                            @if (scheduledJob.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-primary" asp-controller="ScheduledJob" asp-action="Edit" asp-route-id="@scheduledJob.Id">View</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
