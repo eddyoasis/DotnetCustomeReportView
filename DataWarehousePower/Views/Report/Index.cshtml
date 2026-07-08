@@ -311,9 +311,12 @@
         </div>
 
         <!-- ════════ COLUMN CUSTOMISER ════════ -->
-        <div class="card mb-4 shadow-sm">
+        <div class="card mb-4 shadow-sm @(Model.SchemaTemplate == "" ? "disabled-div" : "")" aria-disabled=@(Model.SchemaTemplate == "")>
             <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-                <span>Column Customiser</span>
+                Column Customiser
+                <span class="text-muted">
+                    (Please create or select any template other than Default to adjust column)
+                </span>
                 <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted"
                         type="button"
                         data-bs-toggle="collapse"
@@ -478,6 +481,15 @@
     </div>
 
 </div><!-- /row -->
+
+<style>
+    .disabled-div {
+        pointer-events: none; /* blocks clicks, links, buttons inside */
+        opacity: 0.5; /* faded look */
+        user-select: none; /* prevents text selection */
+    }
+</style>
+
 @section Scripts {
     <script>
         const reportId = @Model.ReportId;
