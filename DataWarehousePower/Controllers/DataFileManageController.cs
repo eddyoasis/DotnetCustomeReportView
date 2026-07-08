@@ -63,8 +63,8 @@ namespace DataWarehousePower.Controllers
             var userId = HttpHelper.ResolveUserId(HttpContext);
             var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
 
-            //var vm = await _service.GetListViewModelAsync(filter);
-            var vm = await _service.GetListViewModelAsync(userId, userDepartment, filter);
+            //var vm = await _service.GetListViewModelAsync(userId, userDepartment, filter);
+            var vm = await _service.GetListViewModelAsync(userId, filter);
             ViewData["DepartmentLookup"] = (await _departmentService.GetAllAsync())
                 .GroupBy(department => department.Id)
                 .ToDictionary(group => group.Key, group => group.First().Name);

@@ -53,7 +53,8 @@ namespace DataWarehousePower.Controllers
                 IsActive = isActive
             };
 
-            DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, userDepartment ?? string.Empty, filter);
+            DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, filter);
+            //DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, userDepartment ?? string.Empty, filter);
             if (listViewModel.DataFiles.Count == 0)
             {
                 return View("NoDataFiles");

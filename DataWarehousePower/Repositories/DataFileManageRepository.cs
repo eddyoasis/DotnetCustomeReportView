@@ -2,7 +2,6 @@ using DataWarehousePower.Data;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
-using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -1218,6 +1217,17 @@ namespace DataWarehousePower.Repositories
                 .Include(dataFile => dataFile.Columns.OrderBy(column => column.DisplayOrder))
                 .OrderBy(dataFile => dataFile.DataFileName)
                 .ToListAsync();
+
+        public async Task<List<DataFileDefinition>> GetAllWithColumnsAsync(string userId)
+        {
+            var datafiles = await _context.DataFileDefinitions
+                .AsNoTracking()
+                .Include(dataFile => dataFile.Columns.OrderBy(column => column.DisplayOrder))
+                .OrderBy(dataFile => dataFile.DataFileName)
+                .ToListAsync();
+
+            return datafiles.Where(dataFile => dataFile.UserId == userId ).ToList();
+        }
 
         public async Task<List<DataFileDefinition>> GetAllWithColumnsAsync(string userId, string userDepartment)
         {
