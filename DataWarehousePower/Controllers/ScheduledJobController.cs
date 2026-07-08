@@ -48,7 +48,7 @@ public sealed class ScheduledJobController(
             viewModel.SchemaTemplate = schemaTemplate.Trim();
         }
 
-        if (viewModel.RequiresSchemaTemplateAndClientCode && !string.IsNullOrWhiteSpace(clientCode))
+        if (!string.IsNullOrWhiteSpace(clientCode))
         {
             viewModel.ClientCode = clientCode.Trim();
         }
@@ -476,19 +476,19 @@ public sealed class ScheduledJobController(
 
     private void ValidateSchemaAndClientCode(ScheduledJobFormViewModel form)
     {
-        if (!form.RequiresSchemaTemplateAndClientCode)
-        {
-            //form.SchemaTemplate = null;
-            form.ClientCode = null;
-            //ModelState.Remove(nameof(form.SchemaTemplate));
-            ModelState.Remove(nameof(form.ClientCode));
-            return;
-        }
-
-        //if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
+        //if (!form.RequiresSchemaTemplateAndClientCode)
         //{
-        //    ModelState.AddModelError(nameof(form.SchemaTemplate), "Schema Template is required.");
+        //    form.SchemaTemplate = null;
+        //    form.ClientCode = null;
+        //    ModelState.Remove(nameof(form.SchemaTemplate));
+        //    ModelState.Remove(nameof(form.ClientCode));
+        //    return;
         //}
+
+        if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
+        {
+            ModelState.AddModelError(nameof(form.SchemaTemplate), "Schema Template is required.");
+        }
 
         if (string.IsNullOrWhiteSpace(form.ClientCode))
         {

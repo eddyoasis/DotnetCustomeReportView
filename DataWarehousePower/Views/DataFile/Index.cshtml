@@ -268,7 +268,12 @@
                                 </div>
                                 <div class="col-md-8 d-flex gap-2">
                                     <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
-                                    <a id="schedule-datafile-link" asp-action="ScheduleDataFile" asp-route-id="@selectedDataFile.Id" asp-route-schemaTemplate="@Model.SchemaTemplate" class="btn btn-outline-primary btn-sm">Schedule Data File</a>
+                                    <a id="schedule-datafile-link" 
+                                        asp-action="ScheduleDataFile" 
+                                        asp-route-id="@selectedDataFile.Id" 
+                                        asp-route-schemaTemplate="@Model.SchemaTemplate"
+                                           asp-route-clientCode="@Model.ClientCode"
+                                           class="btn btn-outline-primary btn-sm">Schedule Data File</a>
                                     <span id="export-status" class="small align-self-center"></span>
                                 </div>
                             </div>
@@ -579,7 +584,7 @@
 
             let activePreferenceId = initialPreferenceId;
             let autoSaveTimer = null;
-            let isAutoSaveEnabled = true;
+            let isAutoSaveEnabled = false;
             let previewRows = [];
             let previewTotalRows = 0;
             let previewCurrentPage = 1;
@@ -848,6 +853,8 @@
                 if (schemaTemplateStatus) {
                     schemaTemplateStatus.innerHTML = `Preference scope: <strong>${esc(normalizedValue || 'Default')}</strong>`;
                 }
+
+                syncScheduleLink();
             }
 
             function upsertSchemaTemplateOption(value, preferenceId) {
@@ -951,6 +958,19 @@
 
                 const scheduleUrl = new URL(scheduleDataFileLink.href, window.location.origin);
                 const returnUrl = new URL(window.location.href);
+                const activeSchemaTemplate = getActiveSchemaTemplate();
+
+                if (activeSchemaTemplate) {
+                    scheduleUrl.searchParams.set('schemaTemplate', activeSchemaTemplate);
+                } else {
+                    scheduleUrl.searchParams.delete('schemaTemplate');
+                }
+
+                if (filterClientCodeInput?.value) {
+                    scheduleUrl.searchParams.set('clientCode', filterClientCodeInput.value);
+                } else {
+                    scheduleUrl.searchParams.delete('clientCode');
+                }
 
                 if (filterClientCodeInput?.value) {
                     returnUrl.searchParams.set('clientCode', filterClientCodeInput.value);
@@ -1667,6 +1687,7 @@
 
             filterDateFromInput?.addEventListener('change', syncScheduleLink);
             filterDateToInput?.addEventListener('change', syncScheduleLink);
+            filterClientCodeInput?.addEventListener('change', syncScheduleLink);
 
             if (schemaTemplateSearchInput) {
                 schemaTemplateSearchInput.addEventListener('input', e => {

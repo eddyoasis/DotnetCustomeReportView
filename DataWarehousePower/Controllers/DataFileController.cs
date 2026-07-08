@@ -156,7 +156,7 @@ namespace DataWarehousePower.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> ScheduleDataFile(int id, string? schemaTemplate = null, string? returnUrl = null)
+        public async Task<IActionResult> ScheduleDataFile(int id, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             int? existingJobId = await _scheduledReportJobService.FindExistingJobIdAsync(userId, id, schemaTemplate, null);
@@ -170,7 +170,8 @@ namespace DataWarehousePower.Controllers
             {
                 reportDefinitionId = id,
                 schemaTemplate,
-                clientCode = (string?)null,
+                clientCode,
+                formats,
                 returnUrl,
                 isDataFile = true
             });

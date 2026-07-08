@@ -34,6 +34,24 @@ namespace DataWarehousePower.Repositories
                 .ToList();
         }
 
+        public async Task<List<DashboardDataFileItem>> GetUserDataFilesAsync(string userId)
+        {
+            List<DashboardDataFileItem> dataFiles = await _context.DataFileDefinitions
+                .AsNoTracking()
+                .OrderBy(dataFile => dataFile.DataFileName)
+                .Select(dataFile => new DashboardDataFileItem
+                {
+                    Id = dataFile.Id,
+                    Name = dataFile.DataFileName,
+                    IsActive = dataFile.IsActive,
+                    OwnerUserId = dataFile.UserId,
+                    Departments = dataFile.Departments
+                })
+                .ToListAsync();
+
+            return dataFiles.Where(dataFile => string.Equals(dataFile.OwnerUserId, userId, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
         public async Task<List<DashboardDataFileItem>> GetUserDataFilesAsync(string userId, string? userDepartment)
         {
             int? userDepartmentId = await ResolveUserDepartmentIdAsync(userDepartment);

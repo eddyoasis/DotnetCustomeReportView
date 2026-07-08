@@ -19,7 +19,7 @@ namespace DataWarehousePower.Services
         public async Task<DashboardViewModel> BuildDashboardViewModelAsync(string userId, string? userDepartment)
         {
             List<DashboardReportItem> reports = await _dashboardRepository.GetUserReportsAsync(userDepartment);
-            List<DashboardDataFileItem> dataFiles = await _dashboardRepository.GetUserDataFilesAsync(userId, userDepartment);
+            List<DashboardDataFileItem> dataFiles = await _dashboardRepository.GetUserDataFilesAsync(userId);
             List<DashboardScheduledJobItem> scheduledJobs = await _dashboardRepository.GetUserScheduledJobsAsync(userId);
 
             foreach (var item in scheduledJobs)

@@ -434,11 +434,12 @@
             }
 
             function requiresSchemaAndClientCode() {
-                if (!requiresSchemaAndClientCodeInput) {
-                    return true;
-                }
+                return true;
+                // if (!requiresSchemaAndClientCodeInput) {
+                //     return true;
+                // }
 
-                return (requiresSchemaAndClientCodeInput.value || '').toLowerCase() === 'true';
+                // return (requiresSchemaAndClientCodeInput.value || '').toLowerCase() === 'true';
             }
 
             function getSourceMode() {
@@ -490,9 +491,9 @@
             function updateSchemaAndClientCodeFields() {
                 const isRequired = requiresSchemaAndClientCode();
 
-                // if (schemaTemplateGroup) {
-                //     schemaTemplateGroup.style.display = isRequired ? '' : 'none';
-                // }
+                if (schemaTemplateGroup) {
+                    schemaTemplateGroup.style.display = isRequired ? '' : 'none';
+                }
 
                 if (clientCodeGroup) {
                     clientCodeGroup.style.display = isRequired ? '' : 'none';
@@ -823,15 +824,15 @@
                     return;
                 }
 
-                // if (!requiresSchemaAndClientCode()) {
-                //     clientCodeSelect.innerHTML = '';
-                //     const defaultOption = document.createElement('option');
-                //     defaultOption.value = '';
-                //     defaultOption.textContent = 'Default';
-                //     clientCodeSelect.appendChild(defaultOption);
-                //     syncClientCodeUi('');
-                //     return;
-                // }
+                if (!requiresSchemaAndClientCode()) {
+                    clientCodeSelect.innerHTML = '';
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Default';
+                    clientCodeSelect.appendChild(defaultOption);
+                    syncClientCodeUi('');
+                    return;
+                }
 
                 const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
                 const reportSchemaTemplates = Number.isFinite(selectedReportId)
