@@ -922,13 +922,19 @@
                 return { valid: true, message: '' };
             }
 
-            const hasDateFilterColumn = getVisibleMappingParameterFilterSelects()
-                .some(select => (select.value || '').trim() === 'FilterDateFrom,FilterDateTo');
+            const selectedFilterValues = new Set(
+                getVisibleMappingParameterFilterSelects()
+                    .map(select => (select.value || '').trim())
+                    .filter(Boolean)
+            );
 
-            if (!hasDateFilterColumn) {
+            const hasDateFilterColumn = selectedFilterValues.has('FilterDateFrom,FilterDateTo');
+            const hasClientCodeFilterColumn = selectedFilterValues.has('ClientCode');
+
+            if (!hasDateFilterColumn || !hasClientCodeFilterColumn) {
                 return {
                     valid: false,
-                    message: 'Please select a date column for filter datefrom/dateto'
+                    message: 'Please select one column for ClientCode and one column for FilterDateFrom/FilterDateTo.'
                 };
             }
 
