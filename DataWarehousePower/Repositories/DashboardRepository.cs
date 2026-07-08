@@ -62,13 +62,17 @@ namespace DataWarehousePower.Repositories
         {
             List<DashboardScheduledJobItem> ScheduledJobs = await _context.ScheduledReportJobs
                 .AsNoTracking()
+                .Include(ScheduledJob => ScheduledJob.ReportDefinition)
+                .Include(ScheduledJob => ScheduledJob.DataFileDefinition)
                 .OrderBy(ScheduledJob => ScheduledJob.JobName)
                 .Select(ScheduledJob => new DashboardScheduledJobItem
                 {
                     Id = ScheduledJob.Id,
-                    Name = ScheduledJob.JobName,
+                    Name = ScheduledJob.ReportDefinition != null ? ScheduledJob.ReportDefinition.ReportName : ScheduledJob.DataFileDefinition.DataFileName,
                     IsActive = ScheduledJob.IsActive,
-                    OwnerUserId = ScheduledJob.CreatedByUserId
+                    OwnerUserId = ScheduledJob.CreatedByUserId,
+                    Type = ScheduledJob.ReportDefinition != null ? "Report" : "Data File",
+                    ClientCode = ScheduledJob.ClientCode ?? "-"
                 })
                 .ToListAsync();
 

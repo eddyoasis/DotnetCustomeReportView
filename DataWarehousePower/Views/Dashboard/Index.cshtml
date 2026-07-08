@@ -148,7 +148,7 @@
         </div>
     </div>
 
-    <div class="col-lg-8">
+    <div class="col-lg-10">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Scheduled Jobs</h5>
@@ -164,7 +164,9 @@
                         <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th>Type</th>
                                     <th>Name</th>
+                                    <th>Client Code</th>
                                     <th style="width: 110px;">Status</th>
                                     <th style="width: 160px;">Last Execution</th>
                                     <th style="width: 160px;">Next Execution</th>
@@ -176,7 +178,13 @@
                                 {
                                     <tr>
                                         <td>
+                                            <div class="fw-semibold">@scheduledJob.Type</div>
+                                        </td>
+                                        <td>
                                             <div class="fw-semibold">@scheduledJob.Name</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@scheduledJob.ClientCode</div>
                                         </td>
                                         <td>
                                             @if (scheduledJob.IsActive)
