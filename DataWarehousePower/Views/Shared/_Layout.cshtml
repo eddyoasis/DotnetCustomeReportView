@@ -177,7 +177,10 @@
             </div>
         </nav>
     </header>
-    <div class="container">
+    @{
+        var mainContainerClass = ViewData["MainContainerClass"] as string ?? "container";
+    }
+    <div class="@mainContainerClass">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>

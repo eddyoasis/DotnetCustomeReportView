@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.WebUtilities
 @{
     ViewData["Title"] = Model.ReportName;
+    ViewData["MainContainerClass"] = "container report-page-container";
     var visibleRuntimeParameters = Model.RuntimeParameters
         .Where(parameter => string.IsNullOrWhiteSpace(parameter.DefaultValue))
         .ToList();
@@ -174,7 +175,7 @@
             </div>
         </div>
 
-        <div id="client-code-status" class="alert alert-light border small py-2 px-3 mb-3">
+        <div hidden id="client-code-status" class="alert alert-light border small py-2 px-3 mb-3">
             Preference scope:
             <strong>@(string.IsNullOrWhiteSpace(Model.SchemaTemplate) ? "Default" : Model.SchemaTemplate)</strong>
         </div>
@@ -388,7 +389,9 @@
             </div>
         </div>
         </div>
+    </div><!-- /col -->
 
+    <div class="col-md-12">
         <!-- ════════ DATA TABLE ════════ -->
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
             <div class="small text-muted">
@@ -465,15 +468,15 @@
             </div>
             <div class="btn-group" role="group" aria-label="Pagination">
                 <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
-                         href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
+                   href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                    aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
                 <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
-                         href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
+                   href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                    aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
             </div>
         </div>
+    </div>
 
-    </div><!-- /col -->
 </div><!-- /row -->
 @section Scripts {
     <script>
