@@ -224,6 +224,17 @@ namespace DataWarehousePower.Controllers
                 return View("Form", form);
             }
 
+            string? requiredDateFilterColumnValidationError = ValidateRequiredDateFilterColumn(form);
+            if (!string.IsNullOrWhiteSpace(requiredDateFilterColumnValidationError))
+            {
+                ModelState.AddModelError("", requiredDateFilterColumnValidationError);
+                await PopulateSourceDatabaseOptionsAsync(form);
+                await PopulateSourceTableOptionsAsync(form);
+                await PopulateSourceSPOptionsAsync(form);
+                await PopulateDepartmentOptionsAsync(form);
+                return View("Form", form);
+            }
+
             //string? requiredMappingValidationError = ValidateRequiredMappingParameters(form, hasTable, hasSP);
             //if (!string.IsNullOrWhiteSpace(requiredMappingValidationError))
             //{
@@ -601,6 +612,23 @@ namespace DataWarehousePower.Controllers
             if (!hasClientCode || !hasDateFrom || !hasDateTo)
             {
                 return "Please map ClientCode, FilterDateFrom, and FilterDateTo before saving the data file.";
+            }
+
+            return null;
+        }
+
+        private static string? ValidateRequiredDateFilterColumn(DataFileManageFormViewModel form)
+        {
+            bool hasDateFilterColumn = form.Columns
+                .Where(column => !column.IsDeleted)
+                .Any(column => string.Equals(
+                    column.MappingParameterFilter,
+                    "FilterDateFrom,FilterDateTo",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (!hasDateFilterColumn)
+            {
+                return "Please select a date column for filter datefrom/dateto";
             }
 
             return null;

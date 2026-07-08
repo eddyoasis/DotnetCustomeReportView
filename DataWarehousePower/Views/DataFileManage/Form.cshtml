@@ -914,6 +914,26 @@
             return { valid: true, message: '' };
         }
 
+        function validateRequiredDateFilterColumn() {
+            const selectedSourceTable = (document.getElementById('input-source-table')?.value || '').trim();
+            const selectedSourceSP = (document.getElementById('input-source-sp')?.value || '').trim();
+            if (!selectedSourceTable && !selectedSourceSP) {
+                return { valid: true, message: '' };
+            }
+
+            const hasDateFilterColumn = getVisibleMappingParameterFilterSelects()
+                .some(select => (select.value || '').trim() === 'FilterDateFrom,FilterDateTo');
+
+            if (!hasDateFilterColumn) {
+                return {
+                    valid: false,
+                    message: 'Please select a date column for filter datefrom/dateto'
+                };
+            }
+
+            return { valid: true, message: '' };
+        }
+
         const databaseInput = document.getElementById('input-source-database');
         const tableInput = document.getElementById('input-source-table');
         const spInput = document.getElementById('input-source-sp');
@@ -1756,11 +1776,11 @@
         }
 
         document.getElementById('data-file-form').addEventListener('submit', e => {
-            // const validationResult = validateRequiredMappingParameters();
-            // if (!validationResult.valid) {
-            //     e.preventDefault();
-            //     alert(validationResult.message);
-            // }
+            const validationResult = validateRequiredDateFilterColumn();
+            if (!validationResult.valid) {
+                e.preventDefault();
+                alert(validationResult.message);
+            }
         });
 
         initializeSearchableDropdown({
