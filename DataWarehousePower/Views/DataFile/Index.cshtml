@@ -430,7 +430,16 @@
 
     <div class="col-md-12">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
-            <div id="preview-data-summary" class="small text-muted">No data loaded yet.</div>
+            <div class="small text-muted">
+                @if (!string.IsNullOrWhiteSpace(Model.ClientCode))
+                {
+                    <span id="preview-data-summary">No data loaded yet.</span>
+                }
+                else
+                {
+                    <span id="preview-data-summary">Select a client code and click Apply to view data.</span>
+                }
+            </div>
             <div class="d-flex align-items-center gap-2">
                 <label for="preview-page-size" class="small text-muted mb-0">Rows per page</label>
                 <select id="preview-page-size" class="form-select form-select-sm" style="width: 92px;">
@@ -445,11 +454,12 @@
         </div>
 
         <div class="table-responsive shadow-sm">
-            <table class="table table-bordered table-hover align-middle table-sm" id="preview-report-table">
+            <table class="table table-bordered table-hover align-middle" id="report-table">
+                <colgroup id="table-colgroup"></colgroup>
                 <thead class="table-dark">
-                    <tr id="preview-table-head-row"></tr>
+                    <tr id="table-header-row"></tr>
                 </thead>
-                <tbody id="preview-table-body" style="font-size: 0.85rem;">
+                <tbody id="table-body" style="font-size: 0.85rem;">
                     <tr>
                         <td id="preview-table-placeholder" class="text-muted text-center py-4">No data loaded yet.</td>
                     </tr>
@@ -472,6 +482,18 @@
         pointer-events: none; /* blocks clicks, links, buttons inside */
         opacity: 0.5; /* faded look */
         user-select: none; /* prevents text selection */
+    }
+
+    #report-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    #report-table th,
+    #report-table td {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
     }
 </style>
 
@@ -517,8 +539,9 @@
             const pageSizeInput = document.getElementById('preview-page-size');
             const status = document.getElementById('preview-status');
             const summary = document.getElementById('preview-data-summary');
-            const head = document.getElementById('preview-table-head-row');
-            const body = document.getElementById('preview-table-body');
+            const head = document.getElementById('table-header-row');
+            const body = document.getElementById('table-body');
+            const colgroup = document.getElementById('table-colgroup');
             const pageInfo = document.getElementById('preview-page-info');
             const pagePrevButton = document.getElementById('preview-page-prev');
             const pageNextButton = document.getElementById('preview-page-next');
@@ -609,6 +632,9 @@
             function renderPreviewPlaceholder(message) {
                 head.innerHTML = '';
                 body.innerHTML = '';
+                if (colgroup) {
+                    colgroup.innerHTML = '';
+                }
 
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
@@ -659,13 +685,18 @@
                     return;
                 }
 
-                const headRow = document.createElement('tr');
+                if (colgroup) {
+                    const widthPercent = (100 / columnDefinitions.length).toFixed(4);
+                    colgroup.innerHTML = columnDefinitions
+                        .map(() => `<col style="width:${widthPercent}%">`)
+                        .join('');
+                }
+
                 columnDefinitions.forEach(column => {
                     const th = document.createElement('th');
                     th.textContent = column.label;
-                    headRow.appendChild(th);
+                    head.appendChild(th);
                 });
-                head.appendChild(headRow);
 
                 (Array.isArray(rows) ? rows : []).forEach(row => {
                     const tr = document.createElement('tr');
