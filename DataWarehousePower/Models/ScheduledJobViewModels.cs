@@ -86,7 +86,7 @@ public sealed class ScheduledJobFormViewModel
     public string? RecipientEmail { get; set; }
 
     [Required]
-    [Display(Name = "Schedule Type")]
+    [Display(Name = "Schedule Interval Type")]
     public string ScheduleType { get; set; } = ScheduleTypeDailyTime;
 
     [Range(1, 1440)]
@@ -109,14 +109,14 @@ public sealed class ScheduledJobFormViewModel
     public string CronExpression { get; set; } = "0 8 * * *";
 
     [MaxLength(128)]
-    [Display(Name = "Schema Template")]
+    [Display(Name = "Column Template")]
     public string? SchemaTemplate { get; set; }
 
     [MaxLength(128)]
     [Display(Name = "Client Code")]
     public string? ClientCode { get; set; }
 
-    [Display(Name = "Requires Schema Template and Client Code")]
+    [Display(Name = "Requires Column Template and Client Code")]
     public bool RequiresSchemaTemplateAndClientCode { get; set; } = true;
 
     [Display(Name = "Parameters")]
@@ -151,11 +151,11 @@ public sealed class ScheduledJobFormViewModel
     public bool IsCustom { get; set; } = true;
 
     [MaxLength(16)]
-    [Display(Name = "Auto Date Interval")]
+    [Display(Name = "Data Date Range")]
     public string AutoDateIntervalUnit { get; set; } = AutoDateIntervalDaily;
 
     [Range(1, int.MaxValue)]
-    [Display(Name = "Interval Value")]
+    [Display(Name = "Data Range Value")]
     public int? AutoDateIntervalValue { get; set; } = 1;
 
     [Display(Name = "Password")]

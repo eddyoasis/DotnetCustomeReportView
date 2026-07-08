@@ -238,7 +238,7 @@
                 </div>
 
                 <div class="col-md-6" id="schemaTemplateGroup">
-                    <label class="form-label">Schema Template</label>
+                    <label class="form-label">Column Template</label>
                     <input asp-for="SchemaTemplate" type="hidden" />
 
                     <select id="scheduled-client-code-select" class="d-none" aria-hidden="true">
@@ -317,15 +317,15 @@
                 <div class="col-md-4" id="autoDateIntervalUnitGroup">
                     <label asp-for="AutoDateIntervalUnit" class="form-label"></label>
                     <select asp-for="AutoDateIntervalUnit" class="form-select" id="autoDateIntervalUnitSelect">
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalMinutely">Minutely</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalHourly">Hourly</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalDaily">Daily</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalWeekly">Weekly</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalMonthly">Monthly</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalYearly">Yearly</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalLastDay">Last Day</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalLastMonth">Last Month</option>
-                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalLastYear">Last Year</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalMinutely">Last Minutes</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalHourly">Last Hours</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalDaily">Last Days</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalWeekly">Last Weeks</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalMonthly">Last Months</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalYearly">Last Years</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalLastDay">Previous Days</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalLastMonth">Previous Months</option>
+                        <option value="@ScheduledJobFormViewModel.AutoDateIntervalLastYear">Previous Years</option>
                     </select>
                     <span asp-validation-for="AutoDateIntervalUnit" class="text-danger"></span>
                 </div>
@@ -338,7 +338,7 @@
 
                 <div class="col-md-6" id="autoDateIntervalHintGroup">
                     <div class="form-text mt-4">
-                        Examples: Minutely 5 = from 5 minutes ago to now, Hourly 1 = from 1 hour ago to now.
+                        Examples: Last Minutes 5 = from 5 minutes ago to now, Previous Month 2 = from last 2 month start date to last month end date.
                     </div>
                 </div>
 
