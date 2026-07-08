@@ -34,6 +34,11 @@
                 queryValues["isActive"] = Model.Filter.IsActive.Value.ToString().ToLowerInvariant();
             }
 
+            if (!string.IsNullOrWhiteSpace(Model.ClientCode))
+            {
+                queryValues["clientCode"] = Model.ClientCode;
+            }
+
             if (Model.FilterDateFrom.HasValue)
             {
                 queryValues["dateFrom"] = Model.FilterDateFrom.Value.ToString("yyyy-MM-dd");
@@ -186,25 +191,38 @@
                             <input type="hidden" name="isActive" value="@Model.Filter.IsActive.Value.ToString().ToLowerInvariant()" />
                         }
 
-                        <div class="col-md-4 d-flex flex-column gap-1">
+                        <div class="col-md-3 d-flex flex-column gap-1">
+                            <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
+                            <select id="filter-client-code"
+                                    name="clientCode"
+                                    class="form-select form-select-sm">
+                                <option value="">All client codes</option>
+                                @foreach (var availableClientCode in Model.AvailableClientCodes)
+                                {
+                                    <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-3 d-flex flex-column gap-1">
                             <label for="filter-date-from" class="form-label small fw-semibold">DateFrom</label>
                             <input id="filter-date-from"
                                    name="dateFrom"
                                    type="date"
                                    class="form-control form-control-sm"
-                                   value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
+                                   value="@((Model.FilterDateFrom ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
                         </div>
 
-                        <div class="col-md-4 d-flex flex-column gap-1">
+                        <div class="col-md-3 d-flex flex-column gap-1">
                             <label for="filter-date-to" class="form-label small fw-semibold">DateTo</label>
                             <input id="filter-date-to"
                                    name="dateTo"
                                    type="date"
                                    class="form-control form-control-sm"
-                                   value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                                   value="@((Model.FilterDateTo ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
                         </div>
 
-                        <div class="col-md-4 d-flex gap-2 align-self-end">
+                        <div class="col-md-3 d-flex gap-2 align-self-end">
                             <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                             <a class="btn btn-sm btn-outline-secondary w-100"
                                href="@BuildDataFileUrl(selectedDataFile.Id, null, false)">Clear</a>
@@ -411,28 +429,39 @@
     </div>
 
     <div class="col-md-12">
-        <div class="card shadow-sm mb-3">
-            <div class="card-header fw-semibold">Preview Data</div>
-            <div class="card-body">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <label for="preview-take" class="form-label mb-0 small text-muted">Rows</label>
-                    <select id="preview-take" class="form-select form-select-sm" style="width: 90px;">
-                        <option value="10" selected>10</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                    <button id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Preview</button>
-                    <span id="preview-status" class="small text-muted">Click Preview to load sample data.</span>
-                </div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+            <div id="preview-data-summary" class="small text-muted">No data loaded yet.</div>
+            <div class="d-flex align-items-center gap-2">
+                <label for="preview-page-size" class="small text-muted mb-0">Rows per page</label>
+                <select id="preview-page-size" class="form-select form-select-sm" style="width: 92px;">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <button id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Refresh</button>
+                <span id="preview-status" class="small text-muted">Loading latest preview data.</span>
+            </div>
+        </div>
 
-                <div id="preview-table-wrap" class="table-responsive" style="display:none;">
-                    <table class="table table-sm table-bordered mb-0 align-middle">
-                        <thead id="preview-table-head" class="table-light"></thead>
-                        <tbody id="preview-table-body"></tbody>
-                    </table>
-                </div>
+        <div class="table-responsive shadow-sm">
+            <table class="table table-bordered table-hover align-middle table-sm" id="preview-report-table">
+                <thead class="table-dark">
+                    <tr id="preview-table-head-row"></tr>
+                </thead>
+                <tbody id="preview-table-body" style="font-size: 0.85rem;">
+                    <tr>
+                        <td id="preview-table-placeholder" class="text-muted text-center py-4">No data loaded yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-                <div id="preview-empty-state" class="small text-muted" style="display:none;">No rows were returned for the selected source.</div>
+        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+            <div id="preview-page-info" class="small text-muted">Page 1 of 1</div>
+            <div class="btn-group" role="group" aria-label="Preview pagination">
+                <button id="preview-page-prev" type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                <button id="preview-page-next" type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
             </div>
         </div>
     </div>
@@ -485,12 +514,14 @@
                     .ToList()));
 
             const button = document.getElementById('btn-preview-data');
-            const takeInput = document.getElementById('preview-take');
+            const pageSizeInput = document.getElementById('preview-page-size');
             const status = document.getElementById('preview-status');
-            const tableWrap = document.getElementById('preview-table-wrap');
-            const head = document.getElementById('preview-table-head');
+            const summary = document.getElementById('preview-data-summary');
+            const head = document.getElementById('preview-table-head-row');
             const body = document.getElementById('preview-table-body');
-            const emptyState = document.getElementById('preview-empty-state');
+            const pageInfo = document.getElementById('preview-page-info');
+            const pagePrevButton = document.getElementById('preview-page-prev');
+            const pageNextButton = document.getElementById('preview-page-next');
             const reportSidebarFilter = document.getElementById('report-sidebar-filter');
             const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
             const schemaTemplateSearchInput = document.getElementById('schema-template-search');
@@ -513,6 +544,7 @@
             const exportButton = document.getElementById('btn-export');
             const exportFormatContainer = document.getElementById('export-format');
             const exportStatus = document.getElementById('export-status');
+            const filterClientCodeInput = document.getElementById('filter-client-code');
             const filterDateFromInput = document.getElementById('filter-date-from');
             const filterDateToInput = document.getElementById('filter-date-to');
             const scheduleDataFileLink = document.getElementById('schedule-datafile-link');
@@ -525,6 +557,9 @@
             let activePreferenceId = initialPreferenceId;
             let autoSaveTimer = null;
             let isAutoSaveEnabled = true;
+            let previewRows = [];
+            let previewTotalRows = 0;
+            let previewCurrentPage = 1;
             const autoSaveStorageKey = `datafile:${reportId}:columnAutoSave`;
 
             try {
@@ -562,11 +597,42 @@
                     .replace(/"/g, '&quot;');
             }
 
-            function clearPreviewTable() {
+            function getCurrentPreviewPageSize() {
+                const parsed = Number.parseInt(pageSizeInput?.value || '10', 10);
+                if (parsed === 10 || parsed === 25 || parsed === 50 || parsed === 100) {
+                    return parsed;
+                }
+
+                return 10;
+            }
+
+            function renderPreviewPlaceholder(message) {
                 head.innerHTML = '';
                 body.innerHTML = '';
-                tableWrap.style.display = 'none';
-                emptyState.style.display = 'none';
+
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.className = 'text-muted text-center py-4';
+                cell.colSpan = 1;
+                cell.textContent = message;
+                row.appendChild(cell);
+                body.appendChild(row);
+
+                if (summary) {
+                    summary.textContent = message;
+                }
+
+                if (pageInfo) {
+                    pageInfo.textContent = 'Page 1 of 1';
+                }
+
+                if (pagePrevButton) {
+                    pagePrevButton.disabled = true;
+                }
+
+                if (pageNextButton) {
+                    pageNextButton.disabled = true;
+                }
             }
 
             function getColumnsFromChips() {
@@ -589,8 +655,7 @@
                 body.innerHTML = '';
 
                 if (!Array.isArray(columnDefinitions) || columnDefinitions.length === 0) {
-                    tableWrap.style.display = 'none';
-                    emptyState.style.display = 'none';
+                    renderPreviewPlaceholder('No visible columns are selected in this schema template.');
                     return;
                 }
 
@@ -612,20 +677,60 @@
                     });
                     body.appendChild(tr);
                 });
-
-                tableWrap.style.display = 'block';
-                emptyState.style.display = (Array.isArray(rows) && rows.length === 0) ? 'block' : 'none';
             }
 
-            function renderPreviewFromCurrentState(rows) {
-                const visibleColumns = getColumnsFromChips().filter(column => column.isVisible);
+            function renderPreviewFromCurrentState() {
+                const visibleColumns = getColumnsFromChips()
+                    .filter(column => column.isVisible)
+                    .sort((left, right) => left.order - right.order);
+
                 if (!visibleColumns.length) {
+                    renderPreviewPlaceholder('No visible columns are selected in this schema template.');
                     setPreviewStatus('No visible columns are selected in this schema template.', true);
-                    clearPreviewTable();
                     return;
                 }
 
-                renderPreviewTable(visibleColumns.map(column => ({ key: column.key, label: column.displayLabel })), rows);
+                const pageSize = getCurrentPreviewPageSize();
+                const totalRows = previewRows.length;
+                const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+                previewCurrentPage = Math.min(Math.max(1, previewCurrentPage), totalPages);
+
+                const startIndex = totalRows === 0 ? 0 : (previewCurrentPage - 1) * pageSize;
+                const endIndex = totalRows === 0 ? 0 : Math.min(startIndex + pageSize, totalRows);
+                const pageRows = totalRows === 0 ? [] : previewRows.slice(startIndex, endIndex);
+
+                renderPreviewTable(
+                    visibleColumns.map(column => ({ key: column.key, label: column.displayLabel })),
+                    pageRows);
+
+                if (totalRows === 0) {
+                    renderPreviewPlaceholder('No rows were returned for the selected source.');
+                }
+
+                if (summary) {
+                    if (totalRows > 0) {
+                        const startRow = startIndex + 1;
+                        const endRow = endIndex;
+                        const limitedText = previewTotalRows > totalRows
+                            ? ` (preview limited to first ${totalRows} of ${previewTotalRows} total records)`
+                            : '';
+                        summary.textContent = `Showing ${startRow} to ${endRow} of ${totalRows} records${limitedText}`;
+                    } else {
+                        summary.textContent = 'No data loaded yet.';
+                    }
+                }
+
+                if (pageInfo) {
+                    pageInfo.textContent = `Page ${previewCurrentPage} of ${totalPages}`;
+                }
+
+                if (pagePrevButton) {
+                    pagePrevButton.disabled = previewCurrentPage <= 1;
+                }
+
+                if (pageNextButton) {
+                    pageNextButton.disabled = previewCurrentPage >= totalPages;
+                }
             }
 
             function setPreviewStatus(message, isError) {
@@ -816,6 +921,12 @@
                 const scheduleUrl = new URL(scheduleDataFileLink.href, window.location.origin);
                 const returnUrl = new URL(window.location.href);
 
+                if (filterClientCodeInput?.value) {
+                    returnUrl.searchParams.set('clientCode', filterClientCodeInput.value);
+                } else {
+                    returnUrl.searchParams.delete('clientCode');
+                }
+
                 if (filterDateFromInput?.value) {
                     returnUrl.searchParams.set('dateFrom', filterDateFromInput.value);
                 } else {
@@ -993,6 +1104,7 @@
                             formats,
                             password,
                             schemaTemplate: getActiveSchemaTemplate(),
+                            clientCode: filterClientCodeInput?.value || null,
                             dateFrom: filterDateFromInput?.value || null,
                             dateTo: filterDateToInput?.value || null
                         })
@@ -1047,11 +1159,13 @@
                 const dbName = (sourceDatabase || '').trim();
                 const tableName = (sourceTable || '').trim();
                 const procedureName = (sourceSP || '').trim();
-                const take = Number.parseInt(takeInput.value, 10) || 10;
 
                 if (!dbName || ((!tableName && !procedureName) || (tableName && procedureName))) {
                     setPreviewStatus('Preview source is not configured correctly for this data file.', true);
-                    clearPreviewTable();
+                    previewRows = [];
+                    previewTotalRows = 0;
+                    previewCurrentPage = 1;
+                    renderPreviewPlaceholder('Preview source is not configured correctly for this data file.');
                     return;
                 }
 
@@ -1066,7 +1180,10 @@
 
                 if (previewRequestColumns.length === 0) {
                     setPreviewStatus('No columns are available for preview.', true);
-                    clearPreviewTable();
+                    previewRows = [];
+                    previewTotalRows = 0;
+                    previewCurrentPage = 1;
+                    renderPreviewPlaceholder('No columns are available for preview.');
                     return;
                 }
 
@@ -1086,9 +1203,10 @@
                             sourceDatabase: dbName,
                             sourceTable: tableName,
                             sourceSP: procedureName,
+                            clientCode: filterClientCodeInput?.value || null,
                             dateFrom: filterDateFromInput?.value || null,
                             dateTo: filterDateToInput?.value || null,
-                            take,
+                            take: 0,
                             columns: previewRequestColumns.map(column => ({
                                 propertyName: column.propertyName,
                                 mappingParameter: column.mappingParameter,
@@ -1100,24 +1218,39 @@
                     const payload = await response.json().catch(() => ({}));
                     if (!response.ok) {
                         setPreviewStatus(payload?.message || 'Failed to load preview data.', true);
-                        clearPreviewTable();
+                        previewRows = [];
+                        previewTotalRows = 0;
+                        previewCurrentPage = 1;
+                        renderPreviewPlaceholder('Failed to load preview data.');
                         return;
                     }
 
-                    if (!payload.canExport) {
-                            exportButton.setAttribute("disabled", "true");
-                            // exportButton.style.pointerEvents = "none"; // prevents mouse interaction
+                    if (payload.canExport) {
+                        exportButton.removeAttribute('disabled');
+                    } else {
+                        exportButton.setAttribute('disabled', 'true');
                     }
 
-                    const responseRows = Array.isArray(payload?.rows) ? payload.rows : [];
-                    const totalCount = Number.isFinite(Number(payload?.count))
+                    previewRows = Array.isArray(payload?.rows) ? payload.rows : [];
+                    previewTotalRows = Number.isFinite(Number(payload?.count))
                         ? Number(payload.count)
-                        : responseRows.length;
-                    renderPreviewFromCurrentState(responseRows);
-                    setPreviewStatus(`Showing ${responseRows.length} of ${totalCount} row(s).`, false);
+                        : previewRows.length;
+                    previewCurrentPage = 1;
+                    renderPreviewFromCurrentState();
+
+                    if (previewRows.length === 0) {
+                        setPreviewStatus('No rows were returned for the selected source.', false);
+                    } else if (previewTotalRows > previewRows.length) {
+                        setPreviewStatus(`Showing first ${previewRows.length} of ${previewTotalRows} row(s).`, false);
+                    } else {
+                        setPreviewStatus(`Showing ${previewRows.length} row(s).`, false);
+                    }
                 } catch {
                     setPreviewStatus('Failed to load preview data.', true);
-                    clearPreviewTable();
+                    previewRows = [];
+                    previewTotalRows = 0;
+                    previewCurrentPage = 1;
+                    renderPreviewPlaceholder('Failed to load preview data.');
                 } finally {
                     button.disabled = false;
                 }
@@ -1358,12 +1491,14 @@
                     const chk = e.target.closest('.col-visible-toggle');
                     if (!chk) return;
                     chk.closest('li.chip').classList.toggle('opacity-50', !chk.checked);
+                    renderPreviewFromCurrentState();
                     scheduleAutoSave();
                 });
 
                 sortable.addEventListener('input', e => {
                     const labelInput = e.target.closest('.label-input');
                     if (!labelInput) return;
+                    renderPreviewFromCurrentState();
                     scheduleAutoSave();
                 });
             }
@@ -1445,7 +1580,22 @@
             });
 
             document.getElementById('btn-preview-data')?.addEventListener('click', loadPreviewData);
-            takeInput?.addEventListener('change', loadPreviewData);
+            pageSizeInput?.addEventListener('change', () => {
+                previewCurrentPage = 1;
+                renderPreviewFromCurrentState();
+            });
+            pagePrevButton?.addEventListener('click', () => {
+                if (previewCurrentPage <= 1) {
+                    return;
+                }
+
+                previewCurrentPage -= 1;
+                renderPreviewFromCurrentState();
+            });
+            pageNextButton?.addEventListener('click', () => {
+                previewCurrentPage += 1;
+                renderPreviewFromCurrentState();
+            });
 
             exportButton?.addEventListener('click', () => {
                 const selectedFormats = getSelectedExportFormats();

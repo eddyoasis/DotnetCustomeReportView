@@ -2,6 +2,7 @@ using DataWarehousePower.Data;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
+using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -319,7 +320,11 @@ namespace DataWarehousePower.Repositories
             }
             else
             {
-                if (take != 10 && take != 50 && take != 100)
+                if (take <= 0)
+                {
+                    take = 0;
+                }
+                else if (take != 10 && take != 50 && take != 100)
                 {
                     take = 10;
                 }
@@ -371,6 +376,19 @@ namespace DataWarehousePower.Repositories
                 string columnName = requestedColumn.PropertyName.Trim();
                 if (!metadataByName.TryGetValue(columnName, out SourceColumnMetadata? metadataColumn))
                 {
+                    continue;
+                }
+
+                if (IsClientCodeMapping(requestedColumn.MappingParameter))
+                {
+                    string clientCode = (request.ClientCode ?? string.Empty).Trim();
+                    if (!string.IsNullOrWhiteSpace(clientCode))
+                    {
+                        string clientCodeParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {clientCodeParameterName}");
+                        AddParameter(cmd, clientCodeParameterName, $"%{clientCode}%");
+                    }
+
                     continue;
                 }
 
@@ -484,6 +502,11 @@ namespace DataWarehousePower.Repositories
                     }
                     orderBySql = $" ORDER BY {escapedColumnName}";
                 }
+                else
+                {
+                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                    AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
+                }
             }
 
             string whereSql = whereClauses.Count > 0
@@ -507,8 +530,10 @@ namespace DataWarehousePower.Repositories
                 ? 0
                 : Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
 
+            string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
+
             cmd.CommandText =
-                $"SELECT TOP ({take}) {selectList} " +
+                $"SELECT {topSql}{selectList} " +
                 fromSql +
                 whereSql +
                 orderBySql;
@@ -558,9 +583,13 @@ namespace DataWarehousePower.Repositories
             {
                 take = _scheduledJob.ExportSplit.MaxTotalRecord;
             }
-            else 
+            else
             {
-                if (take != 10 && take != 50 && take != 100)
+                if (take <= 0)
+                {
+                    take = 0;
+                }
+                else if (take != 10 && take != 50 && take != 100)
                 {
                     take = 10;
                 }
@@ -612,6 +641,19 @@ namespace DataWarehousePower.Repositories
                 string columnName = requestedColumn.PropertyName.Trim();
                 if (!metadataByName.TryGetValue(columnName, out SourceColumnMetadata? metadataColumn))
                 {
+                    continue;
+                }
+
+                if (IsClientCodeMapping(requestedColumn.MappingParameter))
+                {
+                    string clientCode = (request.ClientCode ?? string.Empty).Trim();
+                    if (!string.IsNullOrWhiteSpace(clientCode))
+                    {
+                        string clientCodeParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {clientCodeParameterName}");
+                        AddParameter(cmd, clientCodeParameterName, $"%{clientCode}%");
+                    }
+
                     continue;
                 }
 
@@ -722,8 +764,10 @@ namespace DataWarehousePower.Repositories
                 ? 0
                 : Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
 
+            string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
+
             cmd.CommandText =
-                $"SELECT TOP ({take}) {selectList} " +
+                $"SELECT {topSql}{selectList} " +
                 fromSql +
                 whereSql;
 
@@ -975,6 +1019,14 @@ namespace DataWarehousePower.Repositories
         {
             string normalized = (dataType ?? string.Empty).Trim().ToLowerInvariant();
             return normalized == "bit" || normalized.StartsWith("bit(");
+        }
+
+        private static bool IsClientCodeMapping(string? mappingParameter)
+        {
+            string normalized = (mappingParameter ?? string.Empty).Trim();
+            return !string.IsNullOrWhiteSpace(normalized)
+                && (normalized.Contains("ClientCode", StringComparison.OrdinalIgnoreCase)
+                    || normalized.Contains("ClintCode", StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsIntegerTypeName(string? dataType)

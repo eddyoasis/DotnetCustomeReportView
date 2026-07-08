@@ -2,6 +2,7 @@ using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
+using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +18,7 @@ namespace DataWarehousePower.Controllers
         private readonly IColumnPreferenceService _prefService;
         private readonly IDepartmentService _departmentService;
         private readonly IReportExportService _exportService;
+        private readonly IReportRepository _reportRepository;
         private readonly ILogger<DataFileController> _logger;
         private readonly ScheduledJob _scheduledJobAppSetting;
 
@@ -27,6 +29,7 @@ namespace DataWarehousePower.Controllers
             IColumnPreferenceService prefService,
             IDepartmentService departmentService,
             IReportExportService exportService,
+            IReportRepository reportRepository,
             ILogger<DataFileController> logger)
         {
             _scheduledJobAppSetting = scheduledJobAppSetting.Value;
@@ -35,10 +38,11 @@ namespace DataWarehousePower.Controllers
             _prefService = prefService;
             _departmentService = departmentService;
             _exportService = exportService;
+            _reportRepository = reportRepository;
             _logger = logger;
         }
 
-        public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null, DateTime? dateFrom = null, DateTime? dateTo = null)
+        public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null, string? clientCode = null, DateTime? dateFrom = null, DateTime? dateTo = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -72,11 +76,29 @@ namespace DataWarehousePower.Controllers
                 .ToList();
 
             string normalizedSchemaTemplate = schemaTemplate?.Trim() ?? string.Empty;
+            string normalizedClientCode = clientCode?.Trim() ?? string.Empty;
             (List<ColumnDefinition> displayColumns, int? activePreferenceId) = await _prefService.LoadDataFileColumnPreferencesAsync(
                 userId,
                 selectedDataFile.Id,
                 normalizedSchemaTemplate,
                 availableColumns);
+
+            List<string> availableClientCodes = (await _reportRepository.GetClientCodesByUserIdAsync(userId))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(normalizedClientCode) &&
+                !availableClientCodes.Contains(normalizedClientCode, StringComparer.OrdinalIgnoreCase))
+            {
+                availableClientCodes.Add(normalizedClientCode);
+                availableClientCodes = availableClientCodes
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
 
             List<string> savedSchemaTemplates = await _prefService.GetDataFileSchemaTemplatesAsync(userId, selectedDataFile.Id);
             Dictionary<string, int> schemaTemplatePreferenceIds = await _prefService.GetDataFileSchemaTemplatePreferenceIdsAsync(userId, selectedDataFile.Id);
@@ -89,6 +111,8 @@ namespace DataWarehousePower.Controllers
                 Filter = listViewModel.Filter,
                 DataFiles = listViewModel.DataFiles,
                 SelectedDataFile = selectedDataFile,
+                ClientCode = normalizedClientCode,
+                AvailableClientCodes = availableClientCodes,
                 FilterDateFrom = dateFrom,
                 FilterDateTo = dateTo,
                 SchemaTemplate = normalizedSchemaTemplate,
@@ -100,7 +124,7 @@ namespace DataWarehousePower.Controllers
             });
         }
 
-        public async Task<IActionResult> List(string? search = null, bool? isActive = null, DateTime? dateFrom = null, DateTime? dateTo = null)
+        public async Task<IActionResult> List(string? search = null, bool? isActive = null, string? clientCode = null, DateTime? dateFrom = null, DateTime? dateTo = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -124,6 +148,7 @@ namespace DataWarehousePower.Controllers
                 id = listViewModel.DataFiles[0].Id,
                 search,
                 isActive,
+                clientCode,
                 dateFrom,
                 dateTo
             });
@@ -324,6 +349,7 @@ namespace DataWarehousePower.Controllers
                     SourceDatabase = form.SourceDatabase,
                     SourceTable = form.SourceTable,
                     SourceSP = form.SourceSP,
+                    ClientCode = request.ClientCode,
                     DateFrom = request.DateFrom,
                     DateTo = request.DateTo,
                     Columns = form.Columns

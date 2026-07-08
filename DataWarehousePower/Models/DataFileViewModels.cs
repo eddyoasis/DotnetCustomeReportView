@@ -5,6 +5,8 @@ namespace DataWarehousePower.Models
         public DataFileManageFilterViewModel Filter { get; set; } = new();
         public List<DataFileDefinition> DataFiles { get; set; } = new();
         public DataFileDefinition? SelectedDataFile { get; set; }
+        public string ClientCode { get; set; } = string.Empty;
+        public List<string> AvailableClientCodes { get; set; } = new();
         public DateTime? FilterDateFrom { get; set; }
         public DateTime? FilterDateTo { get; set; }
         public string SchemaTemplate { get; set; } = string.Empty;

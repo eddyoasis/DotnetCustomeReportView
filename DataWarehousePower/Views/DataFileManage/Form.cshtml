@@ -222,7 +222,7 @@
                             <td>
                                 <select name="Columns[@i].MappingParameterFilter" class="form-select form-select-sm">
                                     <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameterFilter) ? "selected" : null)">-- None --</option>
-                                    @* <option value="ClientCode" selected="@(Model.Columns[i].MappingParameterFilter == "ClientCode" ? "selected" : null)">ClientCode</option> *@
+                                    <option value="ClientCode" selected="@(Model.Columns[i].MappingParameterFilter == "ClientCode" ? "selected" : null)">ClientCode</option>
                                     <option value="FilterDateFrom,FilterDateTo" selected="@(Model.Columns[i].MappingParameterFilter == "FilterDateFrom,FilterDateTo" ? "selected" : null)">FilterDateRange (From + To)</option>
                                 </select>
                             </td>

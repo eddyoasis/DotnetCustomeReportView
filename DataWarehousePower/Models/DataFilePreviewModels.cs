@@ -12,6 +12,7 @@ namespace DataWarehousePower.Models
         public string? SourceDatabase { get; set; }
         public string? SourceTable { get; set; }
         public string? SourceSP { get; set; }
+        public string? ClientCode { get; set; }
         public DateTime? DateFrom { get; set; }
         public DateTime? DateTo { get; set; }
         public int Take { get; set; } = 10;
