@@ -109,12 +109,27 @@
     </div>
 
      <div class="card shadow-sm mb-4">
-        <div class="card-header fw-semibold">
+        @* <div class="card-header fw-semibold">
             Departments  
             <span class="text-muted">
                 (Select departments allowed to view this data file. Leave all unchecked to allow all departments.)
             </span>
+        </div> *@
+        <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+            Departments
+            <span class="text-muted">
+                (Select departments allowed to view this data file. Leave all unchecked to allow all departments.)
+            </span>
+            <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#department-card-body"
+                    aria-expanded="false"
+                    aria-controls="department-card-body">
+                &#9660;
+            </button>
         </div>
+        <div id="department-card-body" class="collapse">
         <div class="card-body row g-3">
             <div class="col-md-12">
                 @* <label asp-for="Departments" class="form-label"></label> *@
@@ -148,6 +163,7 @@
                 @* <div class="form-text">Select departments allowed to view this data file. Leave all unchecked to allow all departments.</div> *@
                 <span asp-validation-for="Departments" class="text-danger small"></span>
             </div>
+        </div>
         </div>
      </div>
 
@@ -1778,5 +1794,13 @@
         document.querySelectorAll('#columns-body tr.col-row').forEach(syncRowDragHandleState);
         refreshMappingParameterInputTypes();
         syncMappingParameterFilterOptions();
+
+        const departmentCollapseEl = document.getElementById('department-card-body');
+        const departmentCollapseToggle = departmentCollapseEl?.previousElementSibling?.querySelector('[data-bs-target="#department-card-body"]');
+        if (departmentCollapseEl && departmentCollapseToggle) {
+            departmentCollapseEl.addEventListener('hide.bs.collapse', () => { departmentCollapseToggle.innerHTML = '&#9660;'; });
+            departmentCollapseEl.addEventListener('show.bs.collapse', () => { departmentCollapseToggle.innerHTML = '&#9650;'; });
+        }
+
     </script>
 }
