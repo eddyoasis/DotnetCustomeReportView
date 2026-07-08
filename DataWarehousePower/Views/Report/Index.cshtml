@@ -527,7 +527,7 @@
                 .ToList()));
         let autoSaveTimer = null;
         const autoSaveStorageKey = `report:${reportId}:columnAutoSave`;
-        let isAutoSaveEnabled = true;
+        let isAutoSaveEnabled = false;
 
         try {
             const persistedAutoSave = localStorage.getItem(autoSaveStorageKey);

@@ -19,6 +19,7 @@ namespace DataWarehousePower.Controllers
     public class ReportController : Controller
     {
         private readonly IReportService          _reportService;
+        private readonly IReportManageService    _reportManageService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IReportExportService _exportService;
         private readonly IScheduledReportJobService _scheduledReportJobService;
@@ -29,6 +30,7 @@ namespace DataWarehousePower.Controllers
         public ReportController(
             IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
             IReportService reportService,
+            IReportManageService reportManageService,
             IColumnPreferenceService prefService,
             IReportExportService exportService,
             IScheduledReportJobService scheduledReportJobService,
@@ -37,6 +39,7 @@ namespace DataWarehousePower.Controllers
         {
             _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _reportService = reportService;
+            _reportManageService = reportManageService;
             _prefService   = prefService;
             _exportService = exportService;
             _scheduledReportJobService = scheduledReportJobService;
@@ -139,13 +142,27 @@ namespace DataWarehousePower.Controllers
             string? userDepartment = ResolveUserDepartment();
 
             // Load the system columns for this report to validate against
-            var vm = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, requestModel.SchemaTemplate);
-            if (vm is null)
-                return NotFound(new { success = false, error = "Report not found." });
+            //var vm = await _reportService.BuildReportViewModelAsync(id, userId, userDepartment, requestModel.SchemaTemplate);
+            //if (vm is null)
+            //    return NotFound(new { success = false, error = "Report not found." });
+
+            ReportManageFormViewModel form = await _reportManageService.GetFormViewModelAsync(id);
+            List<ColumnDefinition> systemColumns = form.Columns
+                .Where(column => !column.IsDeleted)
+                .OrderBy(column => column.DisplayOrder)
+                .Select((column, index) => new ColumnDefinition
+                {
+                    Key = column.PropertyName,
+                    DefaultLabel = column.DefaultLabel,
+                    DisplayLabel = column.DefaultLabel,
+                    IsVisible = true,
+                    Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1
+                })
+                .ToList();
 
             try
             {
-                int preferenceId = await _prefService.SavePreferencesAsync(userId, id, requestModel.SchemaTemplate, requestModel.PreferenceId, requestModel.Columns, vm.AvailableColumns);
+                int preferenceId = await _prefService.SavePreferencesAsync(userId, id, requestModel.SchemaTemplate, requestModel.PreferenceId, requestModel.Columns, systemColumns);
                 return Ok(new { success = true, preferenceId });
             }
             catch (InvalidOperationException ex)
