@@ -6,6 +6,7 @@
 @model DataWarehousePower.Models.DataFileBrowserViewModel
 @{
     ViewData["Title"] = "Data Files";
+    ViewData["MainContainerClass"] = "container report-page-container";
     var departmentLookup = ViewData["DepartmentLookup"] as Dictionary<int, string> ?? new Dictionary<int, string>();
     var selectedDataFile = Model.SelectedDataFile;
     var canManageReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportManageAccess)).Succeeded;
@@ -212,11 +213,21 @@
                 </div>
             </div>
 
-
             <div class="row g-3">
                 <div class="col-lg-12">
                     <div class="card shadow-sm mb-3">
-                        <div class="card-header fw-semibold">Export</div>
+                        <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                            <span>Export</span>
+                            <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#export-card-body"
+                                    aria-expanded="false"
+                                    aria-controls="export-card-body">
+                                &#9660;
+                            </button>
+                        </div>
+                        <div id="export-card-body" class="collapse">
                         <div class="card-body">
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-4">
@@ -246,6 +257,7 @@
                             <div class="text-muted small mt-2">
                                 Choose one or more formats, set a strong password, and download the data file as a protected ZIP.
                             </div>
+                        </div>
                         </div>
                     </div>
 
@@ -279,10 +291,18 @@
 
                         <div class="col-lg-12">
                             <div class="card mb-4 shadow-sm">
-                                <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                                <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
                                     <span>Column Customiser</span>
-                                    <span class="badge bg-secondary" style="font-size:.75rem;">drag · rename · toggle</span>
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted"
+                                            type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#column-customiser-card-body"
+                                            aria-expanded="false"
+                                            aria-controls="column-customiser-card-body">
+                                        &#9660;
+                                    </button>
                                 </div>
+                                <div id="column-customiser-card-body" class="collapse">
                                 <div class="card-body">
                                     <p class="text-muted small mb-3">
                                         Drag chips to reorder &nbsp;|&nbsp;
@@ -349,27 +369,7 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header fw-semibold">Preview Data</div>
-                        <div class="card-body">
-                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                <label for="preview-take" class="form-label mb-0 small text-muted">Rows</label>
-                                <input id="preview-take" type="number" min="1" max="200" value="10" class="form-control form-control-sm" style="width: 90px;" />
-                                <button id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Preview</button>
-                                <span id="preview-status" class="small text-muted">Click Preview to load sample data.</span>
-                            </div>
-
-                            <div id="preview-table-wrap" class="table-responsive" style="display:none;">
-                                <table class="table table-sm table-bordered mb-0 align-middle">
-                                    <thead id="preview-table-head" class="table-light"></thead>
-                                    <tbody id="preview-table-body"></tbody>
-                                </table>
-                            </div>
-
-                            <div id="preview-empty-state" class="small text-muted" style="display:none;">No rows were returned for the selected source.</div>
-                        </div>
-                    </div>
+                </div>
                 </div>
             </div>
 
@@ -405,6 +405,29 @@
                 </div>
             </div>
         }
+    </div>
+
+    <div class="col-md-12">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header fw-semibold">Preview Data</div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <label for="preview-take" class="form-label mb-0 small text-muted">Rows</label>
+                    <input id="preview-take" type="number" min="1" max="200" value="10" class="form-control form-control-sm" style="width: 90px;" />
+                    <button id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Preview</button>
+                    <span id="preview-status" class="small text-muted">Click Preview to load sample data.</span>
+                </div>
+
+                <div id="preview-table-wrap" class="table-responsive" style="display:none;">
+                    <table class="table table-sm table-bordered mb-0 align-middle">
+                        <thead id="preview-table-head" class="table-light"></thead>
+                        <tbody id="preview-table-body"></tbody>
+                    </table>
+                </div>
+
+                <div id="preview-empty-state" class="small text-muted" style="display:none;">No rows were returned for the selected source.</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1471,6 +1494,20 @@
             }
 
             loadPreviewData();
+
+                const exportCollapseEl = document.getElementById('export-card-body');
+                const exportCollapseToggle = exportCollapseEl?.previousElementSibling?.querySelector('[data-bs-target="#export-card-body"]');
+                if (exportCollapseEl && exportCollapseToggle) {
+                    exportCollapseEl.addEventListener('hide.bs.collapse', () => { exportCollapseToggle.innerHTML = '&#9660;'; });
+                    exportCollapseEl.addEventListener('show.bs.collapse', () => { exportCollapseToggle.innerHTML = '&#9650;'; });
+                }
+
+                const columnCustomiserCollapseEl = document.getElementById('column-customiser-card-body');
+                const columnCustomiserCollapseToggle = columnCustomiserCollapseEl?.previousElementSibling?.querySelector('[data-bs-target="#column-customiser-card-body"]');
+                if (columnCustomiserCollapseEl && columnCustomiserCollapseToggle) {
+                    columnCustomiserCollapseEl.addEventListener('hide.bs.collapse', () => { columnCustomiserCollapseToggle.innerHTML = '&#9660;'; });
+                    columnCustomiserCollapseEl.addEventListener('show.bs.collapse', () => { columnCustomiserCollapseToggle.innerHTML = '&#9650;'; });
+                }
         })();
     </script>
 }
