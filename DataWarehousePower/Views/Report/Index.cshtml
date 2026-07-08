@@ -236,7 +236,16 @@
         </div>
 
         <div class="card mb-3 shadow-sm">
-            <div class="card-header fw-semibold">Export</div>
+            <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                <span>Export</span>
+                <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#export-card-body"
+                        aria-expanded="true"
+                        aria-controls="export-card-body">&#9650;</button>
+            </div>
+            <div id="export-card-body" class="collapse show">
             <div class="card-body">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
@@ -266,6 +275,7 @@
                 <div class="text-muted small mt-2">
                     Choose one or more formats, set a strong password, and download the report as a protected ZIP.
                 </div>
+            </div>
             </div>
         </div>
 
@@ -299,10 +309,18 @@
 
         <!-- ════════ COLUMN CUSTOMISER ════════ -->
         <div class="card mb-4 shadow-sm">
-            <div class="card-header fw-semibold d-flex align-items-center gap-2">
-                <span>Column Customiser</span>
-                <span class="badge bg-secondary" style="font-size:.75rem;">drag · rename · toggle</span>
+            <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                <span>COLUMN CUSTOMISER</span>
+                <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#column-customiser-card-body"
+                        aria-expanded="true"
+                        aria-controls="column-customiser-card-body">
+                    &#9650;
+                </button>
             </div>
+            <div id="column-customiser-card-body" class="collapse show">
             <div class="card-body">
                 <p class="text-muted small mb-3">
                     Drag chips to reorder &nbsp;|&nbsp;
@@ -366,6 +384,7 @@
                     <span id="save-status" class="small align-self-center ms-1"></span>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- ════════ DATA TABLE ════════ -->
@@ -1320,5 +1339,19 @@
         }
 
         syncSchemaTemplateUi(initialSchemaTemplate);
+
+        const exportCollapseEl = document.getElementById('export-card-body');
+        const exportCollapseToggle = exportCollapseEl?.previousElementSibling?.querySelector('[data-bs-target="#export-card-body"]');
+        if (exportCollapseEl && exportCollapseToggle) {
+            exportCollapseEl.addEventListener('hide.bs.collapse', () => { exportCollapseToggle.innerHTML = '&#9660;'; });
+            exportCollapseEl.addEventListener('show.bs.collapse', () => { exportCollapseToggle.innerHTML = '&#9650;'; });
+        }
+
+        const columnCustomiserCollapseEl = document.getElementById('column-customiser-card-body');
+        const columnCustomiserCollapseToggle = columnCustomiserCollapseEl?.previousElementSibling?.querySelector('[data-bs-target="#column-customiser-card-body"]');
+        if (columnCustomiserCollapseEl && columnCustomiserCollapseToggle) {
+            columnCustomiserCollapseEl.addEventListener('hide.bs.collapse', () => { columnCustomiserCollapseToggle.innerHTML = '&#9660;'; });
+            columnCustomiserCollapseEl.addEventListener('show.bs.collapse', () => { columnCustomiserCollapseToggle.innerHTML = '&#9650;'; });
+        }
     </script>
 }
