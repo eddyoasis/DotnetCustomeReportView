@@ -40,6 +40,7 @@ namespace DataWarehousePower.Models
         public string? OwnerUserId { get; set; }
 
         public DateTime? LastSucceeded { get; set; }
+        public DateTime? NextExecution { get; set; }
 
     }
 }

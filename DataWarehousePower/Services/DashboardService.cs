@@ -25,7 +25,8 @@ namespace DataWarehousePower.Services
             foreach (var item in scheduledJobs)
             {
                 var jobDetail = await _hangfireJobDetailService.GetJobDetailAsync(item.Id, userId);
-                item.LastSucceeded = jobDetail.LastSucceededUtc.Value.AddHours(8);
+                item.LastSucceeded = jobDetail.LastSucceededUtc.HasValue ? jobDetail.LastSucceededUtc.Value.AddHours(8) : null;
+                item.NextExecution = jobDetail.NextExecutionUtc.HasValue ? jobDetail.NextExecutionUtc.Value : null;
             }
 
             return new DashboardViewModel
