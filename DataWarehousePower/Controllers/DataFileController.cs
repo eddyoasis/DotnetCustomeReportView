@@ -121,7 +121,8 @@ namespace DataWarehousePower.Controllers
                 AvailableSchemaTemplates = availableSchemaTemplates,
                 SchemaTemplatePreferenceIds = schemaTemplatePreferenceIds,
                 AvailableColumns = availableColumns,
-                DisplayColumns = displayColumns
+                DisplayColumns = displayColumns,
+                HasAppliedFilters = !string.IsNullOrEmpty(clientCode)
             });
         }
 

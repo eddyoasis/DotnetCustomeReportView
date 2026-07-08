@@ -15,5 +15,6 @@ namespace DataWarehousePower.Models
         public Dictionary<string, int> SchemaTemplatePreferenceIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public List<ColumnDefinition> AvailableColumns { get; set; } = new();
         public List<ColumnDefinition> DisplayColumns { get; set; } = new();
+        public bool HasAppliedFilters { get; set; }
     }
 }

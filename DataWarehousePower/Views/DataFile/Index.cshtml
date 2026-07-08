@@ -172,10 +172,17 @@
                 </div>
             </div>
 
-            <div id="schema-template-status" class="alert alert-light border small py-2 px-3 mb-3">
+            <div hidden id="schema-template-status" class="alert alert-light border small py-2 px-3 mb-3">
                 Preference scope:
                 <strong>@(string.IsNullOrWhiteSpace(Model.SchemaTemplate) ? "Default" : Model.SchemaTemplate)</strong>
             </div>
+
+            @if (!Model.HasAppliedFilters)
+            {
+                <div class="alert alert-info border small py-2 px-3 mb-3">
+                    Select a client code and click Apply to load report data.
+                </div>
+            }
 
             <div class="card mb-3 shadow-sm">
                 <div class="card-header fw-semibold">Date Filters</div>
@@ -195,7 +202,8 @@
                             <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
                             <select id="filter-client-code"
                                     name="clientCode"
-                                    class="form-select form-select-sm">
+                                    class="form-select form-select-sm"
+                                    required>
                                 <option value="">All client codes</option>
                                 @foreach (var availableClientCode in Model.AvailableClientCodes)
                                 {
@@ -223,7 +231,7 @@
                         </div>
 
                         <div class="col-md-3 d-flex gap-2 align-self-end">
-                            <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
+                            <button id="btn-filter-apply" type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
                             <a class="btn btn-sm btn-outline-secondary w-100"
                                href="@BuildDataFileUrl(selectedDataFile.Id, null, false)">Clear</a>
                         </div>
@@ -572,6 +580,7 @@
             const exportButton = document.getElementById('btn-export');
             const exportFormatContainer = document.getElementById('export-format');
             const exportStatus = document.getElementById('export-status');
+            const filterForm = document.getElementById('datafile-filter-form');
             const filterClientCodeInput = document.getElementById('filter-client-code');
             const filterDateFromInput = document.getElementById('filter-date-from');
             const filterDateToInput = document.getElementById('filter-date-to');
@@ -1687,7 +1696,22 @@
 
             filterDateFromInput?.addEventListener('change', syncScheduleLink);
             filterDateToInput?.addEventListener('change', syncScheduleLink);
-            filterClientCodeInput?.addEventListener('change', syncScheduleLink);
+            filterClientCodeInput?.addEventListener('change', () => {
+                filterClientCodeInput.setCustomValidity('');
+                syncScheduleLink();
+            });
+
+            filterForm?.addEventListener('submit', e => {
+                if (filterClientCodeInput?.value) {
+                    filterClientCodeInput.setCustomValidity('');
+                    return;
+                }
+
+                e.preventDefault();
+                filterClientCodeInput?.setCustomValidity('ClientCode is required.');
+                filterClientCodeInput?.reportValidity();
+                filterClientCodeInput?.focus();
+            });
 
             if (schemaTemplateSearchInput) {
                 schemaTemplateSearchInput.addEventListener('input', e => {
