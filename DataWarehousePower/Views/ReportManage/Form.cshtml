@@ -1242,6 +1242,7 @@
             if (!validationResult.valid) {
                 e.preventDefault();
                 alert(validationResult.message);
+                getVisibleMappingSelects()[0]?.focus();
             }
         });
 
