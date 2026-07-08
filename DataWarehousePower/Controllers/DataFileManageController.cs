@@ -75,7 +75,6 @@ namespace DataWarehousePower.Controllers
         public async Task<IActionResult> Create()
         {
             var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
-            var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
             var isITDepartment = _generalAppSetting.InformationTechnologyDepartments.Contains(userDepartment);
 
             var vm = new DataFileManageFormViewModel
@@ -89,16 +88,20 @@ namespace DataWarehousePower.Controllers
 
             if (isITDepartment)
             {
-                await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+                await PopulateSourceDatabaseOptionsAsync(vm);
+                await PopulateSourceTableOptionsAsync(vm);
+                await PopulateSourceSPOptionsAsync(vm);
 
             }
             else
             {
-                await PopulateSourceDatabaseAsync(vm, departmentConnection);
+                var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
 
+                await PopulateSourceDatabaseAsync(vm, departmentConnection);
+                await PopulateSourceTableOptionsAsync(vm, departmentConnection);
+                await PopulateSourceSPOptionsAsync(vm, departmentConnection);
             }
-            await PopulateSourceTableOptionsAsync(vm, departmentConnection);
-            await PopulateSourceSPOptionsAsync(vm, departmentConnection);
+            
             await PopulateDepartmentOptionsAsync(vm);
             return View("Form", vm);
         }
@@ -109,7 +112,6 @@ namespace DataWarehousePower.Controllers
             try
             {
                 var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
-                var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
                 var isITDepartment = _generalAppSetting.InformationTechnologyDepartments.Contains(userDepartment);
 
                 var vm = await _service.GetFormViewModelAsync(id);
@@ -117,17 +119,20 @@ namespace DataWarehousePower.Controllers
 
                 if (isITDepartment)
                 {
-                    await PopulateSourceDatabaseOptionsAsync(vm, departmentConnection);
+                    await PopulateSourceDatabaseOptionsAsync(vm);
+                    await PopulateSourceTableOptionsAsync(vm);
+                    await PopulateSourceSPOptionsAsync(vm);
 
                 }
                 else
                 {
-                    await PopulateSourceDatabaseAsync(vm, departmentConnection);
+                    var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
 
+                    await PopulateSourceDatabaseAsync(vm, departmentConnection);
+                    await PopulateSourceTableOptionsAsync(vm, departmentConnection);
+                    await PopulateSourceSPOptionsAsync(vm, departmentConnection);
                 }
 
-                await PopulateSourceTableOptionsAsync(vm, departmentConnection);
-                await PopulateSourceSPOptionsAsync(vm, departmentConnection);
                 await PopulateDepartmentOptionsAsync(vm);
                 return View("Form", vm);
             }
