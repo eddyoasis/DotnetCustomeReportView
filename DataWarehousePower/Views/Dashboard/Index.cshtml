@@ -59,7 +59,8 @@
                                 <tr>
                                     <th>Name</th>
                                     <th style="width: 110px;">Status</th>
-                                    <th style="width: 90px;">Open</th>
+                                    <th style="width: 150px;">Open</th>
+                                    @* <th style="width: 90px;">Open</th> *@
                                 </tr>
                             </thead>
                             <tbody>
@@ -80,8 +81,9 @@
                                                 <span class="badge bg-secondary">Inactive</span>
                                             }
                                         </td>
-                                        <td>
-                                            <a class="btn btn-sm btn-outline-primary" asp-controller="Report" asp-action="Index" asp-route-id="@report.Id">View</a>
+                                        <td class="d-flex gap-2">
+                                            <a class="btn btn-sm btn-outline-primary"asp-controller="Report" asp-action="Index"asp-route-id="@report.Id">View</a>
+                                            @* <a class="btn btn-sm btn-outline-primary"asp-controller="ReportManage" asp-action="Edit"asp-route-id="@report.Id">Edit</a> *@
                                         </td>
                                     </tr>
                                 }
@@ -111,7 +113,7 @@
                                 <tr>
                                     <th>Name</th>
                                     <th style="width: 110px;">Status</th>
-                                    <th style="width: 90px;">Open</th>
+                                    <th style="width: 150px;">Open</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -132,8 +134,9 @@
                                                 <span class="badge bg-secondary">Inactive</span>
                                             }
                                         </td>
-                                        <td>
+                                        <td class="d-flex gap-2">
                                             <a class="btn btn-sm btn-outline-primary" asp-controller="DataFile" asp-action="Index" asp-route-id="@dataFile.Id">View</a>
+                                            <a class="btn btn-sm btn-outline-primary" asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@dataFile.Id">Edit</a>
                                         </td>
                                     </tr>
                                 }
@@ -188,7 +191,7 @@
                                             <div class="fw-semibold">@scheduledJob.LastSucceeded</div>
                                         </td>
                                         <td>
-                                            <a class="btn btn-sm btn-outline-primary" asp-controller="ScheduledJob" asp-action="Edit" asp-route-id="@scheduledJob.Id">View</a>
+                                            <a class="btn btn-sm btn-outline-primary" asp-controller="ScheduledJob" asp-action="Edit" asp-route-id="@scheduledJob.Id">Edit</a>
                                         </td>
                                     </tr>
                                 }
