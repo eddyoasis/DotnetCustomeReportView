@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace DataWarehousePower.Controllers
 {
-    [Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
+    [Authorize(Policy = DepartmentAuthorizationPolicies.DataFileAccess)]
     public class DataFileController : Controller
     {
         private readonly IDataFileManageService _service;

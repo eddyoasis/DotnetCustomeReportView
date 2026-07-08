@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.StaticFiles;
 
 namespace DataWarehousePower.Controllers;
 
-[Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
+[Authorize(Policy = DepartmentAuthorizationPolicies.SchedulerAccess)]
 public sealed class ScheduledJobController(
     IScheduledReportJobService scheduledReportJobService,
     IHangfireJobDetailService hangfireJobDetailService,

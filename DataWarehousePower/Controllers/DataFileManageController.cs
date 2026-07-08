@@ -16,7 +16,7 @@ namespace DataWarehousePower.Controllers
     /// CRUD management for DataFileDefinitions and their DataFileColumns.
     /// Route: /DataFileManage
     /// </summary>
-    [Authorize(Policy = DepartmentAuthorizationPolicies.ReportManageAccess)]
+    [Authorize(Policy = DepartmentAuthorizationPolicies.DataFileManageAccess)]
     public class DataFileManageController : Controller
     {
         private readonly IDataFileManageService _service;

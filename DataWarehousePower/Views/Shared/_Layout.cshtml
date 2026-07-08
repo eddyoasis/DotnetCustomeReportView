@@ -30,15 +30,20 @@
         bool canViewAudilog = false;
         bool canViewJobDashboard = false;
         bool canViewAdmin = false;
+        bool canViewDataFile = false;
+        bool canViewFileManage = false;
+        bool canViewScheduler = false;
 
         if (User?.Identity?.IsAuthenticated == true)
         {
             canViewReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportAccess)).Succeeded;
-
             canManageReports = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.ReportManageAccess)).Succeeded;
             canViewAudilog = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.AuditlogAccess)).Succeeded;
             canViewJobDashboard = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.JobDashboardAccess)).Succeeded;
             canViewAdmin = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.AdminAccess)).Succeeded;
+            canViewDataFile = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.DataFileAccess)).Succeeded;
+            canViewFileManage = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.DataFileManageAccess)).Succeeded;
+            canViewScheduler = (await AuthorizationService.AuthorizeAsync(User, DepartmentAuthorizationPolicies.SchedulerAccess)).Succeeded;
         }
     }
     <header>
@@ -71,35 +76,35 @@
                                             <a class="dropdown-item" asp-area="" asp-controller="ReportManage" asp-action="Index">Manage</a>
 
                                         </li>
-                                        <li>
-                                            <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="Report">Scheduler</a>
-                                        </li>
                                     }
+                                    <li>
+                                        <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="Report">Scheduler</a>
+                                    </li>
                                 </ul>
                             </li>
                         }
-                        @if (canViewReports || canManageReports)
+                        @if (canViewDataFile || canViewFileManage)
                         {
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle text-dark" href="#" id="datafilesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     Data Files
                                 </a>
                                 <ul class="dropdown-menu" aria-labelledby="datafilesDropdown">
-                                    @if (canViewReports)
+                                    @if (canViewDataFile)
                                     {
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="DataFile" asp-action="Index">View</a>
                                         </li>
                                     }
-                                    @if (canManageReports)
+                                    @if (canViewFileManage)
                                     {
                                         <li>
                                             <a class="dropdown-item" asp-area="" asp-controller="DataFileManage" asp-action="Index">Manage</a>
                                         </li>
-                                        <li>
-                                            <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="DataFile">Scheduler</a>
-                                        </li>
                                     }
+                                    <li>
+                                        <a class="dropdown-item" asp-area="" asp-controller="ScheduledJob" asp-action="Index" asp-route-SourceType="DataFile">Scheduler</a>
+                                    </li>
                                 </ul>
                             </li>
                         }

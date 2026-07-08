@@ -158,6 +158,24 @@ authorizationBuilder.AddPolicy(
         .RequireAuthenticatedUser()
         .AddRequirements(new DepartmentAccessRequirement("Admin")));
 
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.DataFileAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("DataFile")));
+
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.DataFileManageAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("DataFileManage")));
+
+authorizationBuilder.AddPolicy(
+    DepartmentAuthorizationPolicies.SchedulerAccess,
+    policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new DepartmentAccessRequirement("Scheduler")));
+
 var app = builder.Build();
 const string ChallengeCookieName = "dw_auth_challenge";
 
