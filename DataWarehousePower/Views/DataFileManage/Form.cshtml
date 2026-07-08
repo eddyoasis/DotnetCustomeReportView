@@ -1780,6 +1780,7 @@
             if (!validationResult.valid) {
                 e.preventDefault();
                 alert(validationResult.message);
+                getVisibleMappingParameterFilterSelects()[0]?.focus();
             }
         });
 
