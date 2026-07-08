@@ -38,5 +38,8 @@ namespace DataWarehousePower.Models
         public string Name { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public string? OwnerUserId { get; set; }
+
+        public DateTime? LastSucceeded { get; set; }
+
     }
 }

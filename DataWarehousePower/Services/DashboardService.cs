@@ -6,10 +6,14 @@ namespace DataWarehousePower.Services
     public class DashboardService : IDashboardService
     {
         private readonly IDashboardRepository _dashboardRepository;
+        private readonly IHangfireJobDetailService _hangfireJobDetailService;
 
-        public DashboardService(IDashboardRepository dashboardRepository)
+        public DashboardService(
+            IDashboardRepository dashboardRepository, 
+            IHangfireJobDetailService hangfireJobDetailService)
         {
             _dashboardRepository = dashboardRepository;
+            _hangfireJobDetailService = hangfireJobDetailService;
         }
 
         public async Task<DashboardViewModel> BuildDashboardViewModelAsync(string userId, string? userDepartment)
@@ -17,6 +21,12 @@ namespace DataWarehousePower.Services
             List<DashboardReportItem> reports = await _dashboardRepository.GetUserReportsAsync(userDepartment);
             List<DashboardDataFileItem> dataFiles = await _dashboardRepository.GetUserDataFilesAsync(userId, userDepartment);
             List<DashboardScheduledJobItem> scheduledJobs = await _dashboardRepository.GetUserScheduledJobsAsync(userId);
+
+            foreach (var item in scheduledJobs)
+            {
+                var jobDetail = await _hangfireJobDetailService.GetJobDetailAsync(item.Id, userId);
+                item.LastSucceeded = jobDetail.LastSucceededUtc.Value.AddHours(8);
+            }
 
             return new DashboardViewModel
             {

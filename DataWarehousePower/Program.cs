@@ -55,6 +55,7 @@ builder.Services.AddScoped<IActiveDirectoryUserService, ActiveDirectoryUserServi
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 builder.Services.AddScoped<IHangfireDataProtectionService, HangfireDataProtectionService>();
+builder.Services.AddScoped<IHangfireJobDetailService, HangfireJobDetailService>();
 builder.Services.AddScoped<IScheduledReportExecutionService, ScheduledReportExecutionService>();
 builder.Services.AddScoped<IScheduledReportJobService, ScheduledReportJobService>();
 builder.Services.AddScoped<IScheduledReportEmailService, ScheduledReportEmailService>();

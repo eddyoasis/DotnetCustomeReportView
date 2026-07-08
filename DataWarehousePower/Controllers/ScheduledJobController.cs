@@ -10,6 +10,7 @@ namespace DataWarehousePower.Controllers;
 [Authorize(Policy = DepartmentAuthorizationPolicies.ReportAccess)]
 public sealed class ScheduledJobController(
     IScheduledReportJobService scheduledReportJobService,
+    IHangfireJobDetailService hangfireJobDetailService,
     IDataFileManageService dataFileManageService,
     IColumnPreferenceService columnPreferenceService,
     IConfiguration configuration,
@@ -199,6 +200,20 @@ public sealed class ScheduledJobController(
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> JobDetail([FromQuery] int id)
+    {
+        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        HangfireJobDetailViewModel? detail = await hangfireJobDetailService.GetJobDetailAsync(id, userId);
+
+        if (detail is null)
+        {
+            return NotFound();
+        }
+
+        return Json(detail);
     }
 
     [HttpGet]
