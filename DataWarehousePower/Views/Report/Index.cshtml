@@ -394,7 +394,7 @@
         </div>
     </div><!-- /col -->
 
-    <div class="col-md-12">
+    <div id="report-data-section" class="col-md-12">
         <!-- ════════ DATA TABLE ════════ -->
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
             <div class="small text-muted">
@@ -407,7 +407,7 @@
                     <span>No data loaded yet.</span>
                 }
             </div>
-            <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2">
+            <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2" data-ajax-pagination-form="true">
                 <input type="hidden" name="schemaTemplate" value="@Model.SchemaTemplate" />
                 <input type="hidden" name="clientCode" value="@Model.ClientCode" />
                 <input type="hidden" name="dateFrom" value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
@@ -470,7 +470,7 @@
                 Page @Model.Page of @Model.TotalPages
             </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                     <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2">
+                     <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2" data-ajax-pagination-form="true">
                           <input type="hidden" name="schemaTemplate" value="@Model.SchemaTemplate" />
                           <input type="hidden" name="clientCode" value="@Model.ClientCode" />
                           <input type="hidden" name="dateFrom" value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
@@ -495,15 +495,19 @@
 
                      <div class="btn-group" role="group" aria-label="Pagination">
                           <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+                              data-ajax-pagination-link="true"
                               href="@BuildReportUrl(Model.ReportId, 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                               aria-disabled="@(Model.Page <= 1 ? "true" : "false")">First</a>
                           <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+                              data-ajax-pagination-link="true"
                               href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                               aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
                           <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+                              data-ajax-pagination-link="true"
                               href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
                               aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
                           <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+                              data-ajax-pagination-link="true"
                               href="@BuildReportUrl(Model.ReportId, Model.TotalPages, Model.PageSize, null, true, Model.HasAppliedFilters)"
                               aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Last</a>
                      </div>
@@ -1385,6 +1389,92 @@
             reportSidebarFilter.addEventListener('input', filterSidebarReports);
             filterSidebarReports();
         }
+
+        const reportDataSection = document.getElementById('report-data-section');
+
+        async function loadReportDataSectionAsync(targetUrl, pushHistory = true) {
+            if (!reportDataSection) {
+                window.location.href = targetUrl;
+                return;
+            }
+
+            try {
+                reportDataSection.classList.add('opacity-50');
+
+                const response = await fetch(targetUrl, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load report page.');
+                }
+
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const nextDataSection = doc.getElementById('report-data-section');
+
+                if (!nextDataSection) {
+                    throw new Error('Report data section not found in response.');
+                }
+
+                reportDataSection.innerHTML = nextDataSection.innerHTML;
+
+                if (pushHistory) {
+                    window.history.pushState({ reportDataUrl: targetUrl }, '', targetUrl);
+                }
+            } catch {
+                window.location.href = targetUrl;
+            } finally {
+                reportDataSection.classList.remove('opacity-50');
+            }
+        }
+
+        document.addEventListener('click', event => {
+            const link = event.target.closest('a[data-ajax-pagination-link="true"]');
+            if (!link) {
+                return;
+            }
+
+            if (link.classList.contains('disabled') || link.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+                return;
+            }
+
+            event.preventDefault();
+            loadReportDataSectionAsync(link.href, true);
+        });
+
+        document.addEventListener('submit', event => {
+            const form = event.target.closest('form[data-ajax-pagination-form="true"]');
+            if (!form) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const action = form.getAttribute('action') || window.location.pathname;
+            const url = new URL(action, window.location.origin);
+            const formData = new FormData(form);
+
+            for (const [key, value] of formData.entries()) {
+                const text = String(value ?? '').trim();
+                if (text) {
+                    url.searchParams.set(key, text);
+                } else {
+                    url.searchParams.delete(key);
+                }
+            }
+
+            loadReportDataSectionAsync(url.toString(), true);
+        });
+
+        window.addEventListener('popstate', () => {
+            loadReportDataSectionAsync(window.location.href, false);
+        });
 
         syncSchemaTemplateUi(initialSchemaTemplate);
 
