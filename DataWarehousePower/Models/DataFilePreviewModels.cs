@@ -15,6 +15,7 @@ namespace DataWarehousePower.Models
         public string? ClientCode { get; set; }
         public DateTime? DateFrom { get; set; }
         public DateTime? DateTo { get; set; }
+        public int Page { get; set; } = 1;
         public int Take { get; set; } = 10;
         public bool IsExport { get; set; } = false;
         public List<DataFilePreviewColumnRequest> Columns { get; set; } = new();

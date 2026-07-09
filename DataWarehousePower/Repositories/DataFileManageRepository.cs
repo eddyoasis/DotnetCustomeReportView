@@ -313,6 +313,7 @@ namespace DataWarehousePower.Repositories
             }
 
             int take = request.Take;
+            int page = request.Page <= 0 ? 1 : request.Page;
             if (request.IsExport)
             {
                 take = _scheduledJob.ExportSplit.MaxTotalRecord;
@@ -323,7 +324,7 @@ namespace DataWarehousePower.Repositories
                 {
                     take = 0;
                 }
-                else if (take != 10 && take != 50 && take != 100)
+                else if (take != 10 && take != 25 && take != 50 && take != 100)
                 {
                     take = 10;
                 }
@@ -529,13 +530,30 @@ namespace DataWarehousePower.Repositories
                 ? 0
                 : Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
 
-            string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
+            if (!request.IsExport && take > 0)
+            {
+                int offset = (page - 1) * take;
+                string effectiveOrderBySql = string.IsNullOrWhiteSpace(orderBySql)
+                    ? $" ORDER BY [{EscapeSqlIdentifier(selectedColumns[0])}]"
+                    : orderBySql;
 
-            cmd.CommandText =
-                $"SELECT {topSql}{selectList} " +
-                fromSql +
-                whereSql +
-                orderBySql;
+                cmd.CommandText =
+                    $"SELECT {selectList} " +
+                    fromSql +
+                    whereSql +
+                    effectiveOrderBySql +
+                    $" OFFSET {offset} ROWS FETCH NEXT {take} ROWS ONLY";
+            }
+            else
+            {
+                string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
+
+                cmd.CommandText =
+                    $"SELECT {topSql}{selectList} " +
+                    fromSql +
+                    whereSql +
+                    orderBySql;
+            }
 
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
@@ -578,6 +596,7 @@ namespace DataWarehousePower.Repositories
             }
 
             int take = request.Take;
+            int page = request.Page <= 0 ? 1 : request.Page;
             if (request.IsExport)
             {
                 take = _scheduledJob.ExportSplit.MaxTotalRecord;
@@ -588,7 +607,7 @@ namespace DataWarehousePower.Repositories
                 {
                     take = 0;
                 }
-                else if (take != 10 && take != 50 && take != 100)
+                else if (take != 10 && take != 25 && take != 50 && take != 100)
                 {
                     take = 10;
                 }
@@ -763,12 +782,24 @@ namespace DataWarehousePower.Repositories
                 ? 0
                 : Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
 
-            string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
+            if (!request.IsExport && take > 0)
+            {
+                int offset = (page - 1) * take;
+                cmd.CommandText =
+                    $"SELECT {selectList} " +
+                    fromSql +
+                    whereSql +
+                    $" ORDER BY [{EscapeSqlIdentifier(selectedColumns[0])}] OFFSET {offset} ROWS FETCH NEXT {take} ROWS ONLY";
+            }
+            else
+            {
+                string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
 
-            cmd.CommandText =
-                $"SELECT {topSql}{selectList} " +
-                fromSql +
-                whereSql;
+                cmd.CommandText =
+                    $"SELECT {topSql}{selectList} " +
+                    fromSql +
+                    whereSql;
+            }
 
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
