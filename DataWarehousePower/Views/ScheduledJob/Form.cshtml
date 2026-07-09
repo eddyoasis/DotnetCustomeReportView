@@ -682,11 +682,6 @@
                     ? `${selectedBasePath}${normalizedSubfolder}`
                     : '';
 
-                if (exportLocationSubfolderError) {
-                    exportLocationSubfolderError.classList.toggle('d-none', !!normalizedSubfolder);
-                }
-                exportLocationSubfolderInput.classList.toggle('is-invalid', !normalizedSubfolder);
-
                 if (exportToLocalFolderHint) {
                     exportToLocalFolderHint.textContent = normalizedSubfolder
                         // ? `When enabled, an additional copy is saved to: %temp%\\${normalizedSubfolder}`
@@ -708,8 +703,33 @@
                     .map(option => option.value)
                     .filter(optionValue => optionValue);
 
+                function syncExportLocationValidationFeedback(forceShow) {
+                    const hasBasePath = !!exportLocationBasePathSelect.value;
+                    const hasSubfolder = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
+                    const hasExistingValidationState =
+                        exportLocationBasePathSelect.classList.contains('is-invalid')
+                        || exportLocationSubfolderInput.classList.contains('is-invalid')
+                        || !!(exportLocationBasePathError && !exportLocationBasePathError.classList.contains('d-none'))
+                        || !!(exportLocationSubfolderError && !exportLocationSubfolderError.classList.contains('d-none'));
+
+                    if (!forceShow && !hasExistingValidationState) {
+                        return;
+                    }
+
+                    exportLocationBasePathSelect.classList.toggle('is-invalid', !hasBasePath);
+                    exportLocationSubfolderInput.classList.toggle('is-invalid', !hasSubfolder);
+
+                    if (exportLocationBasePathError) {
+                        exportLocationBasePathError.classList.toggle('d-none', hasBasePath);
+                    }
+
+                    if (exportLocationSubfolderError) {
+                        exportLocationSubfolderError.classList.toggle('d-none', hasSubfolder);
+                    }
+                }
+
                 const { basePath, subfolder } = trySplitExportLocation(exportLocationHiddenInput.value, availableBasePaths);
-                exportLocationBasePathSelect.value = basePath;
+                exportLocationBasePathSelect.value = basePath || (availableBasePaths[0] || '');
                 const initialSubfolder = normalizeWindowsFolderName((exportLocationSubfolderHiddenInput?.value || '').trim()) || subfolder;
                 let initialSubfolderOptionValue = '';
                 if (initialSubfolder) {
@@ -736,22 +756,17 @@
 
                 exportLocationBasePathSelect.addEventListener('change', () => {
                     updateExportLocationValue();
-                    if (exportLocationBasePathError) {
-                        const hasSelection = !!exportLocationBasePathSelect.value;
-                        exportLocationBasePathSelect.classList.toggle('is-invalid', !hasSelection);
-                        exportLocationBasePathError.classList.toggle('d-none', hasSelection);
-                    }
-                    if (exportLocationSubfolderError) {
-                        const hasSelection = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
-                        exportLocationSubfolderInput.classList.toggle('is-invalid', !hasSelection);
-                        exportLocationSubfolderError.classList.toggle('d-none', hasSelection);
-                    }
+                    syncExportLocationValidationFeedback(false);
                 });
-                exportLocationSubfolderInput.addEventListener('input', updateExportLocationValue);
+                exportLocationSubfolderInput.addEventListener('input', () => {
+                    updateExportLocationValue();
+                    syncExportLocationValidationFeedback(false);
+                });
                 exportLocationSubfolderInput.addEventListener('change', () => {
                     if (suppressExportLocationSubfolderConfirm) {
                         suppressExportLocationSubfolderConfirm = false;
                         updateExportLocationValue();
+                        syncExportLocationValidationFeedback(false);
                         return;
                     }
 
@@ -760,6 +775,7 @@
                     if (!selectedValue) {
                         lastConfirmedExportLocationSubfolder = '';
                         updateExportLocationValue();
+                        syncExportLocationValidationFeedback(false);
                         return;
                     }
 
@@ -768,11 +784,13 @@
                         suppressExportLocationSubfolderConfirm = true;
                         exportLocationSubfolderInput.value = lastConfirmedExportLocationSubfolder;
                         updateExportLocationValue();
+                        syncExportLocationValidationFeedback(false);
                         return;
                     }
 
                     lastConfirmedExportLocationSubfolder = selectedOptionValue;
                     updateExportLocationValue();
+                    syncExportLocationValidationFeedback(false);
                 });
 
                 if (exportToLocalFolderToggle) {
@@ -800,18 +818,16 @@
                         const hasSubfolder = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
                         const isValid = hasBasePath && hasSubfolder;
 
+                        syncExportLocationValidationFeedback(true);
+
                         if (!isValid) {
                             event.preventDefault();
                             event.stopImmediatePropagation();
-                            exportLocationBasePathSelect.classList.toggle('is-invalid', !hasBasePath);
-                            exportLocationSubfolderInput.classList.toggle('is-invalid', !hasSubfolder);
-                            if (exportLocationBasePathError) {
-                                exportLocationBasePathError.classList.toggle('d-none', hasBasePath);
+                            if (!hasBasePath) {
+                                exportLocationBasePathSelect.focus();
+                            } else if (!hasSubfolder) {
+                                exportLocationSubfolderInput.focus();
                             }
-                            if (exportLocationSubfolderError) {
-                                exportLocationSubfolderError.classList.toggle('d-none', hasSubfolder);
-                            }
-                            exportLocationBasePathSelect.focus();
                         }
                     }, true);
                 }
