@@ -466,7 +466,7 @@
             </div>
         </div>
 
-        <div class="table-responsive shadow-sm">
+        <div id="preview-table-container" class="table-responsive shadow-sm position-relative" aria-busy="false">
             <table class="table table-bordered table-hover align-middle" id="report-table">
                 <colgroup id="table-colgroup"></colgroup>
                 <thead class="table-dark">
@@ -478,6 +478,12 @@
                     </tr>
                 </tbody>
             </table>
+            <div id="preview-loading-overlay" class="preview-loading-overlay d-none" role="status" aria-live="polite">
+                <div class="d-flex align-items-center gap-2 bg-white border rounded px-3 py-2 shadow-sm">
+                    <div class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></div>
+                    <span class="small text-muted">Loading data...</span>
+                </div>
+            </div>
         </div>
 
         <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
@@ -522,6 +528,21 @@
         overflow-wrap: anywhere;
         word-break: break-word;
         white-space: normal;
+    }
+
+    #preview-table-container.preview-loading {
+        pointer-events: none;
+        user-select: none;
+    }
+
+    .preview-loading-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.55);
+        z-index: 10;
     }
 </style>
 
@@ -570,6 +591,8 @@
             const head = document.getElementById('table-header-row');
             const body = document.getElementById('table-body');
             const colgroup = document.getElementById('table-colgroup');
+            const previewTableContainer = document.getElementById('preview-table-container');
+            const previewLoadingOverlay = document.getElementById('preview-loading-overlay');
             const pageInfo = document.getElementById('preview-page-info');
             const pageJumpForm = document.getElementById('preview-page-jump-form');
             const pageJumpInput = document.getElementById('preview-page-jump');
@@ -837,6 +860,17 @@
                 status.textContent = message;
                 status.classList.toggle('text-danger', !!isError);
                 status.classList.toggle('text-muted', !isError);
+            }
+
+            function setPreviewLoading(isLoading) {
+                if (previewTableContainer) {
+                    previewTableContainer.classList.toggle('preview-loading', !!isLoading);
+                    previewTableContainer.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+                }
+
+                if (previewLoadingOverlay) {
+                    previewLoadingOverlay.classList.toggle('d-none', !isLoading);
+                }
             }
 
             function filterSidebarReports() {
@@ -1304,6 +1338,7 @@
                 }
 
                 button.disabled = true;
+                setPreviewLoading(true);
                 setPreviewStatus('Loading preview...', false);
 
                 const antiForgeryToken = document.querySelector('#preview-antiforgery-form input[name="__RequestVerificationToken"]')?.value || '';
@@ -1373,6 +1408,7 @@
                     renderPreviewPlaceholder('Failed to load preview data.');
                 } finally {
                     button.disabled = false;
+                    setPreviewLoading(false);
                 }
             }
 
