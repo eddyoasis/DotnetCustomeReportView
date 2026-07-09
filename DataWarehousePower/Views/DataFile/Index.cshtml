@@ -482,9 +482,24 @@
 
         <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
             <div id="preview-page-info" class="small text-muted">Page 1 of 1</div>
-            <div class="btn-group" role="group" aria-label="Preview pagination">
-                <button id="preview-page-prev" type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
-                <button id="preview-page-next" type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <form id="preview-page-jump-form" class="d-flex align-items-center gap-2">
+                    <label for="preview-page-jump" class="small text-muted mb-0">Go to</label>
+                    <input id="preview-page-jump"
+                           type="number"
+                           class="form-control form-control-sm"
+                           style="width: 88px;"
+                           min="1"
+                           value="1" />
+                    <button id="preview-page-jump-btn" type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
+                </form>
+
+                <div class="btn-group" role="group" aria-label="Preview pagination">
+                    <button id="preview-page-first" type="button" class="btn btn-sm btn-outline-secondary" disabled>First</button>
+                    <button id="preview-page-prev" type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    <button id="preview-page-next" type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    <button id="preview-page-last" type="button" class="btn btn-sm btn-outline-secondary" disabled>Last</button>
+                </div>
             </div>
         </div>
     </div>
@@ -556,8 +571,13 @@
             const body = document.getElementById('table-body');
             const colgroup = document.getElementById('table-colgroup');
             const pageInfo = document.getElementById('preview-page-info');
+            const pageJumpForm = document.getElementById('preview-page-jump-form');
+            const pageJumpInput = document.getElementById('preview-page-jump');
+            const pageJumpButton = document.getElementById('preview-page-jump-btn');
+            const pageFirstButton = document.getElementById('preview-page-first');
             const pagePrevButton = document.getElementById('preview-page-prev');
             const pageNextButton = document.getElementById('preview-page-next');
+            const pageLastButton = document.getElementById('preview-page-last');
             const reportSidebarFilter = document.getElementById('report-sidebar-filter');
             const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
             const schemaTemplateSearchInput = document.getElementById('schema-template-search');
@@ -673,6 +693,25 @@
                 if (pageNextButton) {
                     pageNextButton.disabled = true;
                 }
+
+                if (pageFirstButton) {
+                    pageFirstButton.disabled = true;
+                }
+
+                if (pageLastButton) {
+                    pageLastButton.disabled = true;
+                }
+
+                if (pageJumpInput) {
+                    pageJumpInput.value = '1';
+                    pageJumpInput.min = '1';
+                    pageJumpInput.max = '1';
+                    pageJumpInput.disabled = true;
+                }
+
+                if (pageJumpButton) {
+                    pageJumpButton.disabled = true;
+                }
             }
 
             function getColumnsFromChips() {
@@ -769,12 +808,31 @@
                     pageInfo.textContent = `Page ${previewCurrentPage} of ${totalPages}`;
                 }
 
+                if (pageFirstButton) {
+                    pageFirstButton.disabled = previewCurrentPage <= 1;
+                }
+
                 if (pagePrevButton) {
                     pagePrevButton.disabled = previewCurrentPage <= 1;
                 }
 
                 if (pageNextButton) {
                     pageNextButton.disabled = previewCurrentPage >= totalPages;
+                }
+
+                if (pageLastButton) {
+                    pageLastButton.disabled = previewCurrentPage >= totalPages;
+                }
+
+                if (pageJumpInput) {
+                    pageJumpInput.min = '1';
+                    pageJumpInput.max = String(totalPages);
+                    pageJumpInput.value = String(previewCurrentPage);
+                    pageJumpInput.disabled = totalRows === 0;
+                }
+
+                if (pageJumpButton) {
+                    pageJumpButton.disabled = totalRows === 0;
                 }
             }
 
@@ -1644,6 +1702,14 @@
                 previewCurrentPage = 1;
                 renderPreviewFromCurrentState();
             });
+            pageFirstButton?.addEventListener('click', () => {
+                if (previewCurrentPage <= 1) {
+                    return;
+                }
+
+                previewCurrentPage = 1;
+                renderPreviewFromCurrentState();
+            });
             pagePrevButton?.addEventListener('click', () => {
                 if (previewCurrentPage <= 1) {
                     return;
@@ -1654,6 +1720,21 @@
             });
             pageNextButton?.addEventListener('click', () => {
                 previewCurrentPage += 1;
+                renderPreviewFromCurrentState();
+            });
+            pageLastButton?.addEventListener('click', () => {
+                const totalPages = Math.max(1, Math.ceil(previewRows.length / getCurrentPreviewPageSize()));
+                previewCurrentPage = totalPages;
+                renderPreviewFromCurrentState();
+            });
+            pageJumpForm?.addEventListener('submit', e => {
+                e.preventDefault();
+
+                const totalPages = Math.max(1, Math.ceil(previewRows.length / getCurrentPreviewPageSize()));
+                const parsed = Number.parseInt(pageJumpInput?.value || '1', 10);
+                const targetPage = Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), totalPages) : 1;
+
+                previewCurrentPage = targetPage;
                 renderPreviewFromCurrentState();
             });
 
