@@ -469,13 +469,44 @@
             <div class="small text-muted">
                 Page @Model.Page of @Model.TotalPages
             </div>
-            <div class="btn-group" role="group" aria-label="Pagination">
-                <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
-                   href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
-                   aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
-                <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
-                   href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
-                   aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                     <form method="get" action="@Url.Action("Index", "Report", new { id = Model.ReportId })" class="d-flex align-items-center gap-2">
+                          <input type="hidden" name="schemaTemplate" value="@Model.SchemaTemplate" />
+                          <input type="hidden" name="clientCode" value="@Model.ClientCode" />
+                          <input type="hidden" name="dateFrom" value="@Model.FilterDateFrom?.ToString("yyyy-MM-dd")" />
+                          <input type="hidden" name="dateTo" value="@Model.FilterDateTo?.ToString("yyyy-MM-dd")" />
+                          <input type="hidden" name="loadData" value="@Model.HasAppliedFilters.ToString().ToLowerInvariant()" />
+                          <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                          @foreach (var parameter in Model.RuntimeParameters)
+                          {
+                                <input type="hidden" name="@parameter.QueryKey" value="@parameter.Value" />
+                          }
+                          <label for="jump-to-page" class="small text-muted mb-0">Go to</label>
+                          <input id="jump-to-page"
+                                    name="page"
+                                    type="number"
+                                    class="form-control form-control-sm"
+                                    style="width: 88px;"
+                                    min="1"
+                                    max="@Math.Max(1, Model.TotalPages)"
+                                    value="@Model.Page" />
+                          <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
+                     </form>
+
+                     <div class="btn-group" role="group" aria-label="Pagination">
+                          <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+                              href="@BuildReportUrl(Model.ReportId, 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
+                              aria-disabled="@(Model.Page <= 1 ? "true" : "false")">First</a>
+                          <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+                              href="@BuildReportUrl(Model.ReportId, Model.Page - 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
+                              aria-disabled="@(Model.Page <= 1 ? "true" : "false")">Previous</a>
+                          <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+                              href="@BuildReportUrl(Model.ReportId, Model.Page + 1, Model.PageSize, null, true, Model.HasAppliedFilters)"
+                              aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Next</a>
+                          <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+                              href="@BuildReportUrl(Model.ReportId, Model.TotalPages, Model.PageSize, null, true, Model.HasAppliedFilters)"
+                              aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")">Last</a>
+                     </div>
             </div>
         </div>
     </div>
