@@ -90,6 +90,7 @@ namespace DataWarehousePower.Repositories
                     IsActive = ScheduledJob.IsActive,
                     OwnerUserId = ScheduledJob.CreatedByUserId,
                     Type = ScheduledJob.ReportDefinition != null ? "Report" : "Data File",
+                    Template = ScheduledJob.SchemaTemplate ?? "-",
                     ClientCode = ScheduledJob.ClientCode ?? "-"
                 })
                 .ToListAsync();

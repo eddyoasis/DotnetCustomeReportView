@@ -160,7 +160,7 @@ namespace DataWarehousePower.Controllers
         public async Task<IActionResult> ScheduleDataFile(int id, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
-            int? existingJobId = await _scheduledReportJobService.FindExistingJobIdAsync(userId, id, schemaTemplate, null);
+            int? existingJobId = await _scheduledReportJobService.FindExistingJobIdAsync(userId, id, schemaTemplate, clientCode);
 
             if (existingJobId.HasValue)
             {
