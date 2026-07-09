@@ -4,9 +4,21 @@
     ViewData["Title"] = isEdit ? $"Edit Report — {Model.ReportName}" : "New Report";
 }
 
-<div class="d-flex align-items-center gap-2 mb-3">
-    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">← Back</a>
-    <h4 class="mb-0">@(isEdit ? "Edit Report" : "New Report")</h4>
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex gap-2">
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">← Back</a>
+        <h4 class="mb-0">@(isEdit ? "Edit Report" : "New Report")</h4>
+    </div>
+
+    @if (isEdit)
+    {
+        <form asp-action="Delete" asp-route-id="@Model.Id"
+              method="post" class="d-inline"
+              onsubmit="return confirm('Delete report \'@Model.ReportName\'? This cannot be undone.');">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+        </form>
+    }
 </div>
 
 <form asp-action="Save" method="post" id="report-form">
