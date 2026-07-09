@@ -203,6 +203,7 @@ public sealed class ScheduledReportExecutionService(
                 dataFile.SourceTable,
                 dataFile.Columns,
                 dataFile.SourceDatabase,
+                clientCode,
                 dateFrom,
                 dateTo);
 

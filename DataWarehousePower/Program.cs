@@ -312,7 +312,7 @@ app.MapHangfireDashboard(dashboardPath, new DashboardOptions
     // before ASP.NET Core's RequireAuthorization policy even runs.
     Authorization = []
 })
-.RequireAuthorization(DepartmentAuthorizationPolicies.AuditlogAccess);
+.RequireAuthorization(DepartmentAuthorizationPolicies.JobDashboardAccess);
 
 RecurringJob.AddOrUpdate<IAuditLogCleanupJob>(
     "audit-log-cleanup",

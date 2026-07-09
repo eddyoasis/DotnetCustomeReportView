@@ -111,6 +111,47 @@ namespace DataWarehousePower.Repositories
         public async Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableAsync(
             string sourceTable,
             IEnumerable<DataFileColumn> columnNames,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var safeDatabase = await ResolveDatabaseNameAsync(conn, sourceDatabase);
+            if (safeDatabase is null)
+                return new();
+
+            var safeTable = await ValidateTableNameAsync(conn, sourceTable, safeDatabase);
+            if (string.IsNullOrEmpty(safeTable))
+                return new();
+
+            var safeCols = await ValidateColumnNamesAsync(conn, sourceTable, columnNames.Select(x => x.PropertyName), safeDatabase);
+            if (safeCols.Count == 0)
+                return new();
+
+            var req = new DataFilePreviewRequest
+            {
+                SourceDatabase = sourceDatabase, //DataFilePreviewColumnRequest
+                SourceTable = sourceTable,
+                ClientCode = clientCode,
+                Columns = columnNames.Select(c => new DataFilePreviewColumnRequest
+                {
+                    PropertyName = c.PropertyName,
+                    MappingParameter = c.MappingParameter,
+                    MappingParameterFilter = c.MappingParameterFilter
+                }).ToList(),
+                IsExport = true
+            };
+            var result = await _dataFileManageRepository.GetPreviewDataAsync(req, dateFrom, dateTo);
+            return result.Rows;
+        }
+
+        public async Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableAsync(
+            string sourceTable,
+            IEnumerable<DataFileColumn> columnNames,
             string? sourceDatabase = null)
         {
             var conn = _context.Database.GetDbConnection();
