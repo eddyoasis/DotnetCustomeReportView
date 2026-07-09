@@ -114,12 +114,6 @@
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
                             </li>
                         } *@
-                        @if (canViewReports)
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report/Data File Folder</a>
-                            </li>
-                        }
                         @if (canViewReports || canViewJobDashboard)
                         {
                             <li class="nav-item dropdown">
@@ -140,6 +134,12 @@
                                         </li>
                                     }
                                 </ul>
+                            </li>
+                        }
+                        @if (canViewReports)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="ReportFolder" asp-action="Index">Report/Data File Folder</a>
                             </li>
                         }
                         @if (canViewAudilog)

@@ -25,7 +25,7 @@
                 <span asp-validation-for="DataFileName" class="text-danger small"></span>
             </div>
 
-            <div class="col-md-3">
+            <div hidden="@(!Model.IsITDepartment)" class="col-md-3">
                 <label asp-for="SourceDatabase" class="form-label"></label>
                 <div class="dropdown searchable-source-dropdown" id="source-database-dropdown" data-bs-auto-close="outside">
                     <input asp-for="SourceDatabase" type="hidden" class="source-input" id="input-source-database" />
