@@ -235,6 +235,7 @@ public sealed class ScheduledReportJobService(
             Id = entity.Id,
             JobName = entity.JobName,
             ReportDefinitionId = entity.ReportDefinitionId ?? entity.DataFileDefinitionId ?? 0,
+            IsReport = entity.ReportDefinitionId > 0,
             Formats = ParseFormats(entity.Format),
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,

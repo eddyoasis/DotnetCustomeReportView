@@ -459,9 +459,8 @@ public sealed class ScheduledJobController(
 
     private async Task PopulateDataFileOptionsAsync(ScheduledJobFormViewModel form, string userId, string? userDepartment)
     {
-        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(
-            userId,
-            userDepartment ?? string.Empty);
+        //DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId);
 
         form.AvailableDataFiles = dataFileList.DataFiles
             .Where(dataFile => dataFile.IsActive)

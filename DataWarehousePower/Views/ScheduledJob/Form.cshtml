@@ -1,7 +1,8 @@
 @model DataWarehousePower.Models.ScheduledJobFormViewModel
 @{
     bool isEdit = Model.Id > 0;
-    bool isReportMode = Model.RequiresSchemaTemplateAndClientCode;
+    // bool isReportMode = Model.RequiresSchemaTemplateAndClientCode;
+    bool isReportMode = Model.IsReport;
     string sourceLabel = isReportMode ? "Report" : "Data File";
     string sourcePlaceholder = isReportMode ? "-- Select report --" : "-- Select data file --";
     List<ReportDefinitionLookupItem> selectedSourceOptions = isReportMode ? Model.AvailableReports : Model.AvailableDataFiles;
