@@ -485,10 +485,10 @@ public sealed class ScheduledJobController(
         //    return;
         //}
 
-        if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
-        {
-            ModelState.AddModelError(nameof(form.SchemaTemplate), "Schema Template is required.");
-        }
+        //if (string.IsNullOrWhiteSpace(form.SchemaTemplate))
+        //{
+        //    ModelState.AddModelError(nameof(form.SchemaTemplate), "Schema Template is required.");
+        //}
 
         if (string.IsNullOrWhiteSpace(form.ClientCode))
         {

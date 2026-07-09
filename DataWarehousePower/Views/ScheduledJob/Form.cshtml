@@ -89,15 +89,18 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label asp-for="ExportLocation" class="form-label"></label>
-                    <select id="exportLocationBasePathSelect" class="form-select">
-                        <option value="">-- Select base path --</option>
-                        @foreach (ExportLocationBasePathOptionViewModel exportLocationBasePathOption in Model.AvailableExportLocationBasePathOptions)
-                        {
-                            <option value="@exportLocationBasePathOption.Path" title="@exportLocationBasePathOption.Path">@exportLocationBasePathOption.Label</option>
-                        }
-                    </select>
-                    <div id="exportLocationBasePathError" class="text-danger small d-none">Please select a base path.</div>
+                    <div hidden>
+                        <label asp-for="ExportLocation" class="form-label"></label>
+                        <select id="exportLocationBasePathSelect" class="form-select">
+                            <option value="">-- Select base path --</option>
+                            @foreach (ExportLocationBasePathOptionViewModel exportLocationBasePathOption in Model.AvailableExportLocationBasePathOptions)
+                            {
+                                <option value="@exportLocationBasePathOption.Path" title="@exportLocationBasePathOption.Path">@exportLocationBasePathOption.Label</option>
+                            }
+                        </select>
+                        <div id="exportLocationBasePathError" class="text-danger small d-none">Please select a base path.</div>
+                    </div>
+                    <label>Client Folder</label>
                     <select id="exportLocationSubfolderInput" class="form-select mt-2" required disabled>
                         <option value="">-- Select subfolder --</option>
                         @foreach (string exportLocationSubfolder in Model.AvailableClientCodeFolders)
