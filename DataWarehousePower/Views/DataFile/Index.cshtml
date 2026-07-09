@@ -461,7 +461,7 @@
                     <option value="50">50</option>
                     <option value="100">100</option>
                 </select>
-                <button id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Refresh</button>
+                <button hidden id="btn-preview-data" type="button" class="btn btn-outline-primary btn-sm">Refresh</button>
                 <span id="preview-status" class="small text-muted">Loading latest preview data.</span>
             </div>
         </div>
@@ -573,6 +573,7 @@
             const initialSchemaTemplate = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplate));
             const initialPreferenceId = @Html.Raw(JsonSerializer.Serialize(Model.ActivePreferenceId));
             const schemaTemplatePreferenceIds = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplatePreferenceIds));
+            const shouldAutoLoadPreview = @Html.Raw(JsonSerializer.Serialize(Model.HasAppliedFilters));
             const defaultColumnState = @Html.Raw(JsonSerializer.Serialize(
                 Model.AvailableColumns
                     .OrderBy(column => column.Order)
@@ -1854,7 +1855,9 @@
                 loadColumnStateFromDefaults();
             }
 
-            // loadPreviewData();
+            if (shouldAutoLoadPreview) {
+                loadPreviewData(1);
+            }
 
             const exportCollapseEl = document.getElementById('export-card-body');
             const exportCollapseToggle = exportCollapseEl?.previousElementSibling?.querySelector('[data-bs-target="#export-card-body"]');
