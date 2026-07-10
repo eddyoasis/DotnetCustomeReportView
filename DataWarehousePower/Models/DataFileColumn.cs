@@ -19,6 +19,10 @@ namespace DataWarehousePower.Models
         public string PropertyName { get; set; } = string.Empty;
 
         [Required]
+        [MaxLength(50)]
+        public string PropertyType { get; set; } = string.Empty;
+
+        [Required]
         [MaxLength(100)]
         public string DefaultLabel { get; set; } = string.Empty;
 

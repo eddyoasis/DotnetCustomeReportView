@@ -212,6 +212,7 @@
                             <td>
                                 <input type="hidden" name="Columns[@i].Id" value="@Model.Columns[i].Id" />
                                 <input type="hidden" name="Columns[@i].IsDeleted" value="false" class="is-deleted-input" />
+                                <input type="hidden" name="Columns[@i].PropertyType" value="@Model.Columns[i].PropertyType" class="property-type-input" />
                                 <input name="Columns[@i].PropertyName"
                                        value="@Model.Columns[i].PropertyName"
                                        class="form-control form-control-sm"
@@ -322,6 +323,7 @@
                 <td>
                     <input type="hidden" name="Columns[${rowIndex}].Id" value="0" />
                     <input type="hidden" name="Columns[${rowIndex}].IsDeleted" value="false" class="is-deleted-input" />
+                    <input type="hidden" name="Columns[${rowIndex}].PropertyType" value="${seed?.columnType || ''}" class="property-type-input" />
                     <input readonly name="Columns[${rowIndex}].PropertyName" class="form-control form-control-sm" placeholder="e.g. SaleAmount" required />
                 </td>
                 <td>
@@ -867,7 +869,11 @@
 
                 const propertyName = (propertyInput?.value || '').trim();
                 const metadataType = sourceColumnTypeLookup.get(propertyName.toLowerCase()) || '';
-                const columnType = (tr.dataset.columnType || '').trim() || metadataType;
+                const propertyTypeInput = tr.querySelector('input[name$=".PropertyType"]');
+                const postedType = propertyTypeInput instanceof HTMLInputElement
+                    ? (propertyTypeInput.value || '').trim()
+                    : '';
+                const columnType = (tr.dataset.columnType || '').trim() || metadataType || postedType;
                 const targetType = inferMappingInputType(propertyName, columnType);
                 const previousEditorType = tr.dataset.mappingEditorType || '';
                 if (previousEditorType !== targetType || !mappingCell.querySelector('.mapping-parameter-editor')?.children.length) {
@@ -886,6 +892,9 @@
                 }
 
                 tr.dataset.columnType = columnType;
+                if (propertyTypeInput instanceof HTMLInputElement) {
+                    propertyTypeInput.value = columnType;
+                }
             });
         }
 

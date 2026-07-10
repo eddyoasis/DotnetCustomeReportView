@@ -199,6 +199,7 @@ namespace DataWarehousePower.Services
                 {
                     Id = column.Id,
                     PropertyName = column.PropertyName,
+                    PropertyType = column.PropertyType,
                     DefaultLabel = column.DefaultLabel,
                     MappingParameter = column.MappingParameter,
                     MappingParameterFilter = column.MappingParameterFilter,
@@ -231,6 +232,7 @@ namespace DataWarehousePower.Services
                 {
                     Id = column.Id,
                     PropertyName = column.PropertyName.Trim(),
+                    PropertyType = string.IsNullOrWhiteSpace(column.PropertyType) ? string.Empty : column.PropertyType.Trim(),
                     DefaultLabel = column.DefaultLabel.Trim(),
                     MappingParameter = string.IsNullOrWhiteSpace(column.MappingParameter) ? null : column.MappingParameter.Trim(),
                     MappingParameterFilter = string.IsNullOrWhiteSpace(column.MappingParameterFilter) ? null : column.MappingParameterFilter.Trim(),

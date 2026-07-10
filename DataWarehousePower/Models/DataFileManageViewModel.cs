@@ -72,6 +72,9 @@ namespace DataWarehousePower.Models
         [Display(Name = "Property Name")]
         public string PropertyName { get; set; } = string.Empty;
 
+        [MaxLength(50)]
+        public string PropertyType { get; set; } = string.Empty;
+
         [Required(ErrorMessage = "Label is required.")]
         [MaxLength(100)]
         [Display(Name = "Default Label")]
