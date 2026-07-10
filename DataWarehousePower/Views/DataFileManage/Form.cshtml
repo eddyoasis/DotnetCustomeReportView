@@ -125,13 +125,7 @@
         </div>
     </div>
 
-     <div class="card shadow-sm mb-4">
-        @* <div class="card-header fw-semibold">
-            Departments  
-            <span class="text-muted">
-                (Select departments allowed to view this data file. Leave all unchecked to allow all departments.)
-            </span>
-        </div> *@
+     <div hidden class="card shadow-sm mb-4">
         <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
             Departments
             <span class="text-muted">
@@ -200,8 +194,8 @@
                         <th style="width:36px;" class="text-center">#</th>
                         <th>Property Name <span class="text-muted small">(DB column)</span></th>
                         <th>Default Label <span class="text-muted small">(UI header)</span></th>
-                        <th>Mapping Parameter <span class="text-muted small">(optional filter key)</span></th>
-                        <th>Mapping Parameter Filter <span class="text-muted small">(optional filter value)</span></th>
+                        <th>Mapping Parameter <span class="text-muted small">(optional filter value)</span></th>
+                        @* <th>Mapping Parameter Filter <span class="text-muted small">(optional filter value)</span></th> *@
                         @* <th style="width:110px;">Display Order</th> *@
                         @* <th style="width:70px;"></th> *@
                         <th style="width:70px;"></th>
@@ -236,7 +230,7 @@
                                        class="mapping-parameter-input" />
                                 <div class="mapping-parameter-editor"></div>
                             </td>
-                            <td>
+                            <td hidden>
                                 <select name="Columns[@i].MappingParameterFilter" class="form-select form-select-sm">
                                     <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Columns[i].MappingParameterFilter) ? "selected" : null)">-- None --</option>
                                     <option value="ClientCode" selected="@(Model.Columns[i].MappingParameterFilter == "ClientCode" ? "selected" : null)">ClientCode</option>
@@ -1799,14 +1793,14 @@
             });
         }
 
-        document.getElementById('data-file-form').addEventListener('submit', e => {
-            const validationResult = validateRequiredDateFilterColumn();
-            if (!validationResult.valid) {
-                e.preventDefault();
-                alert(validationResult.message);
-                getVisibleMappingParameterFilterSelects()[0]?.focus();
-            }
-        });
+        // document.getElementById('data-file-form').addEventListener('submit', e => {
+        //     const validationResult = validateRequiredDateFilterColumn();
+        //     if (!validationResult.valid) {
+        //         e.preventDefault();
+        //         alert(validationResult.message);
+        //         getVisibleMappingParameterFilterSelects()[0]?.focus();
+        //     }
+        // });
 
         initializeSearchableDropdown({
             hiddenInput: databaseInput,

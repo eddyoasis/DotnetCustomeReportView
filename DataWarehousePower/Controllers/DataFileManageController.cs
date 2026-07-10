@@ -619,17 +619,17 @@ namespace DataWarehousePower.Controllers
 
         private static string? ValidateRequiredDateFilterColumn(DataFileManageFormViewModel form)
         {
-            bool hasDateFilterColumn = form.Columns
-                .Where(column => !column.IsDeleted)
-                .Any(column => string.Equals(
-                    column.MappingParameterFilter,
-                    "FilterDateFrom,FilterDateTo",
-                    StringComparison.OrdinalIgnoreCase));
+            //bool hasDateFilterColumn = form.Columns
+            //    .Where(column => !column.IsDeleted)
+            //    .Any(column => string.Equals(
+            //        column.MappingParameterFilter,
+            //        "FilterDateFrom,FilterDateTo",
+            //        StringComparison.OrdinalIgnoreCase));
 
-            if (!hasDateFilterColumn)
-            {
-                return "Please select a date column for filter datefrom/dateto";
-            }
+            //if (!hasDateFilterColumn)
+            //{
+            //    return "Please select a date column for filter datefrom/dateto";
+            //}
 
             return null;
         }
