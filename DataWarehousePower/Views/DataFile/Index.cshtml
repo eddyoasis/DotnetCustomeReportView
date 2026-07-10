@@ -166,19 +166,56 @@
                                         : availableColumn.MappingParameter;
                                     var filterInputId = $"column-filter-{availableColumn.Order}-{availableColumn.Key}";
                                     Model.ColumnFilters.TryGetValue(filterKey, out var filterValue);
+                                    var normalizedPropertyType = (availableColumn.PropertyType ?? string.Empty).Trim().ToLowerInvariant();
+                                    var supportsRangeFilter =
+                                        normalizedPropertyType.Contains("date") ||
+                                        normalizedPropertyType.Contains("time") ||
+                                        normalizedPropertyType.Contains("decimal") ||
+                                        normalizedPropertyType.Contains("numeric") ||
+                                        normalizedPropertyType.Contains("real") ||
+                                        normalizedPropertyType.Contains("float") ||
+                                        normalizedPropertyType.Contains("money") ||
+                                        normalizedPropertyType.Contains("smallmoney") ||
+                                        normalizedPropertyType.Contains("int") ||
+                                        normalizedPropertyType.Contains("number");
+                                    var rangeInputType = normalizedPropertyType.Contains("date") || normalizedPropertyType.Contains("time")
+                                        ? "date"
+                                        : "number";
 
                                     <div class="col-12 col-md-6 col-xl-4">
                                         <div class="border rounded-3 bg-light-subtle p-2 h-100">
                                             <label for="@filterInputId" class="form-label small fw-semibold mb-1">@availableColumn.DisplayLabel</label>
-                                            
-                                            <input id="@filterInputId"
-                                                   name="columnFilters[@filterKey]"
-                                                   type="text"
-                                                   class="form-control form-control-sm column-filter-input"
-                                                   value="@filterValue"
-                                                   data-filter-key="@filterKey"
-                                                   data-column-key="@availableColumn.Key"
-                                                   placeholder="Optional filter value" />
+
+                                            @if (supportsRangeFilter)
+                                            {
+                                                <div class="column-filter-range d-flex flex-column gap-1"
+                                                     data-range-type="@rangeInputType">
+                                                    <input id="@filterInputId"
+                                                           name="columnFilters[@filterKey]"
+                                                           type="hidden"
+                                                           class="column-filter-input"
+                                                           value="@filterValue"
+                                                           data-filter-key="@filterKey"
+                                                           data-column-key="@availableColumn.Key" />
+                                                    <input type="@rangeInputType"
+                                                           class="form-control form-control-sm column-filter-range-from"
+                                                           placeholder="From" />
+                                                    <input type="@rangeInputType"
+                                                           class="form-control form-control-sm column-filter-range-to"
+                                                           placeholder="To" />
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <input id="@filterInputId"
+                                                       name="columnFilters[@filterKey]"
+                                                       type="text"
+                                                       class="form-control form-control-sm column-filter-input"
+                                                       value="@filterValue"
+                                                       data-filter-key="@filterKey"
+                                                       data-column-key="@availableColumn.Key"
+                                                       placeholder="Optional filter value" />
+                                            }
                                         </div>
                                     </div>
                                 }
@@ -1236,6 +1273,43 @@
                 return parameters;
             }
 
+            function initializeRangeFilterInputs() {
+                const rangeContainers = [...document.querySelectorAll('.column-filter-range')];
+                rangeContainers.forEach(container => {
+                    const hiddenInput = container.querySelector('.column-filter-input');
+                    const fromInput = container.querySelector('.column-filter-range-from');
+                    const toInput = container.querySelector('.column-filter-range-to');
+
+                    if (!(hiddenInput instanceof HTMLInputElement) ||
+                        !(fromInput instanceof HTMLInputElement) ||
+                        !(toInput instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    const raw = (hiddenInput.value || '').trim();
+                    if (raw.includes('|')) {
+                        const [fromRaw, toRaw] = raw.split('|', 2);
+                        fromInput.value = (fromRaw || '').trim();
+                        toInput.value = (toRaw || '').trim();
+                    } else {
+                        fromInput.value = raw;
+                        toInput.value = '';
+                    }
+
+                    const syncHidden = () => {
+                        const fromValue = (fromInput.value || '').trim();
+                        const toValue = (toInput.value || '').trim();
+                        hiddenInput.value = fromValue || toValue
+                            ? `${fromValue}|${toValue}`
+                            : '';
+                    };
+
+                    fromInput.addEventListener('input', syncHidden);
+                    toInput.addEventListener('input', syncHidden);
+                    syncHidden();
+                });
+            }
+
             function showExportPasswordError(message) {
                 if (!exportPasswordError) {
                     return;
@@ -1841,6 +1915,10 @@
                 syncScheduleLink();
             });
 
+            filterForm?.addEventListener('submit', () => {
+                initializeRangeFilterInputs();
+            });
+
             if (schemaTemplateSearchInput) {
                 schemaTemplateSearchInput.addEventListener('input', e => {
                     hideSchemaTemplateError();
@@ -1858,6 +1936,7 @@
             schemaTemplateSelect && renderSchemaTemplateOptions('');
             syncSchemaTemplateUi(initialSchemaTemplate);
             syncScheduleLink();
+            initializeRangeFilterInputs();
 
             if (sortable) {
                 loadColumnStateFromDefaults();

@@ -74,7 +74,8 @@ namespace DataWarehousePower.Controllers
                     IsVisible = true,
                     Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1,
                     MappingParameter = column.MappingParameter,
-                    PropertyName = column.PropertyName
+                    PropertyName = column.PropertyName,
+                    PropertyType = column.PropertyType
                 })
                 .ToList();
 

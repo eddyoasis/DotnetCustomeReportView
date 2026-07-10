@@ -33,6 +33,7 @@ namespace DataWarehousePower.Models
         public int    Order        { get; set; } = 0;
 
         public string PropertyName { get; set; } = string.Empty;
+        public string PropertyType { get; set; } = string.Empty;
         public string? MappingParameter { get; set; }
         public string? MappingParameterFilter { get; set; }
     }
