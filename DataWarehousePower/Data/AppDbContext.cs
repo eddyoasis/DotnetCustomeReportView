@@ -30,6 +30,7 @@ namespace DataWarehousePower.Data
         public DbSet<Department>           Departments           { get; set; }
         public DbSet<ReportConnectionString> ReportConnectionStrings { get; set; }
         public DbSet<DepartmentConnection> DepartmentConnections { get; set; }
+        public DbSet<DWScheme>             DWSchemes             { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
             => SaveChangesAsync(acceptAllChangesOnSuccess, CancellationToken.None).GetAwaiter().GetResult();

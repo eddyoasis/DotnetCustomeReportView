@@ -1,0 +1,84 @@
+@model DWScheme
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Create DW Scheme" : "Edit DW Scheme";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">@ViewData["Title"]</h4>
+    <a asp-action="Index" class="btn btn-secondary btn-sm">Back to List</a>
+</div>
+
+<div class="row">
+    <div class="col-md-10 col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form asp-action="Save" method="post" class="needs-validation" novalidate>
+                    @if (Model.Id > 0)
+                    {
+                        <input type="hidden" asp-for="Id" />
+                    }
+
+                    <div class="mb-3">
+                        <label asp-for="SP" class="form-label">SP <span class="text-danger">*</span></label>
+                        <input asp-for="SP" class="form-control" placeholder="Enter stored procedure name" />
+                        <span asp-validation-for="SP" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Display" class="form-label">Display <span class="text-danger">*</span></label>
+                        <input asp-for="Display" class="form-control" placeholder="Enter display name" />
+                        <span asp-validation-for="Display" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="FilterDateColumnName" class="form-label">Filter Date Column Name <span class="text-danger">*</span></label>
+                        <input asp-for="FilterDateColumnName" class="form-control" placeholder="Enter filter date column name" />
+                        <span asp-validation-for="FilterDateColumnName" class="text-danger small"></span>
+                    </div>
+
+                    @if (Model.Id > 0)
+                    {
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Inserted By</label>
+                                    <p class="form-control-plaintext">@Model.InsertedBy</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Inserted At</label>
+                                    <p class="form-control-plaintext">@Model.InsertedDatetime.ToString("MM/dd/yyyy HH:mm")</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Modified By</label>
+                                    <p class="form-control-plaintext">@(string.IsNullOrWhiteSpace(Model.ModifiedBy) ? "N/A" : Model.ModifiedBy)</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Modified At</label>
+                                    <p class="form-control-plaintext">@(Model.ModifiedDatetime?.ToString("MM/dd/yyyy HH:mm") ?? "N/A")</p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">@(Model.Id == 0 ? "Create" : "Update") DW Scheme</button>
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

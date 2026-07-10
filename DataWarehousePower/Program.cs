@@ -45,6 +45,7 @@ builder.Services.AddScoped<IDataFileManageRepository, DataFileManageRepository>(
 builder.Services.AddScoped<IReportConnectionStringRepository, ReportConnectionStringRepository>();
 builder.Services.AddScoped<IDepartmentConnectionRepository, DepartmentConnectionRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
+builder.Services.AddScoped<IDWSchemeRepository, DWSchemeRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
@@ -65,6 +66,7 @@ builder.Services.AddScoped<IDataFileManageService, DataFileManageService>();
 builder.Services.AddScoped<IReportConnectionStringService, ReportConnectionStringService>();
 builder.Services.AddScoped<IDepartmentConnectionService, DepartmentConnectionService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IDWSchemeService, DWSchemeService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
