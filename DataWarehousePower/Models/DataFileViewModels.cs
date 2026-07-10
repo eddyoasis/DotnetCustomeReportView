@@ -9,6 +9,7 @@ namespace DataWarehousePower.Models
         public List<string> AvailableClientCodes { get; set; } = new();
         public DateTime? FilterDateFrom { get; set; }
         public DateTime? FilterDateTo { get; set; }
+        public Dictionary<string, string?> ColumnFilters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string SchemaTemplate { get; set; } = string.Empty;
         public int? ActivePreferenceId { get; set; }
         public List<string> AvailableSchemaTemplates { get; set; } = new();

@@ -31,5 +31,9 @@ namespace DataWarehousePower.Models
         public string DisplayLabel { get; set; } = string.Empty;
         public bool   IsVisible    { get; set; } = true;
         public int    Order        { get; set; } = 0;
+
+        public string PropertyName { get; set; } = string.Empty;
+        public string? MappingParameter { get; set; }
+        public string? MappingParameterFilter { get; set; }
     }
 }

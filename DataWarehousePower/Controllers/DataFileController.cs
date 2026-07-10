@@ -42,7 +42,7 @@ namespace DataWarehousePower.Controllers
             _logger = logger;
         }
 
-        public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null, string? clientCode = null, DateTime? dateFrom = null, DateTime? dateTo = null)
+        public async Task<IActionResult> Index(int? id = null, string? search = null, bool? isActive = null, string? schemaTemplate = null, string? clientCode = null, DateTime? dateFrom = null, DateTime? dateTo = null, Dictionary<string, string?>? columnFilters = null)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -72,7 +72,9 @@ namespace DataWarehousePower.Controllers
                     DefaultLabel = column.DefaultLabel,
                     DisplayLabel = column.DefaultLabel,
                     IsVisible = true,
-                    Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1
+                    Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1,
+                    MappingParameter = column.MappingParameter,
+                    PropertyName = column.PropertyName
                 })
                 .ToList();
 
@@ -104,6 +106,12 @@ namespace DataWarehousePower.Controllers
             List<string> savedSchemaTemplates = await _prefService.GetDataFileSchemaTemplatesAsync(userId, selectedDataFile.Id);
             Dictionary<string, int> schemaTemplatePreferenceIds = await _prefService.GetDataFileSchemaTemplatePreferenceIdsAsync(userId, selectedDataFile.Id);
             List<string> availableSchemaTemplates = BuildAvailableSchemaTemplates(normalizedSchemaTemplate, savedSchemaTemplates);
+            Dictionary<string, string?> normalizedColumnFilters = (columnFilters ?? new Dictionary<string, string?>())
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value?.Trim(),
+                    StringComparer.OrdinalIgnoreCase);
 
             ViewData["DepartmentLookup"] = await GetDepartmentLookupAsync();
 
@@ -122,7 +130,12 @@ namespace DataWarehousePower.Controllers
                 SchemaTemplatePreferenceIds = schemaTemplatePreferenceIds,
                 AvailableColumns = availableColumns,
                 DisplayColumns = displayColumns,
-                HasAppliedFilters = !string.IsNullOrEmpty(clientCode)
+                ColumnFilters = normalizedColumnFilters,
+                HasAppliedFilters = true
+                //HasAppliedFilters = !string.IsNullOrEmpty(clientCode)
+                //    || dateFrom.HasValue
+                //    || dateTo.HasValue
+                //    || normalizedColumnFilters.Count > 0
             });
         }
 
@@ -355,6 +368,7 @@ namespace DataWarehousePower.Controllers
                     ClientCode = request.ClientCode,
                     DateFrom = request.DateFrom,
                     DateTo = request.DateTo,
+                    Parameters = request.Parameters,
                     Columns = form.Columns
                         .Where(column => !column.IsDeleted)
                         .OrderBy(column => column.DisplayOrder)

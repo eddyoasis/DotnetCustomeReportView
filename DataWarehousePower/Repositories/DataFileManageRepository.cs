@@ -339,6 +339,14 @@ namespace DataWarehousePower.Repositories
             var metadataByName = metadata
                 .Where(column => !string.IsNullOrWhiteSpace(column.Name))
                 .ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
+            //bool hasExplicitParameters = request.Parameters is not null;
+            bool hasExplicitParameters = request.Parameters is not null && request.Parameters.Count() > 0;
+            var parameters = (request.Parameters ?? new Dictionary<string, string?>())
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value?.Trim(),
+                    StringComparer.OrdinalIgnoreCase);
 
             List<DataFilePreviewColumnRequest> requestedColumns = (request.Columns ?? new())
                 .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
@@ -392,7 +400,24 @@ namespace DataWarehousePower.Repositories
                     continue;
                 }
 
-                string filterValue = (requestedColumn.MappingParameter ?? string.Empty).Trim();
+                string parameterKey = (requestedColumn.MappingParameter ?? string.Empty).Trim();
+                string filterValue = string.Empty;
+
+                if (hasExplicitParameters && !string.IsNullOrWhiteSpace(parameterKey) && parameters.TryGetValue(parameterKey, out string? parameterFilterValue))
+                {
+                    filterValue = (parameterFilterValue ?? string.Empty).Trim();
+                }
+
+                if (hasExplicitParameters && string.IsNullOrWhiteSpace(parameterKey) && parameters.TryGetValue(columnName, out string? parameterNewFilterValue))
+                {
+                    filterValue = (parameterNewFilterValue ?? string.Empty).Trim();
+                }
+
+                if (!hasExplicitParameters && string.IsNullOrWhiteSpace(filterValue) && !string.IsNullOrWhiteSpace(parameterKey))
+                {
+                    filterValue = parameterKey;
+                }
+
                 if (string.IsNullOrWhiteSpace(filterValue))
                 {
                     continue;
@@ -480,34 +505,34 @@ namespace DataWarehousePower.Repositories
 
             string orderBySql = string.Empty;
 
-            foreach (var column in requestedColumns.Where(x => !string.IsNullOrEmpty(x.MappingParameterFilter)))
-            {
-                string parameterName = $"@f{parameterIndex++}";
+            //foreach (var column in requestedColumns.Where(x => !string.IsNullOrEmpty(x.MappingParameterFilter)))
+            //{
+            //    string parameterName = $"@f{parameterIndex++}";
 
-                if (column.MappingParameterFilter == "FilterDateFrom,FilterDateTo")
-                {
-                    string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
-                    if (dateFrom.HasValue)
-                    {
-                        whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
-                        AddParameter(cmd, parameterName, dateFrom);
-                    }
+            //    if (column.MappingParameterFilter == "FilterDateFrom,FilterDateTo")
+            //    {
+            //        string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
+            //        if (dateFrom.HasValue)
+            //        {
+            //            whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+            //            AddParameter(cmd, parameterName, dateFrom);
+            //        }
 
-                    if (dateTo.HasValue)
-                    {
-                        string endParameterName = $"@f{parameterIndex++}";
-                        whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
-                        AddParameter(cmd, endParameterName, dateTo);
+            //        if (dateTo.HasValue)
+            //        {
+            //            string endParameterName = $"@f{parameterIndex++}";
+            //            whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+            //            AddParameter(cmd, endParameterName, dateTo);
 
-                    }
-                    orderBySql = $" ORDER BY {escapedColumnName}";
-                }
-                else
-                {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
-                    AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
-                }
-            }
+            //        }
+            //        orderBySql = $" ORDER BY {escapedColumnName}";
+            //    }
+            //    else
+            //    {
+            //        whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
+            //        AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
+            //    }
+            //}
 
             string whereSql = whereClauses.Count > 0
                 ? " WHERE " + string.Join(" AND ", whereClauses)

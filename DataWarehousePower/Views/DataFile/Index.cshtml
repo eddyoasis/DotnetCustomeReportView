@@ -48,6 +48,14 @@
             {
                 queryValues["dateTo"] = Model.FilterDateTo.Value.ToString("yyyy-MM-dd");
             }
+
+                foreach (var columnFilter in Model.ColumnFilters)
+                {
+                    if (!string.IsNullOrWhiteSpace(columnFilter.Key) && !string.IsNullOrWhiteSpace(columnFilter.Value))
+                    {
+                        queryValues[$"columnFilters[{columnFilter.Key.Trim()}]"] = columnFilter.Value;
+                    }
+                }
         }
 
         return queryValues.Count == 0 ? baseUrl : QueryHelpers.AddQueryString(baseUrl, queryValues);
@@ -131,14 +139,14 @@
             @if (!Model.HasAppliedFilters)
             {
                 <div class="alert alert-info border small py-2 px-3 mb-3">
-                    Select a client code and click Apply to load report data.
+                    Enter one or more optional column filters and click Apply to load report data.
                 </div>
             }
 
             <div class="card mb-3 shadow-sm">
-                <div class="card-header fw-semibold">Date Filters</div>
+                <div class="card-header fw-semibold">Column Filters</div>
                 <div class="card-body">
-                    <form id="datafile-filter-form" method="get" action="@Url.Action("Index", "DataFile", new { id = selectedDataFile.Id })" class="row g-3 align-items-end">
+                    <form id="datafile-filter-form" method="get" action="@Url.Action("Index", "DataFile", new { id = selectedDataFile.Id })" class="row g-3">
                         <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
                         @if (!string.IsNullOrWhiteSpace(Model.Filter.Search))
                         {
@@ -149,42 +157,38 @@
                             <input type="hidden" name="isActive" value="@Model.Filter.IsActive.Value.ToString().ToLowerInvariant()" />
                         }
 
-                        <div class="col-md-3 d-flex flex-column gap-1">
-                            <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
-                            <select id="filter-client-code"
-                                    name="clientCode"
-                                    class="form-select form-select-sm"
-                                    required>
-                                <option value="">All client codes</option>
-                                @foreach (var availableClientCode in Model.AvailableClientCodes)
+                        <div class="col-12">
+                            <div class="row g-2">
+                                @foreach (var availableColumn in Model.AvailableColumns.OrderBy(column => column.Order))
                                 {
-                                    <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                                    var filterKey = string.IsNullOrWhiteSpace(availableColumn.MappingParameter)
+                                        ? availableColumn.Key
+                                        : availableColumn.MappingParameter;
+                                    var filterInputId = $"column-filter-{availableColumn.Order}-{availableColumn.Key}";
+                                    Model.ColumnFilters.TryGetValue(filterKey, out var filterValue);
+
+                                    <div class="col-12 col-md-6 col-xl-4">
+                                        <div class="border rounded-3 bg-light-subtle p-2 h-100">
+                                            <label for="@filterInputId" class="form-label small fw-semibold mb-1">@availableColumn.DisplayLabel</label>
+                                            
+                                            <input id="@filterInputId"
+                                                   name="columnFilters[@filterKey]"
+                                                   type="text"
+                                                   class="form-control form-control-sm column-filter-input"
+                                                   value="@filterValue"
+                                                   data-filter-key="@filterKey"
+                                                   data-column-key="@availableColumn.Key"
+                                                   placeholder="Optional filter value" />
+                                        </div>
+                                    </div>
                                 }
-                            </select>
+                            </div>
                         </div>
 
-                        <div class="col-md-3 d-flex flex-column gap-1">
-                            <label for="filter-date-from" class="form-label small fw-semibold">DateFrom</label>
-                            <input id="filter-date-from"
-                                   name="dateFrom"
-                                   type="date"
-                                   class="form-control form-control-sm"
-                                   value="@((Model.FilterDateFrom ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
-                        </div>
-
-                        <div class="col-md-3 d-flex flex-column gap-1">
-                            <label for="filter-date-to" class="form-label small fw-semibold">DateTo</label>
-                            <input id="filter-date-to"
-                                   name="dateTo"
-                                   type="date"
-                                   class="form-control form-control-sm"
-                                   value="@((Model.FilterDateTo ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
-                        </div>
-
-                        <div class="col-md-3 d-flex gap-2 align-self-end">
-                            <button id="btn-filter-apply" type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
-                            <a class="btn btn-sm btn-outline-secondary w-100"
-                               href="@BuildDataFileUrl(selectedDataFile.Id, null, false)">Clear</a>
+                        <div class="col-12 d-flex gap-2 justify-content-end flex-wrap">
+                            <button id="btn-filter-apply" type="submit" class="btn btn-sm btn-primary">Apply</button>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="@BuildDataFileUrl(selectedDataFile.Id, null, false)">Clear All</a>
                         </div>
                     </form>
                 </div>
@@ -442,13 +446,13 @@
     <div class="col-md-12">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
             <div class="small text-muted">
-                @if (!string.IsNullOrWhiteSpace(Model.ClientCode))
+                    @if (Model.HasAppliedFilters)
                 {
-                    <span id="preview-data-summary">No data loaded yet.</span>
+                        <span id="preview-data-summary">Loading preview data.</span>
                 }
                 else
                 {
-                    <span id="preview-data-summary">Select a client code and click Apply to view data.</span>
+                        <span id="preview-data-summary">Enter optional column filters and click Apply to view data.</span>
                 }
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -626,6 +630,7 @@
             const filterClientCodeInput = document.getElementById('filter-client-code');
             const filterDateFromInput = document.getElementById('filter-date-from');
             const filterDateToInput = document.getElementById('filter-date-to');
+            const columnFilterInputs = [...document.querySelectorAll('.column-filter-input')];
             const scheduleDataFileLink = document.getElementById('schedule-datafile-link');
             const exportPasswordModalElement = document.getElementById('export-password-modal');
             const exportPasswordInput = document.getElementById('export-password-input');
@@ -1216,6 +1221,21 @@
                     .map(input => input.value);
             }
 
+            function getColumnFilterParameters() {
+                const parameters = {};
+
+                columnFilterInputs.forEach(input => {
+                    const key = (input.dataset.filterKey || input.dataset.columnKey || '').trim();
+                    const value = (input.value || '').trim();
+
+                    if (key && value) {
+                        parameters[key] = value;
+                    }
+                });
+
+                return parameters;
+            }
+
             function showExportPasswordError(message) {
                 if (!exportPasswordError) {
                     return;
@@ -1254,7 +1274,8 @@
                             schemaTemplate: getActiveSchemaTemplate(),
                             clientCode: filterClientCodeInput?.value || null,
                             dateFrom: filterDateFromInput?.value || null,
-                            dateTo: filterDateToInput?.value || null
+                            dateTo: filterDateToInput?.value || null,
+                            parameters: getColumnFilterParameters()
                         })
                     });
 
@@ -1356,6 +1377,7 @@
                             clientCode: filterClientCodeInput?.value || null,
                             dateFrom: filterDateFromInput?.value || null,
                             dateTo: filterDateToInput?.value || null,
+                            parameters: getColumnFilterParameters(),
                             page: requestedPage,
                             take: getCurrentPreviewPageSize(),
                             columns: previewRequestColumns.map(column => ({
@@ -1817,18 +1839,6 @@
             filterClientCodeInput?.addEventListener('change', () => {
                 filterClientCodeInput.setCustomValidity('');
                 syncScheduleLink();
-            });
-
-            filterForm?.addEventListener('submit', e => {
-                if (filterClientCodeInput?.value) {
-                    filterClientCodeInput.setCustomValidity('');
-                    return;
-                }
-
-                e.preventDefault();
-                filterClientCodeInput?.setCustomValidity('ClientCode is required.');
-                filterClientCodeInput?.reportValidity();
-                filterClientCodeInput?.focus();
             });
 
             if (schemaTemplateSearchInput) {
