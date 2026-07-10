@@ -375,7 +375,42 @@
             return [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) select[name$=".MappingParameterFilter"]')];
         }
 
+        function canUseRangeFilterForRow(tr) {
+            const propertyInput = tr?.querySelector('input[name$=".PropertyName"]');
+            const propertyTypeInput = tr?.querySelector('input[name$=".PropertyType"]');
+            const propertyName = (propertyInput?.value || '').trim();
+            const metadataType = sourceColumnTypeLookup.get(propertyName.toLowerCase()) || '';
+            const postedType = propertyTypeInput instanceof HTMLInputElement
+                ? (propertyTypeInput.value || '').trim()
+                : '';
+            const columnType = (tr?.dataset?.columnType || '').trim() || metadataType || postedType;
+            const targetType = inferMappingInputType(propertyName, columnType);
+
+            return targetType === 'datetime-local' ||
+                targetType === 'decimal-range' ||
+                targetType === 'number';
+        }
+
         function syncMappingParameterFilterOptions() {
+            const rows = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)')];
+            rows.forEach(tr => {
+                const select = tr.querySelector('select[name$=".MappingParameterFilter"]');
+                if (!(select instanceof HTMLSelectElement)) {
+                    return;
+                }
+
+                const rangeOption = [...select.options].find(option => (option.value || '').trim() === 'FilterDateFrom,FilterDateTo');
+                if (!rangeOption) {
+                    return;
+                }
+
+                const canUseRange = canUseRangeFilterForRow(tr);
+                rangeOption.disabled = !canUseRange;
+                if (!canUseRange && (select.value || '').trim() === 'FilterDateFrom,FilterDateTo') {
+                    select.value = '';
+                }
+            });
+
             const selects = getVisibleMappingParameterFilterSelects();
             const selectedValues = new Set(
                 selects
