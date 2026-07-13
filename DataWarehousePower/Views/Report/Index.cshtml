@@ -975,13 +975,7 @@
             clientRenameButton.hidden = !trimmed;
             clientDeleteButton.hidden = !trimmed;
 
-            const targetUrl = url.toString();
-            if (reportDataSection) {
-                loadReportDataSectionAsync(targetUrl, true);
-                return;
-            }
-
-            window.location.href = targetUrl;
+            loadSchemaTemplateSectionsAsync(url.toString(), true);
         }
 
         function applyNewSchemaTemplate() {
@@ -1483,6 +1477,54 @@
                 }
 
                 reportDataSection.innerHTML = nextDataSection.innerHTML;
+
+                if (pushHistory) {
+                    window.history.pushState({ reportDataUrl: targetUrl }, '', targetUrl);
+                }
+            } catch {
+                window.location.href = targetUrl;
+            } finally {
+                setReportDataLoading(false);
+            }
+        }
+
+        async function loadSchemaTemplateSectionsAsync(targetUrl, pushHistory = true) {
+            if (!reportDataSection) {
+                window.location.href = targetUrl;
+                return;
+            }
+
+            try {
+                setReportDataLoading(true);
+
+                const response = await fetch(targetUrl, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load report page.');
+                }
+
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const nextDataSection = doc.getElementById('report-data-section');
+                const nextSortable = doc.getElementById('sortable-columns');
+                const nextSchemaTemplateSelect = doc.getElementById('client-code-select');
+
+                if (!nextDataSection || !nextSortable || !nextSchemaTemplateSelect) {
+                    throw new Error('Required report sections not found in response.');
+                }
+
+                reportDataSection.innerHTML = nextDataSection.innerHTML;
+                sortable.innerHTML = nextSortable.innerHTML;
+                schemaTemplateSelect.innerHTML = nextSchemaTemplateSelect.innerHTML;
+
+                const selectedSchemaTemplate = new URL(targetUrl, window.location.origin).searchParams.get('schemaTemplate') || '';
+                syncSchemaTemplateUi(selectedSchemaTemplate);
 
                 if (pushHistory) {
                     window.history.pushState({ reportDataUrl: targetUrl }, '', targetUrl);
