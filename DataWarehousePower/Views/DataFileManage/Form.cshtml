@@ -273,7 +273,7 @@
         </div>
         <div class="card-body">
             <div>
-                <select class="form-select form-select-sm">
+                <select id="process-data-column-select" class="form-select form-select-sm">
                     @for (int i = 0; i < Model.Columns.Count; i++)
                     {
                         <option value="@Model.Columns[i].PropertyName">@Model.Columns[i].PropertyName</option>
@@ -459,6 +459,7 @@
         document.getElementById('columns-body').addEventListener('input', e => {
             if (!(e.target instanceof HTMLInputElement)) return;
             if (!e.target.matches('input[name$=".PropertyName"]')) return;
+            refreshProcessDataColumnOptions();
             refreshMappingParameterInputTypes();
         });
 
@@ -527,11 +528,41 @@
                     displayOrderInput.value = tr.querySelector('.row-num').textContent;
                 }
             });
+
+            refreshProcessDataColumnOptions();
         }
 
         function toggleNoColsMessage() {
             const visible = document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)').length;
             document.getElementById('no-cols-msg').style.display = visible === 0 ? 'block' : 'none';
+        }
+
+        function refreshProcessDataColumnOptions() {
+            const select = document.getElementById('process-data-column-select');
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const currentValue = (select.value || '').trim();
+            const options = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) input[name$=".PropertyName"]')]
+                .map(input => (input.value || '').trim())
+                .filter(Boolean);
+
+            select.innerHTML = '';
+
+            options.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                if (value === currentValue) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            if (select.options.length > 0 && !options.includes(currentValue)) {
+                select.selectedIndex = 0;
+            }
         }
 
         function getVisibleMappingInputs() {
@@ -1891,6 +1922,7 @@
         syncMissingColumnsFromSource();
         loadSourceParameters();
         document.querySelectorAll('#columns-body tr.col-row').forEach(syncRowDragHandleState);
+        refreshProcessDataColumnOptions();
         refreshMappingParameterInputTypes();
         syncMappingParameterFilterOptions();
 
