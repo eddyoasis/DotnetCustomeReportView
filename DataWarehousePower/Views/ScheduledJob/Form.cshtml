@@ -834,6 +834,7 @@
                     isExportToClientFolderToggle.addEventListener('change', () => {
                         ProcessHasAnyExportLocationfolderError();
                         exportLocationSubfolderInput.hidden = !exportLocationSubfolderInput.hidden;
+                        exportLocationSubfolderError.hidden = !isExportToClientFolderToggle.checked;
                     });
                 }
 
@@ -871,12 +872,10 @@
                         } else {
                             noAnyExportLocationfolderError.hidden = false;
                             isExportToClientFolderToggle.focus();
+                            return;
                         }
 
                         const isValid = hasBasePath && hasSubfolder && hasAnyExportLocationfolder;
-
-                        console.log(hasAnyExportLocationfolder);
-                        console.log(isValid);
 
                         if(!isValid){
                             syncExportLocationValidationFeedback(true);
