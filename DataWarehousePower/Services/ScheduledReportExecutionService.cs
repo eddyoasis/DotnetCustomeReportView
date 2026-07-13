@@ -99,38 +99,41 @@ public sealed class ScheduledReportExecutionService(
             zipSubFileName,
             exportSplitOptions);
 
-        List<string> targetDirectories = new List<string>();
-
-        if (job.IsExportToClientFolder)
+        string jobAction = (job.JobAction ?? string.Empty).Trim().ToLowerInvariant();
+        if (jobAction == ScheduledJobActions.ExportFile || jobAction == ScheduledJobActions.ExportFileAndEmailToUser)
         {
-            string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
-            targetDirectories = [primaryDirectory];
-        }
+            List<string> targetDirectories = new List<string>();
 
-        if (job.ExportToLocalFolder)
-        {
-            string? localDirectory = ResolveLocalExportDirectory(job, userRemoteFolderExportLocation);
-            if (!string.IsNullOrWhiteSpace(localDirectory) &&
-            !targetDirectories.Contains(localDirectory, StringComparer.OrdinalIgnoreCase))
+            if (job.IsExportToClientFolder)
             {
-                targetDirectories.Add(localDirectory);
+                string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
+                targetDirectories = [primaryDirectory];
+            }
+
+            if (job.ExportToLocalFolder)
+            {
+                string? localDirectory = ResolveLocalExportDirectory(job, userRemoteFolderExportLocation);
+                if (!string.IsNullOrWhiteSpace(localDirectory) &&
+                !targetDirectories.Contains(localDirectory, StringComparer.OrdinalIgnoreCase))
+                {
+                    targetDirectories.Add(localDirectory);
+                }
+            }
+
+            foreach (string targetDirectory in targetDirectories)
+            {
+                Directory.CreateDirectory(targetDirectory);
+                string fullPath = Path.Combine(targetDirectory, fileName);
+                await File.WriteAllBytesAsync(fullPath, zipBytes);
+
+                logger.LogInformation(
+                    "Scheduled export job {ScheduledJobId} produced file {ExportFilePath}.",
+                    scheduledJobId,
+                    fullPath);
             }
         }
-
-        foreach (string targetDirectory in targetDirectories)
-        {
-            Directory.CreateDirectory(targetDirectory);
-            string fullPath = Path.Combine(targetDirectory, fileName);
-            await File.WriteAllBytesAsync(fullPath, zipBytes);
-
-            logger.LogInformation(
-                "Scheduled export job {ScheduledJobId} produced file {ExportFilePath}.",
-                scheduledJobId,
-                fullPath);
-        }
-
-        string jobAction = (job.JobAction ?? string.Empty).Trim().ToLowerInvariant();
-        if (jobAction == ScheduledJobActions.ExportFileAndEmailToUser)
+        
+        if (jobAction == ScheduledJobActions.ExportFileAndEmailToUser || jobAction == ScheduledJobActions.EmailToUser)
         {
             if (string.IsNullOrWhiteSpace(job.RecipientEmail))
             {
