@@ -221,7 +221,7 @@
                         <div class="form-text">Select one or more formats.</div>
                     </div>
                     <div class="col-md-8 d-flex gap-2">
-                        <button id="btn-export" type="button" class="btn btn-sm btn-success" disabled="@(!Model.CanExport)">Export as Password ZIP</button>
+                        <button id="btn-export" type="button" class="btn btn-sm btn-success">Export as Password ZIP</button>
                         <button id="btn-schedule-report" type="button" class="btn btn-sm btn-outline-primary">Schedule Report</button>
                         <span id="export-status" class="small align-self-center"></span>
                     </div>
@@ -322,7 +322,7 @@
                                    maxlength="128"
                                    placeholder="Create new column template"
                                    style="max-width: 260px;" />
-                            <button id="btn-client-create" type="button" class="btn btn-sm btn-primary">Use New</button>
+                            <button id="btn-client-create" type="button" class="btn btn-sm btn-primary">Create</button>
                         </div>
                         <div id="client-code-error" class="text-danger small mt-1" style="display:none;"></div>
                     </div>
@@ -669,6 +669,16 @@
             if (!selectedFormats.length) {
                 exportStatus.textContent = 'Select at least one format.';
                 exportStatus.className = 'small align-self-center text-danger';
+                return;
+            }
+
+            const isClientCodeEmpty = !filterClientCodeInput.value;
+
+            exportStatus.textContent = isClientCodeEmpty ? 'Select at least one client code.' : '';
+            exportStatus.className = isClientCodeEmpty ? 'small align-self-center text-danger' : '';
+
+            if (isClientCodeEmpty) {
+                filterClientCodeInput.focus();
                 return;
             }
 

@@ -161,7 +161,7 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Data Range Value")]
     public int? AutoDateIntervalValue { get; set; } = 1;
 
-    [Display(Name = "Password")]
+    [Display(Name = "Exported Zip Folder Password")]
     public string Password { get; set; } = string.Empty;
 
     [Display(Name = "Update Password")]
