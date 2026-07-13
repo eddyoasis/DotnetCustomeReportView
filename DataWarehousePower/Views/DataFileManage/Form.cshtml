@@ -565,7 +565,11 @@
             // Only include options where columnType === 'date'
             const options = visibleRows
                 .filter(tr => {
-                    const columnType = (tr.dataset.columnType || '').trim().toLowerCase();
+                    let columnType = (tr.dataset.columnType || '').trim().toLowerCase();
+                    if (!columnType) {
+                        const propertyTypeInput = tr.querySelector('input[name$=".PropertyType"]');
+                        columnType = (propertyTypeInput?.value || '').trim().toLowerCase();
+                    }
                     return columnType === 'date';
                 })
                 .map(tr => {
@@ -607,10 +611,14 @@
             const currentValue = (select.value || '').trim();
             const visibleRows = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)')];
             
-            // Only include options where columnType === 'date'
+            // Only include options where columnType === 'nvarchar'
             const options = visibleRows
                 .filter(tr => {
-                    const columnType = (tr.dataset.columnType || '').trim().toLowerCase();
+                    let columnType = (tr.dataset.columnType || '').trim().toLowerCase();
+                    if (!columnType) {
+                        const propertyTypeInput = tr.querySelector('input[name$=".PropertyType"]');
+                        columnType = (propertyTypeInput?.value || '').trim().toLowerCase();
+                    }
                     return columnType === 'nvarchar';
                 })
                 .map(tr => {
