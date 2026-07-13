@@ -312,9 +312,9 @@
                             </div>
 
                             <button hidden id="btn-client-apply" type="button" class="btn btn-sm btn-outline-primary">Load</button>
-                            <button id="btn-client-clear" type="button" class="btn btn-sm btn-outline-secondary">Use Default</button>
-                            <button id="btn-client-rename" type="button" class="btn btn-sm btn-outline-warning">Rename</button>
-                            <button id="btn-client-delete" type="button" class="btn btn-sm btn-outline-danger">Delete</button>
+                            <button id="btn-client-clear" type="button" class="btn btn-sm btn-outline-secondary" @(string.IsNullOrEmpty(Model.SchemaTemplate) ? "hidden" : "")>Use Default</button>
+                            <button id="btn-client-rename" type="button" class="btn btn-sm btn-outline-warning" @(string.IsNullOrEmpty(Model.SchemaTemplate) ? "hidden" : "")>Rename</button>
+                            <button id="btn-client-delete" type="button" class="btn btn-sm btn-outline-danger" @(string.IsNullOrEmpty(Model.SchemaTemplate) ? "hidden" : "")>Delete</button>
 
                             <input id="client-code-new"
                                    type="text"
@@ -971,7 +971,17 @@
                 url.searchParams.delete('schemaTemplate');
             }
 
-            window.location.href = url.toString();
+            clientClearButton.hidden = !trimmed;
+            clientRenameButton.hidden = !trimmed;
+            clientDeleteButton.hidden = !trimmed;
+
+            const targetUrl = url.toString();
+            if (reportDataSection) {
+                loadReportDataSectionAsync(targetUrl, true);
+                return;
+            }
+
+            window.location.href = targetUrl;
         }
 
         function applyNewSchemaTemplate() {
@@ -984,6 +994,7 @@
             const newSchemaTemplate = schemaTemplateNewInput.value.trim();
             if (!newSchemaTemplate) {
                 showSchemaTemplateError('New column template cannot be blank.');
+                schemaTemplateNewInput.focus();
                 return;
             }
 
