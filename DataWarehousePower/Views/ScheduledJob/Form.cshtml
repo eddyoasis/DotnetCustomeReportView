@@ -77,6 +77,7 @@
                     <label asp-for="JobAction" class="form-label"></label>
                     <select asp-for="JobAction" class="form-select" id="jobActionSelect">
                         <option value="@ScheduledJobActions.ExportFile">Export file</option>
+                        <option value="@ScheduledJobActions.EmailToUser">Email to user</option>
                         <option value="@ScheduledJobActions.ExportFileAndEmailToUser">Export file and email to user</option>
                     </select>
                     <span asp-validation-for="JobAction" class="text-danger"></span>
@@ -110,36 +111,38 @@
                         }
                     </select> *@
 
-                    <label>Export Folder</label>
-                    <input asp-for="ExportLocationSubfolder" type="hidden" />
-                    <div id="exportLocationSubfolderError" class="text-danger small d-none">Please select a subfolder.</div>
-                    <div hidden id="noAnyExportLocationfolderError" class="text-danger small">Please select atleast an export option.</div>
+                    <div id="exportFolderGroup">
+                        <label>Export Folder</label>
+                        <input asp-for="ExportLocationSubfolder" type="hidden" />
+                        <div id="exportLocationSubfolderError" class="text-danger small d-none">Please select a subfolder.</div>
+                        <div hidden id="noAnyExportLocationfolderError" class="text-danger small">Please select atleast an export option.</div>
 
-                    <div class="form-check mt-2">
-                        <input asp-for="IsExportToClientFolder" class="form-check-input" id="isExportToClientFolderToggle" />
-                        <label asp-for="IsExportToClientFolder" class="form-check-label"></label>
-                    </div>
+                        <div class="form-check mt-2">
+                            <input asp-for="IsExportToClientFolder" class="form-check-input" id="isExportToClientFolderToggle" />
+                            <label asp-for="IsExportToClientFolder" class="form-check-label"></label>
+                        </div>
 
-                    <div>
-                        @* <label>Client Folder</label> *@
-                        <select @(Model.IsExportToClientFolder ? "" : "hidden") id="exportLocationSubfolderInput" class="form-select mt-2">
-                            <option value="">-- Select subfolder --</option>
-                            @foreach (string exportLocationSubfolder in Model.AvailableClientCodeFolders)
-                            {
-                                <option value="@exportLocationSubfolder">@exportLocationSubfolder</option>
-                            }
-                        </select>
-                    </div>
+                        <div>
+                            @* <label>Client Folder</label> *@
+                            <select @(Model.IsExportToClientFolder ? "" : "hidden") id="exportLocationSubfolderInput" class="form-select mt-2">
+                                <option value="">-- Select subfolder --</option>
+                                @foreach (string exportLocationSubfolder in Model.AvailableClientCodeFolders)
+                                {
+                                    <option value="@exportLocationSubfolder">@exportLocationSubfolder</option>
+                                }
+                            </select>
+                        </div>
 
-                    <div class="form-check mt-2">
-                        <input asp-for="ExportToLocalFolder" class="form-check-input" id="exportToLocalFolderToggle" />
-                        <label asp-for="ExportToLocalFolder" class="form-check-label"></label>
+                        <div class="form-check mt-2">
+                            <input asp-for="ExportToLocalFolder" class="form-check-input" id="exportToLocalFolderToggle" />
+                            <label asp-for="ExportToLocalFolder" class="form-check-label"></label>
+                        </div>
+                        @* <div id="exportToLocalFolderHint" class="form-text">If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.</div> *@
+
+                        <button hidden id="openExportLocationButton" type="button" class="btn btn-outline-secondary btn-sm mt-2" disabled>Open</button>
+                        <input asp-for="ExportLocation" type="hidden" />
+                        <span asp-validation-for="ExportLocation" class="text-danger"></span>
                     </div>
-                    @* <div id="exportToLocalFolderHint" class="form-text">If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.</div> *@
-                    
-                      <button hidden id="openExportLocationButton" type="button" class="btn btn-outline-secondary btn-sm mt-2" disabled>Open</button>
-                    <input asp-for="ExportLocation" type="hidden" />
-                    <span asp-validation-for="ExportLocation" class="text-danger"></span>
                 </div>
 
                 <div class="col-md-6">
@@ -400,6 +403,7 @@
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
             const jobActionSelect = document.getElementById('jobActionSelect');
             const recipientEmailGroup = document.getElementById('recipientEmailGroup');
+            const exportFolderGroup = document.getElementById('exportFolderGroup');
             const recipientEmailInput = document.getElementById('RecipientEmail');
             const everyMinutesGroup = document.getElementById('everyMinutesGroup');
             const dailyTimeGroup = document.getElementById('dailyTimeGroup');
@@ -558,8 +562,10 @@
                     return;
                 }
 
-                const requiresEmail = jobActionSelect.value === '@ScheduledJobActions.ExportFileAndEmailToUser';
+                const requiresEmail = jobActionSelect.value === '@ScheduledJobActions.ExportFileAndEmailToUser' || jobActionSelect.value === '@ScheduledJobActions.EmailToUser';
+                const requiresExportFolder = jobActionSelect.value === '@ScheduledJobActions.ExportFile' || jobActionSelect.value === '@ScheduledJobActions.ExportFileAndEmailToUser';
                 recipientEmailGroup.style.display = requiresEmail ? '' : 'none';
+                exportFolderGroup.style.display = requiresExportFolder ? '' : 'none';
                 recipientEmailInput.required = requiresEmail;
 
                 if (!requiresEmail) {
@@ -832,7 +838,8 @@
                 }
 
                 function ProcessHasAnyExportLocationfolderError() {
-                    noAnyExportLocationfolderError.hidden = exportToLocalFolderToggle.checked || isExportToClientFolderToggle.checked;
+                    const isExportFolder = jobActionSelect.value === '@ScheduledJobActions.ExportFileAndEmailToUser' || jobActionSelect.value === '@ScheduledJobActions.ExportFile';
+                    noAnyExportLocationfolderError.hidden = !isExportFolder || exportToLocalFolderToggle.checked || isExportToClientFolderToggle.checked;
                 }
 
                 if (openExportLocationButton) {

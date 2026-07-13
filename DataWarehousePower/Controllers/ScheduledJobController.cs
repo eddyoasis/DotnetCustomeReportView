@@ -537,6 +537,13 @@ public sealed class ScheduledJobController(
 
     private void ValidateExportLocation(ScheduledJobFormViewModel form)
     {
+        if (form.JobAction == ScheduledJobActions.EmailToUser)
+        {
+            form.IsExportToClientFolder = false;
+            form.ExportToLocalFolder = false;
+            form.ExportLocation = "";
+        }
+
         if (form.IsExportToClientFolder)
         {
             List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
