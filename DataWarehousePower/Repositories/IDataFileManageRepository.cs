@@ -13,6 +13,14 @@ namespace DataWarehousePower.Repositories
         Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase);
         Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
         Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+
+        Task<DataFilePreviewResult> GetPreviewDataAsync(
+            DataFilePreviewRequest request,
+            string? filterClientCodeColumn,
+            string? filterDateColumn,
+            DateTime? dateFrom,
+            DateTime? dateTo);
+
         Task<DataFilePreviewResult> GetPreviewDataAsync(
             DataFilePreviewRequest request,
             DateTime? dateFrom,

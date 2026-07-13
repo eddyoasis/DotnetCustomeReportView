@@ -399,8 +399,8 @@ namespace DataWarehousePower.Controllers
                   $"{request.DateFrom:yyyy-MM-dd}_{request.DateTo:yyyy-MM-dd}";
 
                 string dataFileName = string.Join("_", vm.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-                string zipFileName = $"{dataFileName}_{request.ClientCode}_{dataFileDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
-                string zipSubFileName = $"{dataFileName}_format_{request.ClientCode}_{dataFileDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
+                string zipFileName = $"{dataFileName}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
+                string zipSubFileName = $"{dataFileName}_format_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
 
                 byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
                     vm,

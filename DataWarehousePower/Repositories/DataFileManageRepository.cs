@@ -285,6 +285,347 @@ namespace DataWarehousePower.Repositories
 
         public async Task<DataFilePreviewResult> GetPreviewDataAsync(
             DataFilePreviewRequest request,
+            string? filterClientCodeColumn,
+            string? filterDateColumn,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            if (request is null)
+            {
+                throw new ArgumentException("Preview request is required.");
+            }
+
+            string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
+            string sourceTable = (request.SourceTable ?? string.Empty).Trim();
+            string sourceSP = (request.SourceSP ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(sourceDatabase))
+            {
+                throw new ArgumentException("Source database is required for preview.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceSP))
+            {
+                throw new InvalidOperationException("Preview currently supports Source Table only.");
+            }
+
+            if (string.IsNullOrWhiteSpace(sourceTable))
+            {
+                throw new ArgumentException("Source table is required for preview.");
+            }
+
+            int take = request.Take;
+            int page = request.Page <= 0 ? 1 : request.Page;
+            if (request.IsExport)
+            {
+                take = _scheduledJob.ExportSplit.MaxTotalRecord;
+            }
+            else
+            {
+                if (take <= 0)
+                {
+                    take = 0;
+                }
+                else if (take != 10 && take != 25 && take != 50 && take != 100)
+                {
+                    take = 10;
+                }
+            }
+
+            var metadata = await GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, null);
+            if (metadata.Count == 0)
+            {
+                return new DataFilePreviewResult();
+            }
+
+            var metadataByName = metadata
+                .Where(column => !string.IsNullOrWhiteSpace(column.Name))
+                .ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
+            bool hasExplicitParameters = request.Parameters is not null && request.Parameters.Count() > 0;
+            var parameters = (request.Parameters ?? new Dictionary<string, string?>())
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value?.Trim(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            List<DataFilePreviewColumnRequest> requestedColumns = (request.Columns ?? new())
+                .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                .GroupBy(column => column.PropertyName.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            var selectedColumns = requestedColumns
+                .Select(column => column.PropertyName.Trim())
+                .Where(metadataByName.ContainsKey)
+                .ToList();
+
+            if (selectedColumns.Count == 0)
+            {
+                return new DataFilePreviewResult();
+            }
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string escapedDatabase = EscapeSqlIdentifier(sourceDatabase);
+            string escapedTable = EscapeSqlIdentifier(sourceTable);
+
+            await using var cmd = conn.CreateCommand();
+
+            string selectList = string.Join(", ", selectedColumns.Select(column => $"[{EscapeSqlIdentifier(column)}]"));
+            var whereClauses = new List<string>();
+            int parameterIndex = 0;
+
+            foreach (DataFilePreviewColumnRequest requestedColumn in requestedColumns)
+            {
+                string columnName = requestedColumn.PropertyName.Trim();
+                if (!metadataByName.TryGetValue(columnName, out SourceColumnMetadata? metadataColumn))
+                {
+                    continue;
+                }
+
+                if (IsClientCodeMapping(requestedColumn.MappingParameter))
+                {
+                    string clientCode = (request.ClientCode ?? string.Empty).Trim();
+                    if (!string.IsNullOrWhiteSpace(clientCode))
+                    {
+                        string clientCodeParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {clientCodeParameterName}");
+                        AddParameter(cmd, clientCodeParameterName, $"%{clientCode}%");
+                    }
+
+                    continue;
+                }
+
+                string parameterKey = (requestedColumn.MappingParameter ?? string.Empty).Trim();
+                string filterValue = string.Empty;
+
+                if (hasExplicitParameters && !string.IsNullOrWhiteSpace(parameterKey) && parameters.TryGetValue(parameterKey, out string? parameterFilterValue))
+                {
+                    filterValue = (parameterFilterValue ?? string.Empty).Trim();
+                }
+
+                if (hasExplicitParameters && string.IsNullOrWhiteSpace(parameterKey) && parameters.TryGetValue(columnName, out string? parameterNewFilterValue))
+                {
+                    filterValue = (parameterNewFilterValue ?? string.Empty).Trim();
+                }
+
+                if (!hasExplicitParameters && string.IsNullOrWhiteSpace(filterValue) && !string.IsNullOrWhiteSpace(parameterKey))
+                {
+                    filterValue = parameterKey;
+                }
+
+                if (string.IsNullOrWhiteSpace(filterValue))
+                {
+                    continue;
+                }
+
+                string parameterName = $"@f{parameterIndex++}";
+                bool isDateTimeType = IsDateTimeTypeName(metadataColumn.DataType);
+                bool isBooleanType = IsBooleanTypeName(metadataColumn.DataType);
+                bool isDecimalType = IsDecimalTypeName(metadataColumn.DataType);
+                bool isIntegerType = IsIntegerTypeName(metadataColumn.DataType);
+
+                if (isDateTimeType)
+                {
+                    if (!TryParseDateTimeRangeFilter(filterValue, out DateTime? startDateTime, out DateTime? endDateTime))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid datetime.");
+                    }
+
+                    string escapedColumnName = EscapeSqlIdentifier(columnName);
+                    if (startDateTime.HasValue)
+                    {
+                        whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+                        AddParameter(cmd, parameterName, startDateTime.Value);
+                    }
+
+                    if (endDateTime.HasValue)
+                    {
+                        string endParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+                        AddParameter(cmd, endParameterName, endDateTime.Value);
+                    }
+                }
+                else if (isBooleanType)
+                {
+                    if (filterValue.Equals("all", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (!TryParseBooleanFilter(filterValue, out bool boolValue))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid boolean.");
+                    }
+
+                    whereClauses.Add($"[{EscapeSqlIdentifier(columnName)}] = {parameterName}");
+                    AddParameter(cmd, parameterName, boolValue);
+                }
+                else if (isDecimalType)
+                {
+                    if (!TryParseDecimalRangeFilter(filterValue, out decimal? fromValue, out decimal? toValue))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid decimal.");
+                    }
+
+                    string escapedColumnName = EscapeSqlIdentifier(columnName);
+                    if (fromValue.HasValue)
+                    {
+                        whereClauses.Add($"TRY_CONVERT(decimal(38, 10), [{escapedColumnName}]) >= {parameterName}");
+                        AddParameter(cmd, parameterName, fromValue.Value);
+                    }
+
+                    if (toValue.HasValue)
+                    {
+                        string toParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"TRY_CONVERT(decimal(38, 10), [{escapedColumnName}]) <= {toParameterName}");
+                        AddParameter(cmd, toParameterName, toValue.Value);
+                    }
+                }
+                else if (isIntegerType)
+                {
+                    if (!TryParseIntegerFilter(filterValue, out long intValue))
+                    {
+                        throw new ArgumentException($"Mapping value for column '{columnName}' is not a valid number.");
+                    }
+
+                    whereClauses.Add($"TRY_CONVERT(bigint, [{EscapeSqlIdentifier(columnName)}]) = {parameterName}");
+                    AddParameter(cmd, parameterName, intValue);
+                }
+                else
+                {
+                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                    AddParameter(cmd, parameterName, $"%{filterValue}%");
+                }
+            }
+
+            string orderBySql = string.Empty;
+
+            if (!string.IsNullOrEmpty(filterClientCodeColumn))
+            {
+                string parameterName = $"@f{parameterIndex++}";
+
+                whereClauses.Add($"CAST([{EscapeSqlIdentifier(filterClientCodeColumn)}] AS nvarchar(4000)) LIKE {parameterName}");
+                AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
+            }
+
+            if (!string.IsNullOrEmpty(filterDateColumn))
+            {
+                string parameterName = $"@f{parameterIndex++}";
+
+                string escapedColumnName = EscapeSqlIdentifier(filterDateColumn);
+                if (dateFrom.HasValue)
+                {
+                    whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+                    AddParameter(cmd, parameterName, dateFrom);
+                }
+
+                if (dateTo.HasValue)
+                {
+                    string endParameterName = $"@f{parameterIndex++}";
+                    whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+                    AddParameter(cmd, endParameterName, dateTo);
+
+                }
+                orderBySql = $" ORDER BY {escapedColumnName}";
+            }
+
+            //foreach (var column in requestedColumns.Where(x => !string.IsNullOrEmpty(x.MappingParameterFilter)))
+            //{
+            //    string parameterName = $"@f{parameterIndex++}";
+
+            //    if (column.MappingParameterFilter == "FilterDateFrom,FilterDateTo")
+            //    {
+            //        string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
+            //        if (dateFrom.HasValue)
+            //        {
+            //            whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+            //            AddParameter(cmd, parameterName, dateFrom);
+            //        }
+
+            //        if (dateTo.HasValue)
+            //        {
+            //            string endParameterName = $"@f{parameterIndex++}";
+            //            whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+            //            AddParameter(cmd, endParameterName, dateTo);
+
+            //        }
+            //        orderBySql = $" ORDER BY {escapedColumnName}";
+            //    }
+            //    else
+            //    {
+            //        whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
+            //        AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
+            //    }
+            //}
+
+            string whereSql = whereClauses.Count > 0
+                ? " WHERE " + string.Join(" AND ", whereClauses)
+                : string.Empty;
+
+            string fromSql = $"FROM [{escapedDatabase}]..[{escapedTable}] WITH(NOLOCK)";
+
+            cmd.CommandText =
+                "SELECT COUNT(1) " +
+                fromSql +
+                whereSql;
+
+            var result = new DataFilePreviewResult
+            {
+                Columns = selectedColumns
+            };
+
+            object? totalCountObj = await cmd.ExecuteScalarAsync();
+            result.TotalRowCount = totalCountObj is null || totalCountObj == DBNull.Value
+                ? 0
+                : Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
+
+            if (!request.IsExport && take > 0)
+            {
+                int offset = (page - 1) * take;
+                string effectiveOrderBySql = string.IsNullOrWhiteSpace(orderBySql)
+                    ? $" ORDER BY [{EscapeSqlIdentifier(selectedColumns[0])}]"
+                    : orderBySql;
+
+                cmd.CommandText =
+                    $"SELECT {selectList} " +
+                    fromSql +
+                    whereSql +
+                    effectiveOrderBySql +
+                    $" OFFSET {offset} ROWS FETCH NEXT {take} ROWS ONLY";
+            }
+            else
+            {
+                string topSql = take > 0 ? $"TOP ({take}) " : string.Empty;
+
+                cmd.CommandText =
+                    $"SELECT {topSql}{selectList} " +
+                    fromSql +
+                    whereSql +
+                    orderBySql;
+            }
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                result.Rows.Add(row);
+            }
+
+            return result;
+        }
+
+        public async Task<DataFilePreviewResult> GetPreviewDataAsync(
+            DataFilePreviewRequest request,
             DateTime? dateFrom,
             DateTime? dateTo)
         {
@@ -1342,6 +1683,8 @@ namespace DataWarehousePower.Repositories
             dataFileDefinition.Parameters = dataFileDefinitionRequest.Parameters;
             dataFileDefinition.IsActive = dataFileDefinitionRequest.IsActive;
             dataFileDefinition.Departments = dataFileDefinitionRequest.Departments;
+            dataFileDefinition.FilterDateColumn = dataFileDefinitionRequest.FilterDateColumn;
+            dataFileDefinition.FilterClientCodeColumn = dataFileDefinitionRequest.FilterClientCodeColumn;
             //dataFileDefinition.UserId = dataFileDefinitionRequest.UserId;
             dataFileDefinition.ModifiedBy = dataFileDefinitionRequest.ModifiedBy;
             dataFileDefinition.ModifiedAt = DateTimeHelper.GetCurrentLocalTime();

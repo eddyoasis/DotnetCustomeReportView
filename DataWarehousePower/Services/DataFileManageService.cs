@@ -195,6 +195,8 @@ namespace DataWarehousePower.Services
                 Parameters = dataFile.Parameters,
                 IsActive = dataFile.IsActive,
                 Departments = dataFile.Departments,
+                FilterDateColumn = dataFile.FilterDateColumn,
+                FilterClientCodeColumn = dataFile.FilterClientCodeColumn,
                 Columns = dataFile.Columns.Select(column => new DataFileColumnFormModel
                 {
                     Id = column.Id,
@@ -224,6 +226,8 @@ namespace DataWarehousePower.Services
                 CreatedAt = DateTimeHelper.GetCurrentLocalTime(),
                 ModifiedBy = string.IsNullOrWhiteSpace(form.UserId) ? null : form.UserId.Trim(),
                 ModifiedAt = DateTimeHelper.GetCurrentLocalTime(),
+                FilterDateColumn = form.FilterDateColumn,
+                FilterClientCodeColumn = form.FilterClientCodeColumn
             };
 
             var activeColumns = form.Columns

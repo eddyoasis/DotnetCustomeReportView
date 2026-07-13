@@ -12,6 +12,16 @@ namespace DataWarehousePower.Repositories
             string sourceTable,
             IEnumerable<DataFileColumn> columnNames,
             string? sourceDatabase,
+            string? filterClientCodeColumn,
+            string? filterDateColumn,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo);
+
+        Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableAsync(
+            string sourceTable,
+            IEnumerable<DataFileColumn> columnNames,
+            string? sourceDatabase,
             DateTime? dateFrom,
             DateTime? dateTo);
 

@@ -213,6 +213,8 @@ public sealed class ScheduledReportExecutionService(
                 dataFile.SourceTable,
                 dataFile.Columns,
                 dataFile.SourceDatabase,
+                dataFile.FilterClientCodeColumn,
+                dataFile.FilterDateColumn,
                 clientCode,
                 dateFrom,
                 dateTo);

@@ -51,6 +51,12 @@ namespace DataWarehousePower.Models
         [Display(Name = "Departments")]
         public string? Departments { get; set; }
 
+        [Display(Name = "Filter Client Code Column")]
+        public string? FilterClientCodeColumn { get; set; }
+
+        [Display(Name = "Filter Date Column")]
+        public string? FilterDateColumn { get; set; }
+
         public string? UserId { get; set; }
         public bool IsITDepartment { get; set; }
 

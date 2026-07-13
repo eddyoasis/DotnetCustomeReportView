@@ -272,13 +272,25 @@
             <span>Process Data Columns</span>
         </div>
         <div class="card-body">
-            <div>
-                <select id="process-data-column-select" class="form-select form-select-sm">
-                    @for (int i = 0; i < Model.Columns.Count; i++)
-                    {
-                        <option value="@Model.Columns[i].PropertyName">@Model.Columns[i].PropertyName</option>
-                    }
-                </select>
+            <div class="d-flex gap-2">
+                <div>
+                    <label asp-for="FilterDateColumn" class="form-label"></label>
+                    <select asp-for="FilterDateColumn" id="process-data-column-select" class="form-select form-select-sm">
+                        @for (int i = 0; i < Model.Columns.Count; i++)
+                        {
+                            <option value="@Model.Columns[i].PropertyName">@Model.Columns[i].PropertyName</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label asp-for="FilterClientCodeColumn" class="form-label"></label>
+                    <select asp-for="FilterClientCodeColumn" id="process-data-clientcode-column-select" class="form-select form-select-sm">
+                        @for (int i = 0; i < Model.Columns.Count; i++)
+                        {
+                            <option value="@Model.Columns[i].PropertyName">@Model.Columns[i].PropertyName</option>
+                        }
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -460,6 +472,7 @@
             if (!(e.target instanceof HTMLInputElement)) return;
             if (!e.target.matches('input[name$=".PropertyName"]')) return;
             refreshProcessDataColumnOptions();
+            refreshProcessDataClientCodeColumnOptions();
             refreshMappingParameterInputTypes();
         });
 
@@ -530,6 +543,7 @@
             });
 
             refreshProcessDataColumnOptions();
+            refreshProcessDataClientCodeColumnOptions();
         }
 
         function toggleNoColsMessage() {
@@ -539,6 +553,34 @@
 
         function refreshProcessDataColumnOptions() {
             const select = document.getElementById('process-data-column-select');
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const currentValue = (select.value || '').trim();
+            const options = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) input[name$=".PropertyName"]')]
+                .map(input => (input.value || '').trim())
+                .filter(Boolean);
+
+            select.innerHTML = '';
+
+            options.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                if (value === currentValue) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            if (select.options.length > 0 && !options.includes(currentValue)) {
+                select.selectedIndex = 0;
+            }
+        }
+
+        function refreshProcessDataClientCodeColumnOptions() {
+            const select = document.getElementById('process-data-clientcode-column-select');
             if (!(select instanceof HTMLSelectElement)) {
                 return;
             }
@@ -1923,6 +1965,7 @@
         loadSourceParameters();
         document.querySelectorAll('#columns-body tr.col-row').forEach(syncRowDragHandleState);
         refreshProcessDataColumnOptions();
+        refreshProcessDataClientCodeColumnOptions();
         refreshMappingParameterInputTypes();
         syncMappingParameterFilterOptions();
 
