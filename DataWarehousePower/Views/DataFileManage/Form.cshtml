@@ -560,16 +560,28 @@
             }
 
             const currentValue = (select.value || '').trim();
-            const options = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) input[name$=".PropertyName"]')]
-                .map(input => (input.value || '').trim())
+            const visibleRows = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)')];
+            
+            // Only include options where columnType === 'date'
+            const options = visibleRows
+                .filter(tr => {
+                    const columnType = (tr.dataset.columnType || '').trim().toLowerCase();
+                    return columnType === 'date';
+                })
+                .map(tr => {
+                    const input = tr.querySelector('input[name$=".PropertyName"]');
+                    return (input?.value || '').trim();
+                })
                 .filter(Boolean);
 
             select.innerHTML = '';
 
-            const noneOption = document.createElement('option');
-            noneOption.value = '';
-            noneOption.textContent = '--None--';
-            select.appendChild(noneOption);
+            if (options.length > 0) {
+                const noneOption = document.createElement('option');
+                noneOption.value = '';
+                noneOption.textContent = '--None--';
+                select.appendChild(noneOption);
+            }
 
             options.forEach(value => {
                 const option = document.createElement('option');
@@ -593,16 +605,28 @@
             }
 
             const currentValue = (select.value || '').trim();
-            const options = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row) input[name$=".PropertyName"]')]
-                .map(input => (input.value || '').trim())
+            const visibleRows = [...document.querySelectorAll('#columns-body tr.col-row:not(.deleted-row):not(.disabled-row)')];
+            
+            // Only include options where columnType === 'date'
+            const options = visibleRows
+                .filter(tr => {
+                    const columnType = (tr.dataset.columnType || '').trim().toLowerCase();
+                    return columnType === 'nvarchar';
+                })
+                .map(tr => {
+                    const input = tr.querySelector('input[name$=".PropertyName"]');
+                    return (input?.value || '').trim();
+                })
                 .filter(Boolean);
 
             select.innerHTML = '';
 
-            const noneOption = document.createElement('option');
-            noneOption.value = '';
-            noneOption.textContent = '--None--';
-            select.appendChild(noneOption);
+            if (options.length > 0) {
+                const noneOption = document.createElement('option');
+                noneOption.value = '';
+                noneOption.textContent = '--None--';
+                select.appendChild(noneOption);
+            }
 
             options.forEach(value => {
                 const option = document.createElement('option');
