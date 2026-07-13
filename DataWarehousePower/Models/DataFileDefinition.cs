@@ -58,6 +58,12 @@ namespace DataWarehousePower.Models
         [MaxLength(50)]
         public string? UserId { get; set; }
 
+        [MaxLength(50)]
+        public string? FilterClientCodeColumn { get; set; }
+
+        [MaxLength(50)]
+        public string? FilterDateColumn { get; set; }
+
         [Required]
         [MaxLength(50)]
         public string CreatedBy { get; set; } = string.Empty;

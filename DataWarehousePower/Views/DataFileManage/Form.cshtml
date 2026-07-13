@@ -269,6 +269,22 @@
 
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>Process Data Columns</span>
+        </div>
+        <div class="card-body">
+            <div>
+                <select class="form-select form-select-sm">
+                    @for (int i = 0; i < Model.Columns.Count; i++)
+                    {
+                        <option value="@Model.Columns[i].PropertyName">@Model.Columns[i].PropertyName</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
             <span>Preview</span>
             <div class="d-flex align-items-center gap-2">
                 <label for="preview-take" class="small text-muted mb-0">Rows</label>

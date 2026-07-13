@@ -59,6 +59,12 @@ namespace DataWarehousePower.Models
         [MaxLength(1000)]
         public string? Departments { get; set; }
 
+        [MaxLength(50)]
+        public string? FilterClientCodeColumn { get; set; }
+
+        [MaxLength(50)]
+        public string? FilterDateColumn { get; set; }
+
         // Navigation
         public ICollection<ReportColumn> Columns { get; set; } = new List<ReportColumn>();
     }

@@ -187,9 +187,9 @@ namespace DataWarehousePower.Data
             });
 
             // ── Seed: Staff Report ────────────────────────────────────────────
-            modelBuilder.Entity<ReportDefinition>().HasData(
-                new ReportDefinition { Id = 1, ReportName = "Staff Report", SourceTable = "ReportStaff", SourceSP = null, IsActive = true }
-            );
+            //modelBuilder.Entity<ReportDefinition>().HasData(
+            //    new ReportDefinition { Id = 1, ReportName = "Staff Report", SourceTable = "ReportStaff", SourceSP = null, IsActive = true }
+            //);
 
             modelBuilder.Entity<ReportColumn>().HasData(
                 new ReportColumn { Id = 1, ReportDefinitionId = 1, PropertyName = "Id",   DefaultLabel = "ID",   DisplayOrder = 1 },
