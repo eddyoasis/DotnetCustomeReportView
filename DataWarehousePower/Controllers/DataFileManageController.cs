@@ -368,7 +368,9 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var items = await _service.GetSourceTableOptionsAsync(sourceDatabase);
+                var sourceTableOptions = await _service.GetSourceTableOptionsAsync(sourceDatabase);
+                var items = sourceTableOptions.Where(x => x.Contains("VW_")).ToList();
+
                 return Json(items);
             }
             catch (SqlException ex) when (ex.Number is 916 or 229)
@@ -499,12 +501,14 @@ namespace DataWarehousePower.Controllers
 
         private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm)
         {
-            vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
+            var sourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
+            vm.SourceTableOptions = sourceTableOptions.Where(x => x.Contains("VW_")).ToList();
         }
 
         private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
         {
-            vm.SourceTableOptions = await _service.GetSourceTableOptionsAsync(dbConnectionString, vm.SourceDatabase);
+            var sourceTableOptions = await _service.GetSourceTableOptionsAsync(dbConnectionString, vm.SourceDatabase);
+            vm.SourceTableOptions = sourceTableOptions.Where(x => x.Contains("VW_")).ToList();
         }
 
         private async Task PopulateSourceSPOptionsAsync(DataFileManageFormViewModel vm)

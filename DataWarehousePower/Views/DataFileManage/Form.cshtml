@@ -278,7 +278,7 @@
                     <select asp-for="FilterDateColumn" id="process-data-column-select" class="form-select form-select-sm">
                         @for (int i = 0; i < Model.Columns.Count; i++)
                         {
-                            <option value="">-- None --</option>
+                            @* <option value="">-- None --</option> *@
                             <option value="@Model.Columns[i].PropertyName">@Model.Columns[i].PropertyName</option>
                         }
                     </select>
@@ -580,12 +580,12 @@
 
             select.innerHTML = '';
 
-            if (options.length > 0) {
-                const noneOption = document.createElement('option');
-                noneOption.value = '';
-                noneOption.textContent = '--None--';
-                select.appendChild(noneOption);
-            }
+            // if (options.length > 0) {
+            //     const noneOption = document.createElement('option');
+            //     noneOption.value = '';
+            //     noneOption.textContent = '--None--';
+            //     select.appendChild(noneOption);
+            // }
 
             options.forEach(value => {
                 const option = document.createElement('option');
