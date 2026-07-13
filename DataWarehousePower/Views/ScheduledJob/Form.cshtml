@@ -101,25 +101,43 @@
                         </select>
                         <div id="exportLocationBasePathError" class="text-danger small d-none">Please select a base path.</div>
                     </div>
-                    <label>Client Folder</label>
+                    @* <label>Client Folder</label>
                     <select id="exportLocationSubfolderInput" class="form-select mt-2" required disabled>
                         <option value="">-- Select subfolder --</option>
                         @foreach (string exportLocationSubfolder in Model.AvailableClientCodeFolders)
                         {
                             <option value="@exportLocationSubfolder">@exportLocationSubfolder</option>
                         }
-                    </select>
+                    </select> *@
+
+                    <label>Export Folder</label>
                     <input asp-for="ExportLocationSubfolder" type="hidden" />
                     <div id="exportLocationSubfolderError" class="text-danger small d-none">Please select a subfolder.</div>
+
+                    <div class="form-check mt-2">
+                        <input asp-for="IsExportToClientFolder" class="form-check-input" id="isExportToClientFolderToggle" />
+                        <label asp-for="IsExportToClientFolder" class="form-check-label"></label>
+                    </div>
+
+                    <div>
+                        @* <label>Client Folder</label> *@
+                        <select @(Model.IsExportToClientFolder ? "" : "hidden") id="exportLocationSubfolderInput" class="form-select mt-2">
+                            <option value="">-- Select subfolder --</option>
+                            @foreach (string exportLocationSubfolder in Model.AvailableClientCodeFolders)
+                            {
+                                <option value="@exportLocationSubfolder">@exportLocationSubfolder</option>
+                            }
+                        </select>
+                    </div>
+
                     <div class="form-check mt-2">
                         <input asp-for="ExportToLocalFolder" class="form-check-input" id="exportToLocalFolderToggle" />
                         <label asp-for="ExportToLocalFolder" class="form-check-label"></label>
                     </div>
-                    <div id="exportToLocalFolderHint" class="form-text">If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.</div>
+                    @* <div id="exportToLocalFolderHint" class="form-text">If enabled, an extra copy will be saved to the User Remote Folder and can be opened via Menu > Report/Data File Folder.</div> *@
                     
                       <button hidden id="openExportLocationButton" type="button" class="btn btn-outline-secondary btn-sm mt-2" disabled>Open</button>
                     <input asp-for="ExportLocation" type="hidden" />
-                    @* <div class="form-text">Choose a base path and subfolder. Export to Local Folder adds an extra save to %temp%\&lt;subfolder&gt;.</div> *@
                     <span asp-validation-for="ExportLocation" class="text-danger"></span>
                 </div>
 
@@ -358,7 +376,7 @@
                     <span asp-validation-for="DateTo" class="text-danger"></span>
                 </div>
 
-                <div class="col-12">
+                <div hidden class="col-12">
                     <div class="form-check">
                         <input asp-for="IsActive" class="form-check-input" />
                         <label asp-for="IsActive" class="form-check-label"></label>
@@ -803,6 +821,12 @@
                     });
                 }
 
+                if (isExportToClientFolderToggle) {
+                    isExportToClientFolderToggle.addEventListener('change', () => {
+                        exportLocationSubfolderInput.hidden = !exportLocationSubfolderInput.hidden;
+                    });
+                }
+
                 if (openExportLocationButton) {
                     openExportLocationButton.addEventListener('click', () => {
                         const targetPath = normalizeWindowsPath(exportLocationHiddenInput.value);
@@ -819,10 +843,15 @@
                 if (form && availableBasePaths.length > 0) {
                     form.addEventListener('submit', event => {
                         const hasBasePath = !!exportLocationBasePathSelect.value;
-                        const hasSubfolder = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
+                        // const hasSubfolder = !!normalizeWindowsFolderName(exportLocationSubfolderInput.value);
+                        const hasSubfolder = !isExportToClientFolderToggle.checked ||
+                            (isExportToClientFolderToggle.checked && !!normalizeWindowsFolderName(exportLocationSubfolderInput.value));
                         const isValid = hasBasePath && hasSubfolder;
 
-                        syncExportLocationValidationFeedback(true);
+                        if(!isValid){
+                            syncExportLocationValidationFeedback(true);
+                        }
+                        // syncExportLocationValidationFeedback(true);
 
                         if (!isValid) {
                             event.preventDefault();

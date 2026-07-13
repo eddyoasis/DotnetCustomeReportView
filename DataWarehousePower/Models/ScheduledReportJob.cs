@@ -44,6 +44,8 @@ public class ScheduledReportJob
 
     public string? Parameters { get; set; }
 
+    public bool IsExportToClientFolder { get; set; } = false;
+
     [MaxLength(512)]
     public string? ExportLocation { get; set; }
 

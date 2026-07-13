@@ -88,7 +88,6 @@ public sealed class ScheduledReportExecutionService(
 
         string safeReportName = string.Join("_", reportViewModel.ReportName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
         string clientCodeSegment = string.IsNullOrWhiteSpace(job.ClientCode) ? "all" : job.ClientCode.Trim();
-        //string fileName = $"{safeReportName}_{job.ClientCode}_{reportDate}.zip";
         string fileName = $"{safeReportName}_{clientCodeSegment}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
         string zipSubFileName = $"{safeReportName}_format_{clientCodeSegment}_{reportDate}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
         CsvExportSplitOptions? exportSplitOptions = ResolveExportSplitOptions(configuration, logger, scheduledJobId);
@@ -100,14 +99,22 @@ public sealed class ScheduledReportExecutionService(
             zipSubFileName,
             exportSplitOptions);
 
-        string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
-        string? localDirectory = ResolveLocalExportDirectory(job, userRemoteFolderExportLocation);
-        List<string> targetDirectories = [primaryDirectory];
+        List<string> targetDirectories = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(localDirectory) &&
-            !targetDirectories.Contains(localDirectory, StringComparer.OrdinalIgnoreCase))
+        if (job.IsExportToClientFolder)
         {
-            targetDirectories.Add(localDirectory);
+            string primaryDirectory = ResolveExportDirectory(job.ExportLocation);
+            targetDirectories = [primaryDirectory];
+        }
+
+        if (job.ExportToLocalFolder)
+        {
+            string? localDirectory = ResolveLocalExportDirectory(job, userRemoteFolderExportLocation);
+            if (!string.IsNullOrWhiteSpace(localDirectory) &&
+            !targetDirectories.Contains(localDirectory, StringComparer.OrdinalIgnoreCase))
+            {
+                targetDirectories.Add(localDirectory);
+            }
         }
 
         foreach (string targetDirectory in targetDirectories)

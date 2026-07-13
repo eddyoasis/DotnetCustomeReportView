@@ -537,36 +537,39 @@ public sealed class ScheduledJobController(
 
     private void ValidateExportLocation(ScheduledJobFormViewModel form)
     {
-        List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
-        if (availableBasePaths.Count == 0)
+        if (form.IsExportToClientFolder)
         {
-            return;
-        }
+            List<string> availableBasePaths = GetAvailableExportLocationBasePaths();
+            if (availableBasePaths.Count == 0)
+            {
+                return;
+            }
 
-        string normalizedExportLocation = NormalizeWindowsPath(form.ExportLocation);
-        if (string.IsNullOrWhiteSpace(normalizedExportLocation))
-        {
-            ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location base path.");
-            return;
-        }
+            string normalizedExportLocation = NormalizeWindowsPath(form.ExportLocation);
+            if (string.IsNullOrWhiteSpace(normalizedExportLocation))
+            {
+                ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location base path.");
+                return;
+            }
 
-        if (availableBasePaths
-            .Select(NormalizeBasePath)
-            .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
-            .Any(basePath => string.Equals(normalizedExportLocation, basePath!, StringComparison.OrdinalIgnoreCase)))
-        {
-            ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location subfolder.");
-            return;
-        }
+            if (availableBasePaths
+                .Select(NormalizeBasePath)
+                .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
+                .Any(basePath => string.Equals(normalizedExportLocation, basePath!, StringComparison.OrdinalIgnoreCase)))
+            {
+                ModelState.AddModelError(nameof(form.ExportLocation), "Please select an export location subfolder.");
+                return;
+            }
 
-        bool isUnderConfiguredBasePath = availableBasePaths
-            .Select(NormalizeBasePath)
-            .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
-            .Any(basePath => normalizedExportLocation.StartsWith(basePath!, StringComparison.OrdinalIgnoreCase));
+            bool isUnderConfiguredBasePath = availableBasePaths
+                .Select(NormalizeBasePath)
+                .Where(basePath => !string.IsNullOrWhiteSpace(basePath))
+                .Any(basePath => normalizedExportLocation.StartsWith(basePath!, StringComparison.OrdinalIgnoreCase));
 
-        if (!isUnderConfiguredBasePath)
-        {
-            ModelState.AddModelError(nameof(form.ExportLocation), "Export location must start with one of the configured base paths.");
+            if (!isUnderConfiguredBasePath)
+            {
+                ModelState.AddModelError(nameof(form.ExportLocation), "Export location must start with one of the configured base paths.");
+            }
         }
     }
 

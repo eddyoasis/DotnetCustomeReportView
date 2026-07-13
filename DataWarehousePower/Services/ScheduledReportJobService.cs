@@ -239,6 +239,7 @@ public sealed class ScheduledReportJobService(
             Formats = ParseFormats(entity.Format),
             JobAction = entity.JobAction,
             RecipientEmail = entity.RecipientEmail,
+            IsExportToClientFolder = entity.IsExportToClientFolder,
             ExportLocation = entity.ExportLocation,
             ExportLocationSubfolder = ExtractExportLocationSubfolder(entity.ExportLocation),
             ExportToLocalFolder = entity.ExportToLocalFolder,
@@ -304,6 +305,7 @@ public sealed class ScheduledReportJobService(
             SchemaTemplate = NormalizeNullable(form.SchemaTemplate),
             ClientCode = NormalizeNullable(form.ClientCode),
             Parameters = normalizedParameters,
+            IsExportToClientFolder = form.IsExportToClientFolder,
             ExportLocation = NormalizeNullable(form.ExportLocation),
             ExportToLocalFolder = form.ExportToLocalFolder,
             DateFrom = form.IsCustom ? form.DateFrom?.Date : null,
@@ -360,6 +362,7 @@ public sealed class ScheduledReportJobService(
         entity.SchemaTemplate = NormalizeNullable(form.SchemaTemplate);
         entity.ClientCode = NormalizeNullable(form.ClientCode);
         entity.Parameters = normalizedParameters;
+        entity.IsExportToClientFolder = form.IsExportToClientFolder;
         entity.ExportLocation = NormalizeNullable(form.ExportLocation);
         entity.ExportToLocalFolder = form.ExportToLocalFolder;
         entity.DateFrom = form.IsCustom ? form.DateFrom?.Date : null;

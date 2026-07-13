@@ -122,6 +122,9 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Parameters")]
     public string? Parameters { get; set; }
 
+    [Display(Name = "Export to client folder")]
+    public bool IsExportToClientFolder { get; set; } = false;
+
     [MaxLength(512)]
     [Display(Name = "Export Location")]
     public string? ExportLocation { get; set; }
@@ -130,7 +133,7 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Export Subfolder")]
     public string? ExportLocationSubfolder { get; set; }
 
-    [Display(Name = "Export to User Remote Folder")]
+    [Display(Name = "Export to own workspace")]
     public bool ExportToLocalFolder { get; set; }
 
     public List<ExportLocationBasePathOptionViewModel> AvailableExportLocationBasePathOptions { get; set; } = [];
