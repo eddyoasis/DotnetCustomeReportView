@@ -300,7 +300,7 @@ namespace DataWarehousePower.Repositories
                 throw new ArgumentException("Preview request is required.");
             }
 
-            var clintCodes = await GetClientCodesByUserIdAsync(request?.UserId);
+            var clintCodes = await GetTRIDsByUserIdAsync(request?.UserId);
             var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
 
             string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
@@ -618,7 +618,7 @@ namespace DataWarehousePower.Repositories
                 throw new ArgumentException("Preview request is required.");
             }
 
-            var clintCodes = await GetClientCodesByUserIdAsync(request?.UserId);
+            var clintCodes = await GetTRIDsByUserIdAsync(request?.UserId);
             var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
 
             string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
@@ -905,7 +905,7 @@ namespace DataWarehousePower.Repositories
                 throw new ArgumentException("Preview request is required.");
             }
 
-            var clintCodes = await GetClientCodesByUserIdAsync(request?.UserId);
+            var clintCodes = await GetTRIDsByUserIdAsync(request?.UserId);
             var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
 
             string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
@@ -1774,14 +1774,14 @@ namespace DataWarehousePower.Repositories
             return configuredDepartments.Contains(userDepartmentIdToken);
         }
 
-        private async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
+        private async Task<List<string>> GetTRIDsByUserIdAsync(string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
                 return new List<string>();
             }
 
-            string configuredSpName = (_clientCodeLookupOptions.StoredProcedureName ?? string.Empty).Trim();
+            string configuredSpName = (_clientCodeLookupOptions.GetTRsStoredProcedureName ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(configuredSpName))
             {
                 return new List<string>();

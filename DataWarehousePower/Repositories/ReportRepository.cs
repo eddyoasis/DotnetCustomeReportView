@@ -255,7 +255,7 @@ namespace DataWarehousePower.Repositories
             if (safeCols.Count == 0)
                 return new();
 
-            var clintCodes = await GetClientCodesByUserIdAsync(userId);
+            var clintCodes = await GetTRIDsByUserIdAsync(userId);
             var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
 
             var whereClauses = new List<string>();
@@ -463,14 +463,14 @@ namespace DataWarehousePower.Repositories
             return (await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp)).ToList();
         }
 
-        public async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
+        public async Task<List<string>> GetTRIDsByUserIdAsync(string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
                 return new List<string>();
             }
 
-            string configuredSpName = (_clientCodeLookupOptions.StoredProcedureName ?? string.Empty).Trim();
+            string configuredSpName = (_clientCodeLookupOptions.GetTRsStoredProcedureName ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(configuredSpName))
             {
                 return new List<string>();
@@ -515,6 +515,62 @@ namespace DataWarehousePower.Repositories
             //    .Distinct(StringComparer.OrdinalIgnoreCase)
             //    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             //    .ToList();
+
+            return rows
+                .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .SelectMany(value => value!.Split(',', StringSplitOptions.RemoveEmptyEntries)) // split here
+                .Select(code => code.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        public async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new List<string>();
+            }
+
+            string configuredSpName = (_clientCodeLookupOptions.GetCCsStoredProcedureName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(configuredSpName))
+            {
+                return new List<string>();
+            }
+
+            string configuredParameterName = NormalizeParameterName(_clientCodeLookupOptions.UserIdParameterName, "@UserId");
+            string configuredResponseColumnName = (_clientCodeLookupOptions.ResponseColumnName ?? string.Empty).Trim();
+            configuredResponseColumnName = string.IsNullOrWhiteSpace(configuredResponseColumnName)
+                ? "ClientCode"
+                : configuredResponseColumnName;
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string? safeSp = await ValidateSpNameAsync(conn, configuredSpName);
+            if (string.IsNullOrWhiteSpace(safeSp))
+            {
+                return new List<string>();
+            }
+
+            HashSet<string> parameterNames = await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp);
+            Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase);
+            string? userIdParameterName = ResolveUserIdParameterName(parameterNames, configuredParameterName);
+            if (!string.IsNullOrWhiteSpace(userIdParameterName))
+            {
+                parameters[userIdParameterName] = userId.Trim();
+                parameters["@tableName"] = "TBL_VW_AUM";
+            }
+
+            List<Dictionary<string, object?>> rows = await ExecuteReaderAsync(
+                conn,
+                $"[{safeSp}]",
+                CommandType.StoredProcedure,
+                parameters);
 
             return rows
                 .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
