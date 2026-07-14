@@ -340,7 +340,7 @@
                     <span asp-validation-for="Parameters" class="text-danger"></span>
                 </div> *@
 
-                <div class="col-12">
+                <div hidden="@(!Model.IsReport)" class="col-12" id="isUseRecurringDataDateColumnGroup">
                     <div class="form-check">
                         <input asp-for="IsUseRecurringDataDateColumn" class="form-check-input" id="isUseRecurringDataDateColumnToggle" />
                         <label asp-for="IsUseRecurringDataDateColumn" class="form-check-label"></label>
@@ -437,6 +437,7 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const isUseRecurringDataDateColumnGroup = document.getElementById('isUseRecurringDataDateColumnGroup');
             const recurringDataDateColumnGroup = document.getElementById('recurringDataDateColumnGroup');
             const isReport = document.getElementById('IsReport');
             const hasFilterClientCodeColumn = document.getElementById('HasFilterClientCodeColumn');
@@ -534,6 +535,8 @@
                 if (reportDefinitionLabel) {
                     reportDefinitionLabel.textContent = isReportMode ? 'Report' : 'Data File';
                 }
+
+                isUseRecurringDataDateColumnGroup.hidden = isReportMode;
             }
 
             function renderSourceOptions(clearSelection) {

@@ -179,7 +179,7 @@ public sealed class ScheduledJobFormViewModel
     public string? ReturnUrl { get; set; }
 
     [Display(Name = "Use Custom Date Column Recurring Data")]
-    public bool IsUseRecurringDataDateColumn { get; set; }
+    public bool IsUseRecurringDataDateColumn { get; set; } = false;
     public string? RecurringDataDateColumn { get; set; }
     public List<ColumnDefinition> SelectedDataFileRecurringDataDateColumnOptions { get; set; } = [];
     public string? FilterColumnDataJson { get; set; }
