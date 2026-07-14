@@ -349,10 +349,20 @@
                 <div hidden="@(!Model.IsUseRecurringDataDateColumn)" id="recurringDataDateColumnGroup">
                     <label asp-for="RecurringDataDateColumn" class="form-label"></label>
                     <select asp-for="RecurringDataDateColumn" id="process-data-column-select" class="form-select form-select-sm">
+                        @{
+                            string selectedRecurringDataDateColumn = (Model.RecurringDataDateColumn ?? string.Empty).Trim();
+                            bool hasSelectedRecurringDataDateColumn = !string.IsNullOrWhiteSpace(selectedRecurringDataDateColumn)
+                                && Model.SelectedDataFileRecurringDataDateColumnOptions.Any(option =>
+                                    option.PropertyName.Equals(selectedRecurringDataDateColumn, StringComparison.OrdinalIgnoreCase));
+                        }
                         @for (int i = 0; i < Model.SelectedDataFileRecurringDataDateColumnOptions.Count; i++)
                         {
-                            @* <option value="">-- None --</option> *@
-                            <option value="@Model.SelectedDataFileRecurringDataDateColumnOptions[i].PropertyName">@Model.SelectedDataFileRecurringDataDateColumnOptions[i].PropertyName</option>
+                            string propertyName = Model.SelectedDataFileRecurringDataDateColumnOptions[i].PropertyName;
+                            <option value="@propertyName" selected="@(propertyName.Equals(Model.RecurringDataDateColumn ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@propertyName</option>
+                        }
+                        @if (!hasSelectedRecurringDataDateColumn && !string.IsNullOrWhiteSpace(selectedRecurringDataDateColumn))
+                        {
+                            <option value="@selectedRecurringDataDateColumn" selected="selected">@selectedRecurringDataDateColumn</option>
                         }
                     </select>
                 </div>
