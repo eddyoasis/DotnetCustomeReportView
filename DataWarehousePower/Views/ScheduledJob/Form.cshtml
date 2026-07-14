@@ -340,13 +340,32 @@
 
                 <div class="col-12">
                     <div class="form-check">
+                        <input asp-for="IsUseRecurringDataDateColumn" class="form-check-input" id="isUseRecurringDataDateColumnToggle" />
+                        <label asp-for="IsUseRecurringDataDateColumn" class="form-check-label"></label>
+                    </div>
+                    <div class="form-text">When enabled, Select a column for the data recurring date range.</div>
+                </div>
+
+                <div hidden="@(!Model.IsUseRecurringDataDateColumn)" id="recurringDataDateColumnGroup">
+                    <label asp-for="RecurringDataDateColumn" class="form-label"></label>
+                    <select asp-for="RecurringDataDateColumn" id="process-data-column-select" class="form-select form-select-sm">
+                        @for (int i = 0; i < Model.SelectedDataFileRecurringDataDateColumnOptions.Count; i++)
+                        {
+                            @* <option value="">-- None --</option> *@
+                            <option value="@Model.SelectedDataFileRecurringDataDateColumnOptions[i].PropertyName">@Model.SelectedDataFileRecurringDataDateColumnOptions[i].PropertyName</option>
+                        }
+                    </select>
+                </div>
+
+                <div hidden="@(!Model.IsReport)" class="col-12 id=" isCustomGroup"">
+                    <div class="form-check">
                         <input asp-for="IsCustom" class="form-check-input" id="isCustomToggle" />
                         <label asp-for="IsCustom" class="form-check-label"></label>
                     </div>
                     <div class="form-text">When disabled, Date From and Date To are computed at runtime using the interval settings below.</div>
                 </div>
 
-                <div class="col-md-4" id="autoDateIntervalUnitGroup">
+                <div @(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn) ? "":"hidden") class="col-md-4" id="autoDateIntervalUnitGroup">
                     <label asp-for="AutoDateIntervalUnit" class="form-label"></label>
                     <select asp-for="AutoDateIntervalUnit" class="form-select" id="autoDateIntervalUnitSelect">
                         <option value="@ScheduledJobFormViewModel.AutoDateIntervalMinutely">Last Minutes</option>
@@ -362,25 +381,25 @@
                     <span asp-validation-for="AutoDateIntervalUnit" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-2" id="autoDateIntervalValueGroup">
+                <div @(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn) ? "" : "hidden") class="col-md-2" id="autoDateIntervalValueGroup">
                     <label asp-for="AutoDateIntervalValue" class="form-label"></label>
                     <input asp-for="AutoDateIntervalValue" type="number" min="1" step="1" class="form-control" id="autoDateIntervalValueInput" />
                     <span asp-validation-for="AutoDateIntervalValue" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-6" id="autoDateIntervalHintGroup">
+                <div @(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn) ? "" : "hidden") class="col-md-6" id="autoDateIntervalHintGroup">
                     <div class="form-text mt-4">
                         Examples: Last Minutes 5 = from 5 minutes ago to now, Previous Month 2 = from last 2 month start date to last month end date.
                     </div>
                 </div>
 
-                <div class="col-md-6" id="dateFromGroup">
+                <div hidden="@(!Model.IsReport)" class="col-md-6" id="dateFromGroup">
                     <label asp-for="DateFrom" class="form-label"></label>
                     <input asp-for="DateFrom" type="date" class="form-control" />
                     <span asp-validation-for="DateFrom" class="text-danger"></span>
                 </div>
 
-                <div class="col-md-6" id="dateToGroup">
+                <div hidden="@(!Model.IsReport)" class="col-md-6" id="dateToGroup">
                     <label asp-for="DateTo" class="form-label"></label>
                     <input asp-for="DateTo" type="date" class="form-control" />
                     <span asp-validation-for="DateTo" class="text-danger"></span>
@@ -406,6 +425,7 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const recurringDataDateColumnGroup = document.getElementById('recurringDataDateColumnGroup');
             const isReport = document.getElementById('IsReport');
             const hasFilterClientCodeColumn = document.getElementById('HasFilterClientCodeColumn');
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
@@ -433,6 +453,9 @@
             const columnsFilterGroup = document.getElementById('columnsFilterGroup');
             const clientCodeFieldInput = document.getElementById('ClientCode');
             const isCustomToggle = document.getElementById('isCustomToggle');
+            const isUseRecurringDataDateColumnToggle = document.getElementById('isUseRecurringDataDateColumnToggle');
+            const recurringDataDateColumn = document.getElementById('RecurringDataDateColumn');
+            const autoDateIntervalUnitWholeGroup = document.getElementById('autoDateIntervalUnitWholeGroup');
             const dateFromGroup = document.getElementById('dateFromGroup');
             const dateToGroup = document.getElementById('dateToGroup');
             const dateFromInput = document.getElementById('DateFrom');
@@ -682,6 +705,7 @@
                             hiddenInput.value = '';
                             hiddenInput.dataset.filterKey = filterKey;
                             hiddenInput.dataset.columnKey = column.propertyName;
+                            hiddenInput.dataset.columnType = (column.propertyType || '').trim().toLowerCase();
 
                             const fromInput = document.createElement('input');
                             fromInput.type = rangeInputType;
@@ -718,6 +742,7 @@
                             textInput.value = '';
                             textInput.dataset.filterKey = filterKey;
                             textInput.dataset.columnKey = column.propertyName;
+                            textInput.dataset.columnType = (column.propertyType || '').trim().toLowerCase();
                             textInput.placeholder = 'Optional filter value';
                             card.appendChild(textInput);
                         }
@@ -1408,6 +1433,52 @@
 
             if (isCustomToggle) {
                 isCustomToggle.addEventListener('change', updateDateFields);
+            }
+
+            if (isUseRecurringDataDateColumnToggle) {
+                isUseRecurringDataDateColumnToggle.addEventListener('change', () => {
+                    const isUseRecurringDataDateColumn = isUseRecurringDataDateColumnToggle.checked
+
+                    recurringDataDateColumnGroup.hidden = !isUseRecurringDataDateColumn;
+                    autoDateIntervalUnitGroup.hidden = !isUseRecurringDataDateColumn
+                    autoDateIntervalValueGroup.hidden = !isUseRecurringDataDateColumn
+                    autoDateIntervalHintGroup.hidden = !isUseRecurringDataDateColumn
+
+                    if(isUseRecurringDataDateColumnToggle.checked){
+                        refreshProcessDataColumnOptions();
+                    }
+                });
+            }
+
+            function refreshProcessDataColumnOptions() {
+                const select = document.getElementById('process-data-column-select');
+                if (!(select instanceof HTMLSelectElement)) {
+                    return;
+                }
+
+                const currentValue = (select.value || '').trim();
+                const options = [...new Set(
+                    [...document.querySelectorAll('#columnsFilterGroup .column-filter-input[data-column-key]')]
+                        .filter(input => ((input.getAttribute('data-column-type') || '').trim().toLowerCase() === 'date'))
+                        .map(input => (input.getAttribute('data-column-key') || '').trim())
+                        .filter(Boolean)
+                )];
+
+                select.innerHTML = '';
+
+                options.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    if (value === currentValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+
+                if (select.options.length > 0 && !options.includes(currentValue)) {
+                    select.selectedIndex = 0;
+                }
             }
 
             updateScheduleFields();

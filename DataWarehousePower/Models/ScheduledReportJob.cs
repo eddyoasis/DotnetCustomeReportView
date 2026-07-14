@@ -44,6 +44,10 @@ public class ScheduledReportJob
 
     public string? Parameters { get; set; }
 
+    public string? RecurringDataDateColumn { get; set; }
+
+    public string? FilterColumnDataJson { get; set; }
+
     public bool IsExportToClientFolder { get; set; } = false;
 
     [MaxLength(512)]

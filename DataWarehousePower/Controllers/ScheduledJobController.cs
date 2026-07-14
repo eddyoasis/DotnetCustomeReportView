@@ -110,6 +110,7 @@ public sealed class ScheduledJobController(
     {
         string userId = columnPreferenceService.ResolveUserId(HttpContext);
 
+        ProcessForm(form);
         ValidateExportLocation(form);
         ValidateSchemaAndClientCode(form);
 
@@ -553,6 +554,18 @@ public sealed class ScheduledJobController(
         return GetAvailableExportLocationBasePathOptions()
             .Select(option => option.Path)
             .ToList();
+    }
+
+    private void ProcessForm(ScheduledJobFormViewModel form)
+    {
+        if (form.IsReport)
+        {
+
+        }
+        else
+        {
+            form.RecurringDataDateColumn = form.IsUseRecurringDataDateColumn ? form.RecurringDataDateColumn : null;
+        }
     }
 
     private void ValidateExportLocation(ScheduledJobFormViewModel form)

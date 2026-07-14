@@ -268,7 +268,9 @@ public sealed class ScheduledReportJobService(
                 availableSchemaTemplatesByReportId.TryGetValue(entity.ReportDefinitionId ?? 0, out List<string>? reportClientCodes)
                     ? reportClientCodes
                     : []),
-            HasFilterClientCodeColumn = entity.ReportDefinitionId > 0 || (entity.DataFileDefinitionId > 0 && !string.IsNullOrEmpty(entity.DataFileDefinition?.FilterClientCodeColumn))
+            HasFilterClientCodeColumn = entity.ReportDefinitionId > 0 || (entity.DataFileDefinitionId > 0 && !string.IsNullOrEmpty(entity.DataFileDefinition?.FilterClientCodeColumn)),
+            RecurringDataDateColumn = entity.RecurringDataDateColumn,
+            IsUseRecurringDataDateColumn = !string.IsNullOrEmpty(entity.RecurringDataDateColumn)
         };
 
         ApplyScheduleFromCron(form, entity.CronExpression);
@@ -320,7 +322,8 @@ public sealed class ScheduledReportJobService(
             CreatedByUserId = userId,
             CreatedByUsername = username,
             CreatedUtc = DateTime.UtcNow,
-            HangfireJobId = generatedJobName
+            HangfireJobId = generatedJobName,
+            RecurringDataDateColumn = form.RecurringDataDateColumn
         };
 
         await scheduledJobRepository.AddAsync(entity);
@@ -376,6 +379,7 @@ public sealed class ScheduledReportJobService(
         entity.UpdatedByUserId = userId;
         entity.UpdatedByUsername = username;
         entity.UpdatedUtc = DateTime.UtcNow;
+        entity.RecurringDataDateColumn = form.RecurringDataDateColumn;
 
         if (form.UpdatePassword)
         {
