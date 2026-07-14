@@ -1,3 +1,4 @@
+using Azure.Core;
 using DataWarehousePower.Data;
 using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
@@ -227,6 +228,85 @@ namespace DataWarehousePower.Repositories
             };
             var result = await _dataFileManageRepository.GetPreviewDataAsync(req);
             return result.Rows;
+        }
+
+        public async Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
+            string userId,
+            string sourceTable,
+            IEnumerable<ReportColumn> columns,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync();
+
+            var safeDatabase = await ResolveDatabaseNameAsync(conn, sourceDatabase);
+            if (safeDatabase is null)
+                return new();
+
+            var safeTable = await ValidateTableNameAsync(conn, sourceTable, safeDatabase);
+            if (string.IsNullOrEmpty(safeTable))
+                return new();
+
+            var safeCols = await ValidateColumnNamesAsync(conn, sourceTable, columns.Select(x => x.PropertyName), safeDatabase);
+            if (safeCols.Count == 0)
+                return new();
+
+            var clintCodes = await GetClientCodesByUserIdAsync(userId);
+            var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
+
+            var whereClauses = new List<string>();
+            int parameterIndex = 0;
+
+            Dictionary<string, object?> parameters = new Dictionary<string, object?>();
+
+            string orderBySql = string.Empty;
+
+            foreach (var column in columns.Where(x => !string.IsNullOrEmpty(x.MappingParameter)))
+            {
+                string parameterName = $"@f{parameterIndex++}";
+
+                if (column.MappingParameter.Contains("ClientCode"))
+                {
+                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                    parameters.Add(parameterName, $"%{clientCode}%");
+                }
+                else
+                {
+                    string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
+                    if (dateFrom.HasValue)
+                    {
+                        whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+                        parameters.Add(parameterName, dateFrom);
+                    }
+
+                    if (dateTo.HasValue)
+                    {
+                        string endParameterName = $"@f{parameterIndex++}";
+                        whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+                        parameters.Add(endParameterName, dateTo);
+                    }
+                    orderBySql = $" ORDER BY {escapedColumnName}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(clintCodesForSql))
+            {
+                whereClauses.Add($"TR_ID in {clintCodesForSql}");
+            }
+
+            string whereSql = whereClauses.Count > 0
+                ? " WHERE " + string.Join(" AND ", whereClauses)
+                : string.Empty;
+
+            var colList = string.Join(", ", safeCols.Select(c => $"[{c}]"));
+            var escapedDb = EscapeSqlIdentifier(safeDatabase);
+            var sql = $"SELECT {colList} FROM [{escapedDb}]..[{safeTable}] WITH(NOLOCK) {whereSql} {orderBySql}";
+
+            return await ExecuteReaderAsync(conn, sql, CommandType.Text, parameters);
         }
 
         public async Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(

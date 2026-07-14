@@ -4,8 +4,10 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Options;
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 
 namespace DataWarehousePower.Repositories
@@ -13,15 +15,18 @@ namespace DataWarehousePower.Repositories
     public class DataFileManageRepository : IDataFileManageRepository
     {
         private readonly AppDbContext _context;
+        private readonly ClientCodeLookupOptions _clientCodeLookupOptions;
         private readonly ScheduledJob _scheduledJob;
 
 
         public DataFileManageRepository(
+            IOptionsSnapshot<ClientCodeLookupOptions> clientCodeLookupOptions,
             IOptionsSnapshot<ScheduledJob> scheduledJob,
             AppDbContext context)
         {
             _context = context;
             _scheduledJob = scheduledJob.Value;
+            _clientCodeLookupOptions = clientCodeLookupOptions.Value;
 
         }
 
@@ -295,6 +300,9 @@ namespace DataWarehousePower.Repositories
                 throw new ArgumentException("Preview request is required.");
             }
 
+            var clintCodes = await GetClientCodesByUserIdAsync(request?.UserId);
+            var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
+
             string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
             string sourceTable = (request.SourceTable ?? string.Empty).Trim();
             string sourceSP = (request.SourceSP ?? string.Empty).Trim();
@@ -535,34 +543,10 @@ namespace DataWarehousePower.Repositories
                 orderBySql = $" ORDER BY {escapedColumnName}";
             }
 
-            //foreach (var column in requestedColumns.Where(x => !string.IsNullOrEmpty(x.MappingParameterFilter)))
-            //{
-            //    string parameterName = $"@f{parameterIndex++}";
-
-            //    if (column.MappingParameterFilter == "FilterDateFrom,FilterDateTo")
-            //    {
-            //        string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
-            //        if (dateFrom.HasValue)
-            //        {
-            //            whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
-            //            AddParameter(cmd, parameterName, dateFrom);
-            //        }
-
-            //        if (dateTo.HasValue)
-            //        {
-            //            string endParameterName = $"@f{parameterIndex++}";
-            //            whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
-            //            AddParameter(cmd, endParameterName, dateTo);
-
-            //        }
-            //        orderBySql = $" ORDER BY {escapedColumnName}";
-            //    }
-            //    else
-            //    {
-            //        whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
-            //        AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
-            //    }
-            //}
+            if (!string.IsNullOrEmpty(clintCodesForSql))
+            {
+                whereClauses.Add($"TR_ID in {clintCodesForSql}");
+            }
 
             string whereSql = whereClauses.Count > 0
                 ? " WHERE " + string.Join(" AND ", whereClauses)
@@ -633,6 +617,9 @@ namespace DataWarehousePower.Repositories
             {
                 throw new ArgumentException("Preview request is required.");
             }
+
+            var clintCodes = await GetClientCodesByUserIdAsync(request?.UserId);
+            var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
 
             string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
             string sourceTable = (request.SourceTable ?? string.Empty).Trim();
@@ -846,34 +833,10 @@ namespace DataWarehousePower.Repositories
 
             string orderBySql = string.Empty;
 
-            //foreach (var column in requestedColumns.Where(x => !string.IsNullOrEmpty(x.MappingParameterFilter)))
-            //{
-            //    string parameterName = $"@f{parameterIndex++}";
-
-            //    if (column.MappingParameterFilter == "FilterDateFrom,FilterDateTo")
-            //    {
-            //        string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
-            //        if (dateFrom.HasValue)
-            //        {
-            //            whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
-            //            AddParameter(cmd, parameterName, dateFrom);
-            //        }
-
-            //        if (dateTo.HasValue)
-            //        {
-            //            string endParameterName = $"@f{parameterIndex++}";
-            //            whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
-            //            AddParameter(cmd, endParameterName, dateTo);
-
-            //        }
-            //        orderBySql = $" ORDER BY {escapedColumnName}";
-            //    }
-            //    else
-            //    {
-            //        whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
-            //        AddParameter(cmd, parameterName, $"%{request.ClientCode}%");
-            //    }
-            //}
+            if (!string.IsNullOrEmpty(clintCodesForSql))
+            {
+                whereClauses.Add($"TR_ID in {clintCodesForSql}");
+            }
 
             string whereSql = whereClauses.Count > 0
                 ? " WHERE " + string.Join(" AND ", whereClauses)
@@ -941,6 +904,9 @@ namespace DataWarehousePower.Repositories
             {
                 throw new ArgumentException("Preview request is required.");
             }
+
+            var clintCodes = await GetClientCodesByUserIdAsync(request?.UserId);
+            var clintCodesForSql = $"({string.Join(",", clintCodes.Select(code => $"'{code}'"))})";
 
             string sourceDatabase = (request.SourceDatabase ?? string.Empty).Trim();
             string sourceTable = (request.SourceTable ?? string.Empty).Trim();
@@ -1125,6 +1091,11 @@ namespace DataWarehousePower.Repositories
                     whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
                     AddParameter(cmd, parameterName, $"%{filterValue}%");
                 }
+            }
+
+            if (!string.IsNullOrEmpty(clintCodesForSql))
+            {
+                whereClauses.Add($"TR_ID in {clintCodesForSql}");
             }
 
             string whereSql = whereClauses.Count > 0
@@ -1801,6 +1772,197 @@ namespace DataWarehousePower.Repositories
             string userDepartmentIdToken = userDepartmentId.Value.ToString();
 
             return configuredDepartments.Contains(userDepartmentIdToken);
+        }
+
+        private async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new List<string>();
+            }
+
+            string configuredSpName = (_clientCodeLookupOptions.StoredProcedureName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(configuredSpName))
+            {
+                return new List<string>();
+            }
+
+            string configuredParameterName = NormalizeParameterName(_clientCodeLookupOptions.UserIdParameterName, "@UserId");
+            string configuredResponseColumnName = (_clientCodeLookupOptions.ResponseColumnName ?? string.Empty).Trim();
+            configuredResponseColumnName = string.IsNullOrWhiteSpace(configuredResponseColumnName)
+                ? "ClientCode"
+                : configuredResponseColumnName;
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string? safeSp = await ValidateSpNameAsync(conn, configuredSpName);
+            if (string.IsNullOrWhiteSpace(safeSp))
+            {
+                return new List<string>();
+            }
+
+            HashSet<string> parameterNames = await GetStoredProcedureParameterNamesCoreAsync(conn, safeSp);
+            Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase);
+            string? userIdParameterName = ResolveUserIdParameterName(parameterNames, configuredParameterName);
+            if (!string.IsNullOrWhiteSpace(userIdParameterName))
+            {
+                parameters[userIdParameterName] = userId.Trim();
+            }
+
+            List<Dictionary<string, object?>> rows = await ExecuteReaderAsync(
+                conn,
+                $"[{safeSp}]",
+                CommandType.StoredProcedure,
+                parameters);
+
+            //return rows
+            //    .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
+            //    .Where(value => !string.IsNullOrWhiteSpace(value))
+            //    .Select(value => value!)
+            //    .Distinct(StringComparer.OrdinalIgnoreCase)
+            //    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            //    .ToList();
+
+            return rows
+                .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .SelectMany(value => value!.Split(',', StringSplitOptions.RemoveEmptyEntries)) // split here
+                .Select(code => code.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string NormalizeParameterName(string? parameterName, string fallback)
+        {
+            string normalized = (parameterName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return fallback;
+            }
+
+            return normalized.StartsWith("@", StringComparison.Ordinal) ? normalized : "@" + normalized;
+        }
+
+        private static async Task<string?> ValidateSpNameAsync(DbConnection conn, string spName)
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT name FROM sys.procedures WHERE name = @name";
+            AddParam(cmd, "@name", spName);
+            return await cmd.ExecuteScalarAsync() as string;
+        }
+
+        private static async Task<HashSet<string>> GetStoredProcedureParameterNamesCoreAsync(DbConnection conn, string spName)
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT p.name " +
+                "FROM sys.parameters p " +
+                "INNER JOIN sys.procedures sp ON p.object_id = sp.object_id " +
+                "WHERE sp.name = @name AND p.parameter_id > 0 AND p.is_output = 0";
+            AddParam(cmd, "@name", spName);
+
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                names.Add(reader.GetString(0));
+
+            return names;
+        }
+
+        private static void AddParam(System.Data.Common.DbCommand cmd, string name, object? value)
+        {
+            var p = cmd.CreateParameter();
+            p.ParameterName = name;
+            p.Value = value ?? DBNull.Value;
+            cmd.Parameters.Add(p);
+        }
+
+        private static string? ResolveUserIdParameterName(
+            IEnumerable<string> parameterNames,
+            string configuredParameterName)
+        {
+            string? configuredMatch = parameterNames.FirstOrDefault(name =>
+                name.Equals(configuredParameterName, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(configuredMatch))
+            {
+                return configuredMatch;
+            }
+
+            string[] preferredNames = ["@UserId", "@userId", "@userid", "@UserID", "@userID"];
+
+            foreach (string preferredName in preferredNames)
+            {
+                string? match = parameterNames.FirstOrDefault(name =>
+                    name.Equals(preferredName, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(match))
+                {
+                    return match;
+                }
+            }
+
+            return parameterNames.FirstOrDefault();
+        }
+
+        private static async Task<List<Dictionary<string, object?>>> ExecuteReaderAsync(
+            DbConnection conn,
+            string commandText,
+            CommandType commandType,
+            IReadOnlyDictionary<string, object?>? parameters = null)
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = commandText;
+            cmd.CommandType = commandType;
+
+            if (parameters is not null)
+            {
+                foreach (var parameter in parameters)
+                    AddParam(cmd, parameter.Key, parameter.Value);
+            }
+
+            var rows = new List<Dictionary<string, object?>>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < reader.FieldCount; i++)
+                    row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        private static string? ExtractClientCodeValue(
+            IReadOnlyDictionary<string, object?> row,
+            string configuredColumnName)
+        {
+            if (row.TryGetValue(configuredColumnName, out object? configuredColumnValue) && configuredColumnValue is not null)
+            {
+                string configuredValue = configuredColumnValue.ToString()?.Trim() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(configuredValue) ? null : configuredValue;
+            }
+
+            if (row.TryGetValue("ClientCode", out object? clientCodeValue) && clientCodeValue is not null)
+            {
+                string preferredValue = clientCodeValue.ToString()?.Trim() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(preferredValue) ? null : preferredValue;
+            }
+
+            object? firstValue = row.Values.FirstOrDefault(value => value is not null);
+            if (firstValue is null)
+            {
+                return null;
+            }
+
+            string normalizedValue = firstValue.ToString()?.Trim() ?? string.Empty;
+            return string.IsNullOrWhiteSpace(normalizedValue) ? null : normalizedValue;
         }
     }
 }

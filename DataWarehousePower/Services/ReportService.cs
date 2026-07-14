@@ -176,12 +176,21 @@ namespace DataWarehousePower.Services
                 var columnNames = report.Columns.Select(c => c.PropertyName);
 
                 rows = await _reportRepo.GetReportDataFromTableAsync(
+                    userId,
                     report.SourceTable,
                     report.Columns,
                     report.SourceDatabase,
                     normalizedClientCode,
                     dateFrom,
                     dateTo);
+
+                //rows = await _reportRepo.GetReportDataFromTableAsync(
+                //    report.SourceTable,
+                //    report.Columns,
+                //    report.SourceDatabase,
+                //    normalizedClientCode,
+                //    dateFrom,
+                //    dateTo);
 
                 //rows = await _reportRepo.GetReportDataFromTableAsync(
                 //    report.SourceTable,

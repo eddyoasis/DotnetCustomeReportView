@@ -39,6 +39,15 @@ namespace DataWarehousePower.Repositories
             string? sourceDatabase = null);
 
         Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
+            string userId,
+            string sourceTable,
+            IEnumerable<ReportColumn> columns,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo);
+
+        Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
             string sourceTable,
             IEnumerable<ReportColumn> columns,
             string? sourceDatabase,
