@@ -460,18 +460,34 @@ public sealed class ScheduledJobController(
 
     private async Task PopulateDataFileOptionsAsync(ScheduledJobFormViewModel form, string userId, string? userDepartment)
     {
-        //DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
-        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId);
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+        //DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId);
 
         form.AvailableDataFiles = dataFileList.DataFiles
             .Where(dataFile => dataFile.IsActive)
-            .OrderBy(dataFile => dataFile.DataFileName, StringComparer.OrdinalIgnoreCase)
+            //.OrderBy(dataFile => dataFile.DataFileName, StringComparer.OrdinalIgnoreCase)
             .Select(dataFile => new ReportDefinitionLookupItem
             {
                 Id = dataFile.Id,
-                ReportName = dataFile.DataFileName,
-                HasFilterClientCodeColumn = !string.IsNullOrEmpty(dataFile.FilterClientCodeColumn)
+                //ReportName = dataFile.DataFileName,
+                ReportName = string.IsNullOrEmpty(dataFile.Departments) ? dataFile.DataFileName : $"{dataFile.DataFileName} (Default)" ,
+                HasFilterClientCodeColumn = !string.IsNullOrEmpty(dataFile.FilterClientCodeColumn),
+                Columns = dataFile.Columns
+                .OrderBy(column => column.DisplayOrder)
+                .Select((column, index) => new ColumnDefinition
+                {
+                    Key = column.PropertyName,
+                    DefaultLabel = column.DefaultLabel,
+                    DisplayLabel = column.DefaultLabel,
+                    IsVisible = true,
+                    Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1,
+                    MappingParameter = column.MappingParameter,
+                    PropertyName = column.PropertyName,
+                    PropertyType = column.PropertyType
+                }).ToList()
             })
+             .OrderBy(dataFile => dataFile.ReportName.EndsWith(" (Default)") ? 1 : 0) // non-default first
+             .ThenBy(dataFile => dataFile.ReportName.Replace(" (Default)", ""), StringComparer.OrdinalIgnoreCase) // sort by base code
             .ToList();
     }
 

@@ -207,4 +207,5 @@ public sealed class ReportDefinitionLookupItem
     public int Id { get; set; }
     public string ReportName { get; set; } = string.Empty;
     public bool HasFilterClientCodeColumn { get; set; } = false;
+    public List<ColumnDefinition> Columns { get; set; } = new List<ColumnDefinition>();
 }

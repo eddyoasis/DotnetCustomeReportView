@@ -454,11 +454,24 @@ public sealed class ScheduledReportJobService(
     {
         List<DataFileDefinition> reports = await dataFileManageRepository.GetAllWithColumnsAsync(userId, userDepartment);
         return reports
-            .Select(report => new ReportDefinitionLookupItem 
-            { 
-                Id = report.Id, 
-                ReportName = report.DataFileName, 
-                HasFilterClientCodeColumn = !string.IsNullOrEmpty(report.FilterClientCodeColumn)  
+            .Select(report => new ReportDefinitionLookupItem
+            {
+                Id = report.Id,
+                ReportName = report.DataFileName,
+                HasFilterClientCodeColumn = !string.IsNullOrEmpty(report.FilterClientCodeColumn),
+                Columns = report.Columns
+                .OrderBy(column => column.DisplayOrder)
+                .Select((column, index) => new ColumnDefinition
+                {
+                    Key = column.PropertyName,
+                    DefaultLabel = column.DefaultLabel,
+                    DisplayLabel = column.DefaultLabel,
+                    IsVisible = true,
+                    Order = column.DisplayOrder > 0 ? column.DisplayOrder : index + 1,
+                    MappingParameter = column.MappingParameter,
+                    PropertyName = column.PropertyName,
+                    PropertyType = column.PropertyType
+                }).ToList()
             })
             .ToList();
     }
