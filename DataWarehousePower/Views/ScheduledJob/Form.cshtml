@@ -303,6 +303,10 @@
                     <span asp-validation-for="SchemaTemplate" class="text-danger"></span>
                 </div>
 
+                <div class="col-md-12" id="columnsFilterGroup">
+
+                </div>
+
                 <div class="col-md-6" id="clientCodeGroup">
                     <label asp-for="ClientCode" class="form-label"></label>
                     @{
@@ -426,6 +430,7 @@
             const requiresSchemaAndClientCodeInput = document.getElementById('RequiresSchemaTemplateAndClientCode');
             const schemaTemplateGroup = document.getElementById('schemaTemplateGroup');
             const clientCodeGroup = document.getElementById('clientCodeGroup');
+            const columnsFilterGroup = document.getElementById('columnsFilterGroup');
             const clientCodeFieldInput = document.getElementById('ClientCode');
             const isCustomToggle = document.getElementById('isCustomToggle');
             const dateFromGroup = document.getElementById('dateFromGroup');
@@ -481,6 +486,10 @@
 
             function setSourceMode(mode) {
                 const isReportMode = mode !== 'datafile';
+
+                if (isReport) {
+                    isReport.value = isReportMode ? 'true' : 'false';
+                }
 
                 if (requiresSchemaAndClientCodeInput) {
                     requiresSchemaAndClientCodeInput.value = isReportMode ? 'true' : 'false';
@@ -547,10 +556,7 @@
                 }
 
                 if (clientCodeFieldInput) {
-                    console.log(isRequired);
-                    console.log(isReport.value);
-                    console.log(clientCodeFieldInput);
-                    clientCodeFieldInput.required = isReport.value == 'True' && isRequired;
+                    clientCodeFieldInput.required = (isReport?.value || '').toLowerCase() === 'true' && isRequired;
                     clientCodeFieldInput.disabled = !isRequired;
 
                     console.log(clientCodeFieldInput);
@@ -569,6 +575,166 @@
                 // }
 
                 // Preserve SchemaTemplate value for round-trip scenarios even when source mode is datafile.
+            }
+
+            function renderColumnsFilterGroup() {
+                if (!columnsFilterGroup) {
+                    return;
+                }
+
+                columnsFilterGroup.innerHTML = '';
+
+                const isReportMode = getSourceMode() === 'report';
+                const hasSelectedSource = !!(reportDefinitionSelect?.value || '').trim();
+
+                if (isReportMode || !hasSelectedSource) {
+                    columnsFilterGroup.style.display = 'none';
+                    return;
+                }
+
+                columnsFilterGroup.style.display = '';
+
+                const title = document.createElement('label');
+                title.className = 'form-label';
+                title.textContent = 'Column Filters';
+                columnsFilterGroup.appendChild(title);
+
+                const columnsContainer = document.createElement('div');
+                columnsContainer.className = 'row g-2';
+
+                const selectedSourceId = parseInt((reportDefinitionSelect?.value || '').trim(), 10);
+                const sourceOptions = getSourceMode() === 'report' ? (availableReports || []) : (availableDataFiles || []);
+                const selectedSource = Number.isFinite(selectedSourceId)
+                    ? sourceOptions.find(option => parseInt(option?.id ?? option?.Id ?? '', 10) === selectedSourceId)
+                    : null;
+                const selectedColumns = selectedSource?.columns || selectedSource?.Columns || [];
+
+                function supportsRangeFilterByType(propertyType) {
+                    const normalizedPropertyType = String(propertyType || '').trim().toLowerCase();
+                    return normalizedPropertyType.includes('date')
+                        || normalizedPropertyType.includes('time')
+                        || normalizedPropertyType.includes('decimal')
+                        || normalizedPropertyType.includes('numeric')
+                        || normalizedPropertyType.includes('real')
+                        || normalizedPropertyType.includes('float')
+                        || normalizedPropertyType.includes('money')
+                        || normalizedPropertyType.includes('smallmoney')
+                        || normalizedPropertyType.includes('int')
+                        || normalizedPropertyType.includes('number');
+                }
+
+                const seenColumns = new Set();
+                const distinctColumns = [];
+
+                selectedColumns.forEach(column => {
+                    const propertyName = String(column?.propertyName || column?.PropertyName || column?.key || column?.Key || '').trim();
+                    if (!propertyName) {
+                        return;
+                    }
+
+                    const dedupeKey = propertyName.toLowerCase();
+                    if (seenColumns.has(dedupeKey)) {
+                        return;
+                    }
+
+                    seenColumns.add(dedupeKey);
+                    distinctColumns.push({
+                        propertyName,
+                        displayLabel: String(column?.displayLabel || column?.DisplayLabel || column?.defaultLabel || column?.DefaultLabel || propertyName).trim() || propertyName,
+                        mappingParameter: String(column?.mappingParameter || column?.MappingParameter || '').trim(),
+                        propertyType: String(column?.propertyType || column?.PropertyType || '').trim()
+                    });
+                });
+
+                distinctColumns
+                    .sort((left, right) => left.displayLabel.localeCompare(right.displayLabel, undefined, { sensitivity: 'accent' }))
+                    .forEach((column, index) => {
+                        const filterKey = column.mappingParameter || column.propertyName;
+                        const filterInputId = `scheduled-column-filter-${index + 1}-${column.propertyName}`;
+                        const useRangeFilter = supportsRangeFilterByType(column.propertyType);
+                        const rangeInputType = column.propertyType.toLowerCase().includes('date') || column.propertyType.toLowerCase().includes('time')
+                            ? 'date'
+                            : 'number';
+
+                        const columnWrap = document.createElement('div');
+                        columnWrap.className = 'col-12 col-md-6 col-xl-4';
+
+                        const card = document.createElement('div');
+                        card.className = 'border rounded-3 bg-light-subtle p-2 h-100';
+
+                        const columnLabel = document.createElement('label');
+                        columnLabel.className = 'form-label small fw-semibold mb-1';
+                        columnLabel.setAttribute('for', filterInputId);
+                        columnLabel.textContent = column.displayLabel;
+
+                        card.appendChild(columnLabel);
+
+                        if (useRangeFilter) {
+                            const rangeContainer = document.createElement('div');
+                            rangeContainer.className = 'column-filter-range d-flex flex-column gap-1';
+                            rangeContainer.dataset.rangeType = rangeInputType;
+
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.id = filterInputId;
+                            hiddenInput.name = `columnFilters[${filterKey}]`;
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.className = 'column-filter-input';
+                            hiddenInput.value = '';
+                            hiddenInput.dataset.filterKey = filterKey;
+                            hiddenInput.dataset.columnKey = column.propertyName;
+
+                            const fromInput = document.createElement('input');
+                            fromInput.type = rangeInputType;
+                            fromInput.className = 'form-control form-control-sm column-filter-range-from';
+                            fromInput.placeholder = 'From';
+
+                            const toInput = document.createElement('input');
+                            toInput.type = rangeInputType;
+                            toInput.className = 'form-control form-control-sm column-filter-range-to';
+                            toInput.placeholder = 'To';
+
+                            const syncHidden = () => {
+                                const fromValue = (fromInput.value || '').trim();
+                                const toValue = (toInput.value || '').trim();
+                                hiddenInput.value = fromValue || toValue
+                                    ? `${fromValue}|${toValue}`
+                                    : '';
+                            };
+
+                            fromInput.addEventListener('input', syncHidden);
+                            toInput.addEventListener('input', syncHidden);
+                            syncHidden();
+
+                            rangeContainer.appendChild(hiddenInput);
+                            rangeContainer.appendChild(fromInput);
+                            rangeContainer.appendChild(toInput);
+                            card.appendChild(rangeContainer);
+                        } else {
+                            const textInput = document.createElement('input');
+                            textInput.id = filterInputId;
+                            textInput.name = `columnFilters[${filterKey}]`;
+                            textInput.type = 'text';
+                            textInput.className = 'form-control form-control-sm column-filter-input';
+                            textInput.value = '';
+                            textInput.dataset.filterKey = filterKey;
+                            textInput.dataset.columnKey = column.propertyName;
+                            textInput.placeholder = 'Optional filter value';
+                            card.appendChild(textInput);
+                        }
+
+                        columnWrap.appendChild(card);
+                        columnsContainer.appendChild(columnWrap);
+                    });
+
+                if (!columnsContainer.children.length) {
+                    const emptyText = document.createElement('div');
+                    emptyText.className = 'text-muted small';
+                    emptyText.textContent = 'No data file columns available.';
+                    columnsFilterGroup.appendChild(emptyText);
+                    return;
+                }
+
+                columnsFilterGroup.appendChild(columnsContainer);
             }
 
             function updateScheduleFields() {
@@ -1202,6 +1368,7 @@
                     updateSchemaAndClientCodeFields();
                     updateClientCodeSelectOptions();
                     renderScheduledParameterInputs();
+                    renderColumnsFilterGroup();
                 });
             }
 
@@ -1209,11 +1376,11 @@
                 sourceModeSelect.addEventListener('change', () => {
                     
                     setSourceMode(getSourceMode());
-                    isReport.value = getSourceMode() == 'Report';
                     renderSourceOptions(true);
                     updateSchemaAndClientCodeFields();
                     updateClientCodeSelectOptions();
                     renderScheduledParameterInputs();
+                    renderColumnsFilterGroup();
                 });
             }
 
@@ -1250,6 +1417,7 @@
             updateClientCodeSelectOptions();
             updateSchemaAndClientCodeFields();
             renderScheduledParameterInputs();
+            renderColumnsFilterGroup();
             updatePasswordFields();
             updateDateFields();
             initializeExportLocationFields();
