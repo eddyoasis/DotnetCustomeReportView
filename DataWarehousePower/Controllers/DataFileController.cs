@@ -53,8 +53,8 @@ namespace DataWarehousePower.Controllers
                 IsActive = isActive
             };
 
-            DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, filter);
-            //DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, userDepartment ?? string.Empty, filter);
+            //DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, filter);
+            DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(userId, userDepartment ?? string.Empty, filter);
             if (listViewModel.DataFiles.Count == 0)
             {
                 return View("NoDataFiles");
@@ -119,7 +119,8 @@ namespace DataWarehousePower.Controllers
             return View(new DataFileBrowserViewModel
             {
                 Filter = listViewModel.Filter,
-                DataFiles = listViewModel.DataFiles,
+                DataFiles = listViewModel.DataFiles.Any() ? listViewModel.DataFiles.Where(x=> string.IsNullOrEmpty(x.Departments)).ToList() : listViewModel.DataFiles,
+                DefaultDataFiles = listViewModel.DataFiles.Any() ? listViewModel.DataFiles.Where(x => !string.IsNullOrEmpty(x.Departments)).ToList() : listViewModel.DataFiles,
                 SelectedDataFile = selectedDataFile,
                 ClientCode = normalizedClientCode,
                 AvailableClientCodes = availableClientCodes,
@@ -132,7 +133,8 @@ namespace DataWarehousePower.Controllers
                 AvailableColumns = availableColumns,
                 DisplayColumns = displayColumns,
                 ColumnFilters = normalizedColumnFilters,
-                HasAppliedFilters = true
+                HasAppliedFilters = true,
+                IsAllowEdit = selectedDataFile.UserId == userId
                 //HasAppliedFilters = !string.IsNullOrEmpty(clientCode)
                 //    || dateFrom.HasValue
                 //    || dateTo.HasValue

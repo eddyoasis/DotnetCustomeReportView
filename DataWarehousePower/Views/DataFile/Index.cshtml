@@ -108,6 +108,18 @@
                             </a>
                         </li>
                     }
+                    <hr />
+                    @foreach (var dataFile in Model.DefaultDataFiles)
+                    {
+                        <li class="report-sidebar-item list-group-item list-group-item-action p-2 @(selectedDataFile?.Id == dataFile.Id ? "active" : "")"
+                            data-report-name="@dataFile.DataFileName">
+                            <a href="@BuildDataFileUrl(dataFile.Id)"
+                               class="text-decoration-none d-block @(selectedDataFile?.Id == dataFile.Id ? "text-white" : "")"
+                               style="font-size:.85rem;">
+                                @dataFile.DataFileName (Default)
+                            </a>
+                        </li>
+                    }
                 </ul>
                 <div id="report-sidebar-empty" class="text-muted small px-2 py-2 d-none">No matching data files.</div>
             </div>
@@ -127,7 +139,7 @@
                     <div class="text-muted small">Browse the source definition, columns, and allowed departments.</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <a asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-secondary btn-sm">Manage</a>
+                    <a hidden="@(!Model.IsAllowEdit)" asp-controller="DataFileManage" asp-action="Edit" asp-route-id="@selectedDataFile.Id" class="btn btn-outline-secondary btn-sm">Manage</a>
                 </div>
             </div>
 

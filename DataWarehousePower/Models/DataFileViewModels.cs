@@ -4,6 +4,7 @@ namespace DataWarehousePower.Models
     {
         public DataFileManageFilterViewModel Filter { get; set; } = new();
         public List<DataFileDefinition> DataFiles { get; set; } = new();
+        public List<DataFileDefinition> DefaultDataFiles { get; set; } = new();
         public DataFileDefinition? SelectedDataFile { get; set; }
         public string ClientCode { get; set; } = string.Empty;
         public List<string> AvailableClientCodes { get; set; } = new();
@@ -17,5 +18,6 @@ namespace DataWarehousePower.Models
         public List<ColumnDefinition> AvailableColumns { get; set; } = new();
         public List<ColumnDefinition> DisplayColumns { get; set; } = new();
         public bool HasAppliedFilters { get; set; }
+        public bool IsAllowEdit { get; set; }
     }
 }
