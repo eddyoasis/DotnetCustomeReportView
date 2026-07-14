@@ -83,7 +83,7 @@
             </div>
             <div class="col-sm-6 col-md-3">
                 <label class="form-label small mb-1">Report/Data File Name</label>
-                <input type="text" name="ReportName" value="@Model.Filter.ReportName" class="form-control form-control-sm" placeholder="Search source…" />
+                <input type="text" name="ReportName" value="@Model.Filter.ReportName" class="form-control form-control-sm" placeholder="Report/Data File Name…" />
             </div>
             <div class="col-sm-4 col-md-2">
                 <label class="form-label small mb-1">Format</label>
@@ -305,8 +305,20 @@ else
                             {
                                 string exportLocationDisplay = BuildFriendlyExportLocationDisplay(job.ExportLocation);
                                 <div class="d-flex flex-column gap-1">
-                                    <span>@exportLocationDisplay</span>
+                                    @if (exportLocationDisplay == "Own Workspace")
+                                    {
+                                        <a asp-controller="ReportFolder" asp-action="Index" target="_blank" class="text-decoration-none">
+                                            @exportLocationDisplay
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span>@exportLocationDisplay</span>
+                                    }
                                 </div>
+                                @* <div class="d-flex flex-column gap-1">
+                                    <span>@exportLocationDisplay</span>
+                                </div> *@
                             }
                         </td>
                         <td>@(string.IsNullOrWhiteSpace(job.SchemaTemplate) ? "-" : job.SchemaTemplate)</td>
