@@ -74,7 +74,7 @@
             <input type="text" name="JobName" value="@Model.Filter.JobName" class="form-control form-control-sm" placeholder="Search job name…" />
             </div> *@
             <div class="col-sm-6 col-md-2">
-                <label class="form-label small mb-1">Source Type</label>
+                <label class="form-label small mb-1">Type (Report/Data File)</label>
                 <select name="SourceType" class="form-select form-select-sm">
                     <option value="">All</option>
                     <option value="Report" selected="@(string.Equals(Model.Filter.SourceType, "Report", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Report</option>
@@ -82,7 +82,7 @@
                 </select>
             </div>
             <div class="col-sm-6 col-md-3">
-                <label class="form-label small mb-1">Source</label>
+                <label class="form-label small mb-1">Report/Data File Name</label>
                 <input type="text" name="ReportName" value="@Model.Filter.ReportName" class="form-control form-control-sm" placeholder="Search source…" />
             </div>
             <div class="col-sm-4 col-md-2">
@@ -261,8 +261,8 @@ else
                 <tr>
                     @*  <th style="width: 50px;">#</th>
                 <th>Job Name</th> *@
-                    <th>Source Type</th>
-                    <th>Source</th>
+                    <th>Type (Report/Data File)</th>
+                    <th>Report/Data File Name</th>
                     <th>Format</th>
                     <th>Action</th>
                     <th>Export Location</th>
@@ -286,7 +286,11 @@ else
                         <td>@job.ReportName</td>
                         <td class="text-uppercase">@job.Format</td>
                         <td>
-                            <div>@(job.JobAction == ScheduledJobActions.ExportFileAndEmailToUser ? "Export + Email" : "Export File")</div>
+                            @* <div>@(job.JobAction == ScheduledJobActions.ExportFileAndEmailToUser ? "Export + Email" : "Export File")</div> *@
+                            <div>
+                                @(job.JobAction == ScheduledJobActions.ExportFile ? "Export File" :
+                                    job.JobAction == ScheduledJobActions.EmailToUser ? "Email" : "Export + Email")
+                            </div>
                             @if (!string.IsNullOrWhiteSpace(job.RecipientEmail))
                             {
                                 <div class="small text-muted">@job.RecipientEmail</div>

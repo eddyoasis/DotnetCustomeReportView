@@ -491,9 +491,12 @@ public sealed class ScheduledJobController(
         //    ModelState.AddModelError(nameof(form.SchemaTemplate), "Schema Template is required.");
         //}
 
-        if (string.IsNullOrWhiteSpace(form.ClientCode))
+        if (form.IsReport)
         {
-            ModelState.AddModelError(nameof(form.ClientCode), "Client Code is required.");
+            if (string.IsNullOrWhiteSpace(form.ClientCode))
+            {
+                ModelState.AddModelError(nameof(form.ClientCode), "Client Code is required.");
+            }
         }
     }
 

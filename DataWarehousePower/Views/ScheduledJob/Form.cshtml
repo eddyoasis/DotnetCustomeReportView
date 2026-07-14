@@ -22,6 +22,7 @@
             <input asp-for="ReturnUrl" type="hidden" />
             <input asp-for="RequiresSchemaTemplateAndClientCode" type="hidden" />
             <input asp-for="HasFilterClientCodeColumn" type="hidden" />
+            <input asp-for="IsReport" type="hidden" />
 
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -401,6 +402,7 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const isReport = document.getElementById('IsReport');
             const hasFilterClientCodeColumn = document.getElementById('HasFilterClientCodeColumn');
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
             const jobActionSelect = document.getElementById('jobActionSelect');
@@ -463,8 +465,9 @@
                 return;
             }
 
-            function requiresSchemaAndClientCode() {
+            function requiresSchemaAndClientCode() {             
                 return true;
+
                 // if (!requiresSchemaAndClientCodeInput) {
                 //     return true;
                 // }
@@ -544,12 +547,26 @@
                 }
 
                 if (clientCodeFieldInput) {
-                    clientCodeFieldInput.required = isRequired;
+                    console.log(isRequired);
+                    console.log(isReport.value);
+                    console.log(clientCodeFieldInput);
+                    clientCodeFieldInput.required = isReport.value == 'True' && isRequired;
                     clientCodeFieldInput.disabled = !isRequired;
+
+                    console.log(clientCodeFieldInput);
+
                     if (!isRequired) {
                         clientCodeFieldInput.value = '';
                     }
                 }
+
+                // if (clientCodeFieldInput) {
+                //     clientCodeFieldInput.required = isRequired;
+                //     clientCodeFieldInput.disabled = !isRequired;
+                //     if (!isRequired) {
+                //         clientCodeFieldInput.value = '';
+                //     }
+                // }
 
                 // Preserve SchemaTemplate value for round-trip scenarios even when source mode is datafile.
             }
@@ -1190,7 +1207,9 @@
 
             if (sourceModeSelect) {
                 sourceModeSelect.addEventListener('change', () => {
+                    
                     setSourceMode(getSourceMode());
+                    isReport.value = getSourceMode() == 'Report';
                     renderSourceOptions(true);
                     updateSchemaAndClientCodeFields();
                     updateClientCodeSelectOptions();
