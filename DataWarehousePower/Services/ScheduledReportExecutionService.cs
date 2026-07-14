@@ -3,6 +3,8 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Collections.Generic;
 using System.Text.Json;
 
 namespace DataWarehousePower.Services;
@@ -42,6 +44,8 @@ public sealed class ScheduledReportExecutionService(
         Dictionary<string, string?> jobParameters = ParseJobParameters(job.Parameters);
         var remoteFolderExportLocation = remoteFolderExportLocationAppSetting.Value;
         var userRemoteFolderExportLocation = Path.Combine(remoteFolderExportLocationAppSetting.Value.UserReportFolderPhysicalPath, job.CreatedByUserId, $"{DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd}");
+        
+        
 
         ReportViewModel? reportViewModel;
         if (job.ReportDefinitionId.HasValue)
@@ -57,10 +61,19 @@ public sealed class ScheduledReportExecutionService(
         }
         else if (job.DataFileDefinitionId.HasValue)
         {
+            List<ColumnDefinition> dataFileFilterColumns = new List<ColumnDefinition>();
+
+            if (!string.IsNullOrEmpty(job.FilterColumnDataJson))
+            {
+                dataFileFilterColumns = JsonSerializer.Deserialize<List<ColumnDefinition>>(job.FilterColumnDataJson);
+            }
+
             reportViewModel = await BuildDataFileReportViewModelAsync(
                 dataFileDefinitionId: job.DataFileDefinitionId.Value,
                 userId: job.CreatedByUserId,
                 schemaTemplate: job.SchemaTemplate,
+                dataFileFilterColumns: dataFileFilterColumns,
+                recurringDataDateColumn: job.RecurringDataDateColumn,
                 clientCode: job.ClientCode,
                 dateFrom: effectiveDateFrom,
                 dateTo: effectiveDateTo,
@@ -152,6 +165,104 @@ public sealed class ScheduledReportExecutionService(
                 emailSubject,
                 emailBody);
         }
+    }
+
+    private async Task<ReportViewModel?> BuildDataFileReportViewModelAsync(
+        int dataFileDefinitionId,
+        string userId,
+        string? userDepartment = null,
+        string? schemaTemplate = null,
+        List<ColumnDefinition>? dataFileFilterColumns = null,
+        string? recurringDataDateColumn = null,
+        string? clientCode = null,
+        DateTime? dateFrom = null,
+        DateTime? dateTo = null,
+        IReadOnlyDictionary<string, string?>? parameterValues = null)
+    {
+        string normalizedSchemaTemplate = NormalizeSchemaTemplate(schemaTemplate);
+
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync();
+        DataFileDefinition? dataFile = dataFileList.DataFiles
+            .FirstOrDefault(candidate => candidate.Id == dataFileDefinitionId && candidate.IsActive);
+
+        if (dataFile is null)
+        {
+            return null;
+        }
+
+        var dataFileExecFilterColumns = dataFileFilterColumns?.Select(column => new DataFileColumn
+        {
+            PropertyName = column.PropertyName,
+            PropertyType = column.PropertyType,
+            DefaultLabel = column.DefaultLabel,
+            MappingParameter = column.MappingParameterFilter,
+            MappingParameterFilter = column.MappingParameter,
+            DisplayOrder = column.Order
+        }).ToList();
+
+        List<ColumnDefinition> systemColumns = dataFile.Columns
+            .OrderBy(column => column.DisplayOrder)
+            .Select(column => new ColumnDefinition
+            {
+                Key = column.PropertyName,
+                DefaultLabel = column.DefaultLabel,
+                DisplayLabel = column.DefaultLabel,
+                IsVisible = true,
+                Order = column.DisplayOrder
+            })
+            .ToList();
+
+        // Apply user preferences
+        (List<ColumnDefinition> displayColumns, int? activePreferenceId) =
+            await reportService.LoadDataFileColumnPreferencesAsync(userId, dataFileDefinitionId, normalizedSchemaTemplate, systemColumns);
+
+        List<Dictionary<string, object?>> rows;
+        if (!string.IsNullOrWhiteSpace(dataFile.SourceSP))
+        {
+            rows = await reportRepository.GetReportDataFromSpAsync(
+                dataFile.SourceSP,
+                clientCode,
+                dateFrom,
+                dateTo,
+                parameterValues);
+        }
+        else if (!string.IsNullOrWhiteSpace(dataFile.SourceTable))
+        {
+            List<string> columnNames = dataFile.Columns
+                .Select(column => column.PropertyName)
+                .Where(columnName => !string.IsNullOrWhiteSpace(columnName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            rows = await reportRepository.GetDataFileDataFromTableAsync(
+                dataFile.SourceTable,
+                dataFileExecFilterColumns,
+                dataFile.SourceDatabase,
+                dataFile.FilterClientCodeColumn,
+                recurringDataDateColumn,
+                clientCode,
+                dateFrom,
+                dateTo);
+
+            //rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
+        }
+        else
+        {
+            rows = [];
+        }
+
+        return new ReportViewModel
+        {
+            ReportId = dataFile.Id,
+            ReportName = dataFile.DataFileName,
+            ClientCode = clientCode?.Trim() ?? string.Empty,
+            HasAppliedFilters = true,
+            FilterDateFrom = dateFrom,
+            FilterDateTo = dateTo,
+            AvailableColumns = displayColumns,
+            DisplayColumns = displayColumns,
+            Rows = rows
+        };
     }
 
     private async Task<ReportViewModel?> BuildDataFileReportViewModelAsync(
