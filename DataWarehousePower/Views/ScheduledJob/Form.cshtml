@@ -307,6 +307,8 @@
 
                 </div>
 
+                <input asp-for="FilterColumnDataJson" type="hidden" />
+
                 <div class="col-md-6" id="clientCodeGroup">
                     <label asp-for="ClientCode" class="form-label"></label>
                     @{
@@ -461,6 +463,7 @@
             const schemaTemplateGroup = document.getElementById('schemaTemplateGroup');
             const clientCodeGroup = document.getElementById('clientCodeGroup');
             const columnsFilterGroup = document.getElementById('columnsFilterGroup');
+            const filterColumnDataJsonHiddenInput = document.getElementById('FilterColumnDataJson');
             const clientCodeFieldInput = document.getElementById('ClientCode');
             const isCustomToggle = document.getElementById('isCustomToggle');
             const isUseRecurringDataDateColumnToggle = document.getElementById('isUseRecurringDataDateColumnToggle');
@@ -615,6 +618,17 @@
                     return;
                 }
 
+                const existingFilterValuesByKey = new Map(
+                    [...columnsFilterGroup.querySelectorAll('.column-filter-input[data-filter-key]')]
+                        .map(input => [
+                            normalizeColumnFilterKey(input.getAttribute('data-filter-key')),
+                            (input.value || '').trim()
+                        ])
+                        .filter(([key]) => key)
+                );
+
+                const persistedFilterValuesByKey = parsePersistedColumnFilterValues();
+
                 columnsFilterGroup.innerHTML = '';
 
                 const isReportMode = getSourceMode() === 'report';
@@ -672,6 +686,7 @@
 
                     seenColumns.add(dedupeKey);
                     distinctColumns.push({
+                        key: String(column?.key || column?.Key || '').trim(),
                         propertyName,
                         displayLabel: String(column?.displayLabel || column?.DisplayLabel || column?.defaultLabel || column?.DefaultLabel || propertyName).trim() || propertyName,
                         mappingParameter: String(column?.mappingParameter || column?.MappingParameter || '').trim(),
@@ -683,6 +698,7 @@
                     .sort((left, right) => left.displayLabel.localeCompare(right.displayLabel, undefined, { sensitivity: 'accent' }))
                     .forEach((column, index) => {
                         const filterKey = column.mappingParameter || column.propertyName;
+                        const initialFilterValue = resolvePersistedFilterValue(column, filterKey, existingFilterValuesByKey, persistedFilterValuesByKey);
                         const filterInputId = `scheduled-column-filter-${index + 1}-${column.propertyName}`;
                         const useRangeFilter = supportsRangeFilterByType(column.propertyType);
                         const rangeInputType = column.propertyType.toLowerCase().includes('date') || column.propertyType.toLowerCase().includes('time')
@@ -712,7 +728,7 @@
                             hiddenInput.name = `columnFilters[${filterKey}]`;
                             hiddenInput.type = 'hidden';
                             hiddenInput.className = 'column-filter-input';
-                            hiddenInput.value = '';
+                            hiddenInput.value = initialFilterValue;
                             hiddenInput.dataset.filterKey = filterKey;
                             hiddenInput.dataset.columnKey = column.propertyName;
                             hiddenInput.dataset.columnType = (column.propertyType || '').trim().toLowerCase();
@@ -726,6 +742,12 @@
                             toInput.type = rangeInputType;
                             toInput.className = 'form-control form-control-sm column-filter-range-to';
                             toInput.placeholder = 'To';
+
+                            const [fromPersistedValue, toPersistedValue] = initialFilterValue.includes('|')
+                                ? initialFilterValue.split('|', 2)
+                                : [initialFilterValue, ''];
+                            fromInput.value = (fromPersistedValue || '').trim();
+                            toInput.value = (toPersistedValue || '').trim();
 
                             const syncHidden = () => {
                                 const fromValue = (fromInput.value || '').trim();
@@ -749,7 +771,7 @@
                             textInput.name = `columnFilters[${filterKey}]`;
                             textInput.type = 'text';
                             textInput.className = 'form-control form-control-sm column-filter-input';
-                            textInput.value = '';
+                            textInput.value = initialFilterValue;
                             textInput.dataset.filterKey = filterKey;
                             textInput.dataset.columnKey = column.propertyName;
                             textInput.dataset.columnType = (column.propertyType || '').trim().toLowerCase();
@@ -770,6 +792,239 @@
                 }
 
                 columnsFilterGroup.appendChild(columnsContainer);
+            }
+
+            function normalizeColumnFilterKey(value) {
+                return String(value || '')
+                    .trim()
+                    .replace(/^@@+/, '')
+                    .toLowerCase();
+            }
+
+            function getColumnFilterLookupKeys(value) {
+                const normalized = normalizeColumnFilterKey(value);
+                if (!normalized) {
+                    return [];
+                }
+
+                const compact = normalized.replace(/[^a-z0-9]/g, '');
+                return compact && compact !== normalized
+                    ? [normalized, compact]
+                    : [normalized];
+            }
+
+            function resolvePersistedFilterValue(column, filterKey, existingFilterValuesByKey, persistedFilterValuesByKey) {
+                const candidateKeys = [
+                    filterKey,
+                    column?.mappingParameter,
+                    column?.MappingParameter,
+                    column?.propertyName,
+                    column?.PropertyName,
+                    column?.displayLabel,
+                    column?.DisplayLabel,
+                    column?.defaultLabel,
+                    column?.DefaultLabel,
+                    column?.key,
+                    column?.Key
+                ]
+                    .flatMap(getColumnFilterLookupKeys)
+                    .filter((value, index, allValues) => value && allValues.indexOf(value) === index);
+
+                const existingCandidateValues = candidateKeys
+                    .filter(candidateKey => existingFilterValuesByKey.has(candidateKey))
+                    .map(candidateKey => (existingFilterValuesByKey.get(candidateKey) || '').trim());
+
+                const persistedCandidateValues = candidateKeys
+                    .filter(candidateKey => persistedFilterValuesByKey.has(candidateKey))
+                    .map(candidateKey => (persistedFilterValuesByKey.get(candidateKey) || '').trim());
+
+                const firstNonEmptyExisting = existingCandidateValues.find(Boolean);
+                if (firstNonEmptyExisting) {
+                    return firstNonEmptyExisting;
+                }
+
+                const firstNonEmptyPersisted = persistedCandidateValues.find(Boolean);
+                if (firstNonEmptyPersisted) {
+                    return firstNonEmptyPersisted;
+                }
+
+                if (existingCandidateValues.length) {
+                    return existingCandidateValues[0] || '';
+                }
+
+                if (persistedCandidateValues.length) {
+                    return persistedCandidateValues[0] || '';
+                }
+
+                return '';
+            }
+
+            function parsePersistedColumnFilterValues() {
+                const valuesByKey = new Map();
+                const raw = (filterColumnDataJsonHiddenInput?.value || '').trim();
+                if (!raw) {
+                    return valuesByKey;
+                }
+
+                try {
+                    const parsed = parseFilterColumnDataJsonRaw(raw);
+
+                    if (!parsed.length) {
+                        return valuesByKey;
+                    }
+
+                    const setFilterValueIfBetter = (rawKey, rawValue) => {
+                        const nextValue = String(rawValue || '').trim();
+                        getColumnFilterLookupKeys(rawKey).forEach(lookupKey => {
+                            const existingValue = valuesByKey.get(lookupKey);
+                            if (existingValue === undefined || (!existingValue && nextValue)) {
+                                valuesByKey.set(lookupKey, nextValue);
+                            }
+                        });
+                    };
+
+                    parsed.forEach(column => {
+                        const filterValue = String(
+                            column?.mappingParameterFilter
+                            ?? column?.MappingParameterFilter
+                            ?? ''
+                        ).trim();
+
+                        setFilterValueIfBetter(column?.mappingParameter, filterValue);
+                        setFilterValueIfBetter(column?.MappingParameter, filterValue);
+                        setFilterValueIfBetter(column?.propertyName, filterValue);
+                        setFilterValueIfBetter(column?.PropertyName, filterValue);
+                        setFilterValueIfBetter(column?.displayLabel, filterValue);
+                        setFilterValueIfBetter(column?.DisplayLabel, filterValue);
+                        setFilterValueIfBetter(column?.defaultLabel, filterValue);
+                        setFilterValueIfBetter(column?.DefaultLabel, filterValue);
+                        setFilterValueIfBetter(column?.key, filterValue);
+                        setFilterValueIfBetter(column?.Key, filterValue);
+                    });
+                } catch {
+                    return valuesByKey;
+                }
+
+                return valuesByKey;
+            }
+
+            function parseFilterColumnDataJsonRaw(raw) {
+                const normalizeToArray = value => {
+                    if (Array.isArray(value)) {
+                        return value;
+                    }
+
+                    if (value && typeof value === 'object') {
+                        return [value];
+                    }
+
+                    return [];
+                };
+
+                const tryParseJson = value => {
+                    try {
+                        return JSON.parse(value);
+                    } catch {
+                        return null;
+                    }
+                };
+
+                const decodeHtmlEntities = value => {
+                    const textarea = document.createElement('textarea');
+                    textarea.innerHTML = value;
+                    return textarea.value;
+                };
+
+                const directParsed = tryParseJson(raw);
+                if (directParsed !== null) {
+                    if (typeof directParsed === 'string') {
+                        const nestedParsed = tryParseJson(directParsed);
+                        return nestedParsed !== null ? normalizeToArray(nestedParsed) : [];
+                    }
+
+                    return normalizeToArray(directParsed);
+                }
+
+                const decodedRaw = decodeHtmlEntities(raw);
+                if (decodedRaw !== raw) {
+                    const decodedParsed = tryParseJson(decodedRaw);
+                    if (decodedParsed !== null) {
+                        if (typeof decodedParsed === 'string') {
+                            const nestedDecodedParsed = tryParseJson(decodedParsed);
+                            return nestedDecodedParsed !== null ? normalizeToArray(nestedDecodedParsed) : [];
+                        }
+
+                        return normalizeToArray(decodedParsed);
+                    }
+                }
+
+                return [];
+            }
+
+            function serializeFilterColumnDataJson() {
+                if (!filterColumnDataJsonHiddenInput) {
+                    return;
+                }
+
+                const isReportMode = getSourceMode() === 'report';
+                const selectedSourceId = parseInt((reportDefinitionSelect?.value || '').trim(), 10);
+                const hasSelectedSource = Number.isFinite(selectedSourceId);
+
+                if (isReportMode || !hasSelectedSource) {
+                    filterColumnDataJsonHiddenInput.value = '';
+                    return;
+                }
+
+                const sourceOptions = getSourceMode() === 'report' ? (availableReports || []) : (availableDataFiles || []);
+                const selectedSource = sourceOptions.find(option => parseInt(option?.id ?? option?.Id ?? '', 10) === selectedSourceId);
+                const selectedColumns = selectedSource?.columns || selectedSource?.Columns || [];
+
+                const seenColumns = new Set();
+                const distinctColumns = [];
+
+                selectedColumns.forEach(column => {
+                    const propertyName = String(column?.propertyName || column?.PropertyName || column?.key || column?.Key || '').trim();
+                    if (!propertyName) {
+                        return;
+                    }
+
+                    const dedupeKey = propertyName.toLowerCase();
+                    if (seenColumns.has(dedupeKey)) {
+                        return;
+                    }
+
+                    seenColumns.add(dedupeKey);
+                    distinctColumns.push(column);
+                });
+
+                const filterValuesByKey = new Map(
+                    [...(columnsFilterGroup?.querySelectorAll('.column-filter-input[data-filter-key]') || [])]
+                        .map(input => [
+                            (input.getAttribute('data-filter-key') || '').trim(),
+                            (input.value || '').trim()
+                        ])
+                        .filter(([key]) => key)
+                );
+
+                const payload = distinctColumns.map(column => {
+                    const propertyName = String(column?.propertyName || column?.PropertyName || column?.key || column?.Key || '').trim();
+                    const mappingParameter = String(column?.mappingParameter || column?.MappingParameter || '').trim();
+                    const filterKey = mappingParameter || propertyName;
+
+                    return {
+                        Key: String(column?.key || column?.Key || propertyName).trim(),
+                        DefaultLabel: String(column?.defaultLabel || column?.DefaultLabel || propertyName).trim(),
+                        DisplayLabel: String(column?.displayLabel || column?.DisplayLabel || column?.defaultLabel || column?.DefaultLabel || propertyName).trim(),
+                        IsVisible: !!(column?.isVisible ?? column?.IsVisible ?? true),
+                        Order: parseInt(column?.order ?? column?.Order ?? '0', 10) || 0,
+                        PropertyName: propertyName,
+                        PropertyType: String(column?.propertyType || column?.PropertyType || '').trim(),
+                        MappingParameter: mappingParameter,
+                        MappingParameterFilter: filterValuesByKey.get(filterKey) || ''
+                    };
+                });
+
+                filterColumnDataJsonHiddenInput.value = payload.length ? JSON.stringify(payload) : '';
             }
 
             function updateScheduleFields() {
@@ -1427,6 +1682,12 @@
                 });
             }
 
+            if (columnsFilterGroup) {
+                columnsFilterGroup.addEventListener('input', () => {
+                    serializeFilterColumnDataJson();
+                });
+            }
+
             if (updatePasswordToggle) {
                 updatePasswordToggle.addEventListener('change', () => {
                     updatePasswordFields();
@@ -1458,6 +1719,13 @@
                         refreshProcessDataColumnOptions();
                     }
                 });
+            }
+
+            const scheduledJobForm = scheduleTypeSelect.closest('form');
+            if (scheduledJobForm) {
+                scheduledJobForm.addEventListener('submit', () => {
+                    serializeFilterColumnDataJson();
+                }, true);
             }
 
             function refreshProcessDataColumnOptions() {
