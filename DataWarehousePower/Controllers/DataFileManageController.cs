@@ -455,6 +455,9 @@ namespace DataWarehousePower.Controllers
                 if(request.DateTo.HasValue)
                     request.DateTo = request.DateTo.Value.AddDays(1).AddSeconds(-1);
 
+                var userId = HttpHelper.ResolveUserId(HttpContext);
+                request.UserId = userId;
+
                 DataFilePreviewResult preview = await _service.GetPreviewDataAsync(request);
                 return Json(new
                 {

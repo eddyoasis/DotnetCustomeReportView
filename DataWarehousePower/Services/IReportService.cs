@@ -18,6 +18,8 @@ namespace DataWarehousePower.Services
             string? schemaTemplate,
             IReadOnlyList<ColumnDefinition> systemColumns);
 
+        Task<List<string>> GetClientCodesByUserIdAsync(string userId);
+
         Task<List<string>> GetDataFileSchemaTemplatesAsync(string userId, int dataFileDefinitionId);
 
         Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId);

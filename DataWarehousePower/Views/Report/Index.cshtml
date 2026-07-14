@@ -156,7 +156,7 @@
                                     data-bs-toggle="dropdown"
                                     data-bs-auto-close="outside"
                                     aria-expanded="false">
-                                @(string.IsNullOrWhiteSpace(Model.ClientCode) ? "All" : Model.ClientCode)
+                                @(string.IsNullOrWhiteSpace(Model.ClientCode) ? "Select a client code" : Model.ClientCode)
                             </button>
                             <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
                                 <input id="filter-client-code-search"
@@ -168,6 +168,7 @@
                                 <div id="filter-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
                             </div>
                         </div>
+                        <div id="filter-client-code-error" class="text-danger small mt-1" style="display:none;"></div>
                     </div>
 
                     <div class="col-md-3 d-flex flex-column gap-1">
@@ -581,6 +582,7 @@
         const filterClientCodeToggle = document.getElementById('filter-client-code-toggle');
         const filterClientCodeSearchInput = document.getElementById('filter-client-code-search');
         const filterClientCodeOptions = document.getElementById('filter-client-code-options');
+        const filterClientCodeError = document.getElementById('filter-client-code-error');
         const filterClientCodeDropdown = filterClientCodeToggle ? bootstrap.Dropdown.getOrCreateInstance(filterClientCodeToggle) : null;
         const exportButton = document.getElementById('btn-export');
         const scheduleReportButton = document.getElementById('btn-schedule-report');
@@ -607,7 +609,7 @@
                     order = column.Order > 0 ? column.Order : index + 1
                 })
                 .ToList()));
-            const availableClientCodes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodes));
+        const availableClientCodes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodes));
         let autoSaveTimer = null;
         const autoSaveStorageKey = `report:${reportId}:columnAutoSave`;
         let isAutoSaveEnabled = false;
@@ -687,13 +689,9 @@
                 return;
             }
 
-            const isClientCodeEmpty = !filterClientCodeInput.value;
-
-            exportStatus.textContent = isClientCodeEmpty ? 'Select at least one client code.' : '';
-            exportStatus.className = isClientCodeEmpty ? 'small align-self-center text-danger' : '';
-
-            if (isClientCodeEmpty) {
-                filterClientCodeInput.focus();
+            if (!requireClientCodeSelection()) {
+                exportStatus.textContent = 'Select a client code.';
+                exportStatus.className = 'small align-self-center text-danger';
                 return;
             }
 
@@ -707,7 +705,10 @@
             scheduleReportButton.addEventListener('click', () => {
                 const scheduleUrl = new URL(`/Report/ScheduleReport/${reportId}`, window.location.origin);
                 const schemaTemplate = getActiveSchemaTemplate();
-                const clientCode = filterClientCodeInput.value.trim();
+                const clientCode = requireClientCodeSelection();
+                if (!clientCode) {
+                    return;
+                }
                 const runtimeParameters = getRuntimeParameterValues();
                 const selectedFormats = getSelectedExportFormats();
                 const returnUrl = new URL(window.location.href);
@@ -1338,7 +1339,7 @@
                 formats,
                 password,
                 schemaTemplate: getActiveSchemaTemplate(),
-                clientCode: filterClientCodeInput.value.trim() || null,
+                clientCode: getSelectedClientCode() || null,
                 dateFrom: filterDateFromInput.value || null,
                     dateTo: filterDateToInput.value || null,
                     parameters: getRuntimeParameterValues()
@@ -1405,8 +1406,12 @@
         }
 
         if (filterForm && filterSchemaTemplateInput) {
-            filterForm.addEventListener('submit', () => {
+            filterForm.addEventListener('submit', event => {
                 filterSchemaTemplateInput.value = getActiveSchemaTemplate();
+
+                if (!requireClientCodeSelection()) {
+                    event.preventDefault();
+                }
             });
         }
 
@@ -1446,6 +1451,40 @@
             filterSidebarReports();
         }
 
+        function showClientCodeError(message) {
+            if (!filterClientCodeError) {
+                return;
+            }
+
+            filterClientCodeError.textContent = message;
+            filterClientCodeError.style.display = 'block';
+        }
+
+        function hideClientCodeError() {
+            if (!filterClientCodeError) {
+                return;
+            }
+
+            filterClientCodeError.textContent = '';
+            filterClientCodeError.style.display = 'none';
+        }
+
+        function getSelectedClientCode() {
+            return filterClientCodeValueInput?.value.trim() || '';
+        }
+
+        function requireClientCodeSelection() {
+            const clientCode = getSelectedClientCode();
+            if (!clientCode) {
+                showClientCodeError('Select a client code.');
+                filterClientCodeSearchInput?.focus();
+                return '';
+            }
+
+            hideClientCodeError();
+            return clientCode;
+        }
+
         function renderClientCodeOptions(searchValue) {
             if (!filterClientCodeOptions) {
                 return;
@@ -1475,8 +1514,9 @@
                     }
 
                     filterClientCodeValueInput.value = normalizedCode;
-                    filterClientCodeToggle.textContent = normalizedCode || 'All';
+                    filterClientCodeToggle.textContent = normalizedCode;
                     filterClientCodeSearchInput.value = normalizedCode;
+                    hideClientCodeError();
                     filterClientCodeDropdown?.hide();
                 });
                 filterClientCodeOptions.appendChild(optionButton);
@@ -1514,9 +1554,11 @@
                 }
             });
 
+            filterClientCodeToggle.addEventListener('click', hideClientCodeError);
+
             if (filterClientCodeValueInput && filterClientCodeToggle) {
                 const initialClientCode = filterClientCodeValueInput.value.trim();
-                filterClientCodeToggle.textContent = initialClientCode || 'All';
+                filterClientCodeToggle.textContent = initialClientCode || 'Select a client code';
                 filterClientCodeSearchInput.value = initialClientCode;
                 renderClientCodeOptions(initialClientCode);
             }

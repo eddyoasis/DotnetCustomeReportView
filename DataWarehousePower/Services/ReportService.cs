@@ -58,6 +58,11 @@ namespace DataWarehousePower.Services
             IReadOnlyList<ColumnDefinition> systemColumns)
             => LoadDataFilePreferencesAsync(userId, dataFileId, NormalizeSchemaTemplate(schemaTemplate), systemColumns.ToList());
 
+        public async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
+        {
+            return await _reportRepo.GetClientCodesByUserIdAsync(userId);
+        }
+
         public Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId)
             => _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
 
