@@ -148,16 +148,26 @@
 
                     <div class="col-md-4 d-flex flex-column gap-1">
                         <label for="filter-client-code" class="form-label small fw-semibold">ClientCode</label>
-                        <select id="filter-client-code"
-                                name="clientCode"
-                                class="form-select form-select-sm"
-                                required>
-                            <option value="">Select a client code</option>
-                            @foreach (var availableClientCode in Model.AvailableClientCodes)
-                            {
-                                <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
-                            }
-                        </select>
+                        <input type="hidden" name="clientCode" id="filter-client-code-value" value="@Model.ClientCode" />
+                        <div class="dropdown w-100">
+                            <button id="filter-client-code-toggle"
+                                    class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside"
+                                    aria-expanded="false">
+                                @(string.IsNullOrWhiteSpace(Model.ClientCode) ? "All" : Model.ClientCode)
+                            </button>
+                            <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
+                                <input id="filter-client-code-search"
+                                       type="text"
+                                       class="form-control form-control-sm mb-2"
+                                       maxlength="128"
+                                       placeholder="Search client code"
+                                       autocomplete="off" />
+                                <div id="filter-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="col-md-3 d-flex flex-column gap-1">
@@ -567,13 +577,17 @@
         const schemaTemplateStatus = document.getElementById('client-code-status');
         const reportSidebarFilter = document.getElementById('report-sidebar-filter');
         const reportSidebarEmpty = document.getElementById('report-sidebar-empty');
+        const filterClientCodeValueInput = document.getElementById('filter-client-code-value');
+        const filterClientCodeToggle = document.getElementById('filter-client-code-toggle');
+        const filterClientCodeSearchInput = document.getElementById('filter-client-code-search');
+        const filterClientCodeOptions = document.getElementById('filter-client-code-options');
+        const filterClientCodeDropdown = filterClientCodeToggle ? bootstrap.Dropdown.getOrCreateInstance(filterClientCodeToggle) : null;
         const exportButton = document.getElementById('btn-export');
         const scheduleReportButton = document.getElementById('btn-schedule-report');
         const exportFormatContainer = document.getElementById('export-format');
         const exportStatus = document.getElementById('export-status');
         const filterForm = document.getElementById('report-filter-form');
         const filterSchemaTemplateInput = document.getElementById('filter-schema-template');
-        const filterClientCodeInput = document.getElementById('filter-client-code');
         const filterDateFromInput = document.getElementById('filter-date-from');
         const filterDateToInput = document.getElementById('filter-date-to');
         const runtimeParameterInputs = [...document.querySelectorAll('[data-runtime-param="true"]')];
@@ -593,6 +607,7 @@
                     order = column.Order > 0 ? column.Order : index + 1
                 })
                 .ToList()));
+            const availableClientCodes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodes));
         let autoSaveTimer = null;
         const autoSaveStorageKey = `report:${reportId}:columnAutoSave`;
         let isAutoSaveEnabled = false;
@@ -1429,6 +1444,82 @@
             reportSidebarFilter.value = '';
             reportSidebarFilter.addEventListener('input', filterSidebarReports);
             filterSidebarReports();
+        }
+
+        function renderClientCodeOptions(searchValue) {
+            if (!filterClientCodeOptions) {
+                return;
+            }
+
+            const normalizedSearch = (searchValue || '').trim().toLocaleLowerCase();
+            const selectedValue = (filterClientCodeValueInput?.value || '').trim();
+
+            filterClientCodeOptions.innerHTML = '';
+
+            availableClientCodes.forEach(code => {
+                const normalizedCode = String(code || '');
+                const isMatch = !normalizedSearch || normalizedCode.toLocaleLowerCase().includes(normalizedSearch);
+                const isSelected = normalizedCode.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0;
+
+                if (!isMatch && !isSelected) {
+                    return;
+                }
+
+                const optionButton = document.createElement('button');
+                optionButton.type = 'button';
+                optionButton.className = `list-group-item list-group-item-action py-1 px-2${isSelected ? ' active' : ''}`;
+                optionButton.textContent = normalizedCode;
+                optionButton.addEventListener('click', () => {
+                    if (!filterClientCodeValueInput || !filterClientCodeToggle) {
+                        return;
+                    }
+
+                    filterClientCodeValueInput.value = normalizedCode;
+                    filterClientCodeToggle.textContent = normalizedCode || 'All';
+                    filterClientCodeSearchInput.value = normalizedCode;
+                    filterClientCodeDropdown?.hide();
+                });
+                filterClientCodeOptions.appendChild(optionButton);
+            });
+
+            if (!filterClientCodeOptions.children.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-muted small px-2 py-1';
+                empty.textContent = 'No matches';
+                filterClientCodeOptions.appendChild(empty);
+            }
+        }
+
+        if (filterClientCodeSearchInput) {
+            renderClientCodeOptions(filterClientCodeSearchInput.value);
+            filterClientCodeSearchInput.addEventListener('input', () => {
+                renderClientCodeOptions(filterClientCodeSearchInput.value);
+            });
+
+            filterClientCodeSearchInput.addEventListener('focus', () => {
+                renderClientCodeOptions(filterClientCodeSearchInput.value);
+                filterClientCodeDropdown?.show();
+            });
+
+            filterClientCodeSearchInput.addEventListener('click', () => {
+                renderClientCodeOptions(filterClientCodeSearchInput.value);
+                filterClientCodeDropdown?.show();
+            });
+
+            filterClientCodeSearchInput.addEventListener('keydown', e => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    renderClientCodeOptions(filterClientCodeSearchInput.value);
+                    filterClientCodeDropdown?.show();
+                }
+            });
+
+            if (filterClientCodeValueInput && filterClientCodeToggle) {
+                const initialClientCode = filterClientCodeValueInput.value.trim();
+                filterClientCodeToggle.textContent = initialClientCode || 'All';
+                filterClientCodeSearchInput.value = initialClientCode;
+                renderClientCodeOptions(initialClientCode);
+            }
         }
 
         const reportDataSection = document.getElementById('report-data-section');

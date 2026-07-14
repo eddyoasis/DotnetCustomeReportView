@@ -428,12 +428,21 @@ namespace DataWarehousePower.Repositories
                 CommandType.StoredProcedure,
                 parameters);
 
+            //return rows
+            //    .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
+            //    .Where(value => !string.IsNullOrWhiteSpace(value))
+            //    .Select(value => value!)
+            //    .Distinct(StringComparer.OrdinalIgnoreCase)
+            //    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            //    .ToList();
+
             return rows
                 .Select(row => ExtractClientCodeValue(row, configuredResponseColumnName))
                 .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value!)
+                .SelectMany(value => value!.Split(',', StringSplitOptions.RemoveEmptyEntries)) // split here
+                .Select(code => code.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
