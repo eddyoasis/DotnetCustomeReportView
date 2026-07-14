@@ -112,6 +112,8 @@ public sealed class ScheduledJobFormViewModel
     [Display(Name = "Column Template")]
     public string? SchemaTemplate { get; set; }
 
+    public bool HasFilterClientCodeColumn { get; set; }
+
     [MaxLength(128)]
     [Display(Name = "Client Code")]
     public string? ClientCode { get; set; }
@@ -204,4 +206,5 @@ public sealed class ReportDefinitionLookupItem
 {
     public int Id { get; set; }
     public string ReportName { get; set; } = string.Empty;
+    public bool HasFilterClientCodeColumn { get; set; } = false;
 }

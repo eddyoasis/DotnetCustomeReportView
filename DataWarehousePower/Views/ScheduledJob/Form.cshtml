@@ -21,6 +21,7 @@
             <input asp-for="Id" type="hidden" />
             <input asp-for="ReturnUrl" type="hidden" />
             <input asp-for="RequiresSchemaTemplateAndClientCode" type="hidden" />
+            <input asp-for="HasFilterClientCodeColumn" type="hidden" />
 
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -47,7 +48,7 @@
                         <option value="">@sourcePlaceholder</option>
                         @foreach (ReportDefinitionLookupItem report in selectedSourceOptions)
                         {
-                            <option value="@report.Id">@report.ReportName</option>
+                            <option data-has-filter-client-code="@(report.HasFilterClientCodeColumn ? "true" : "false")" value="@report.Id">@report.ReportName</option>
                         }
                     </select>
                     <span asp-validation-for="ReportDefinitionId" class="text-danger"></span>
@@ -400,6 +401,7 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const hasFilterClientCodeColumn = document.getElementById('HasFilterClientCodeColumn');
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
             const jobActionSelect = document.getElementById('jobActionSelect');
             const recipientEmailGroup = document.getElementById('recipientEmailGroup');
@@ -508,6 +510,8 @@
                     const item = document.createElement('option');
                     item.value = String(option.id ?? option.Id ?? '');
                     item.textContent = String(option.reportName ?? option.ReportName ?? '');
+                    const hasFilterClientCode = option.hasFilterClientCodeColumn ?? option.HasFilterClientCodeColumn;
+                    item.dataset.hasFilterClientCode = hasFilterClientCode ? 'true' : 'false';
                     reportDefinitionSelect.appendChild(item);
                 });
 
@@ -524,7 +528,19 @@
                 }
 
                 if (clientCodeGroup) {
-                    clientCodeGroup.style.display = isRequired ? '' : 'none';
+
+                    const isReportMode = getSourceMode() === 'report';
+
+                    const selectedOption = reportDefinitionSelect.options[reportDefinitionSelect.selectedIndex];
+
+                    const hasFilterClientCodeColumn =
+                        (selectedOption?.dataset?.hasFilterClientCode || '').toLowerCase() === 'true';
+
+                    if (isReportMode) {
+                        clientCodeGroup.style.display = isRequired ? '' : 'none';
+                    } else {
+                        clientCodeGroup.style.display = (isRequired && hasFilterClientCodeColumn) ? '' : 'none';
+                    }
                 }
 
                 if (clientCodeFieldInput) {
@@ -1166,6 +1182,7 @@
 
             if (reportDefinitionSelect) {
                 reportDefinitionSelect.addEventListener('change', () => {
+                    updateSchemaAndClientCodeFields();
                     updateClientCodeSelectOptions();
                     renderScheduledParameterInputs();
                 });

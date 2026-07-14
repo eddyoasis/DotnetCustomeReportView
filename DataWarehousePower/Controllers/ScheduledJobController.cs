@@ -469,7 +469,8 @@ public sealed class ScheduledJobController(
             .Select(dataFile => new ReportDefinitionLookupItem
             {
                 Id = dataFile.Id,
-                ReportName = dataFile.DataFileName
+                ReportName = dataFile.DataFileName,
+                HasFilterClientCodeColumn = !string.IsNullOrEmpty(dataFile.FilterClientCodeColumn)
             })
             .ToList();
     }

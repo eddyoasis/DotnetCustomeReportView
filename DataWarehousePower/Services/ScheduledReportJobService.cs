@@ -266,7 +266,8 @@ public sealed class ScheduledReportJobService(
                 entity.SchemaTemplate,
                 availableSchemaTemplatesByReportId.TryGetValue(entity.ReportDefinitionId ?? 0, out List<string>? reportClientCodes)
                     ? reportClientCodes
-                    : [])
+                    : []),
+            HasFilterClientCodeColumn = entity.ReportDefinitionId > 0 || (entity.DataFileDefinitionId > 0 && !string.IsNullOrEmpty(entity.DataFileDefinition?.FilterClientCodeColumn))
         };
 
         ApplyScheduleFromCron(form, entity.CronExpression);
@@ -452,7 +453,12 @@ public sealed class ScheduledReportJobService(
     {
         List<DataFileDefinition> reports = await dataFileManageRepository.GetAllWithColumnsAsync(userId, userDepartment);
         return reports
-            .Select(report => new ReportDefinitionLookupItem { Id = report.Id, ReportName = report.DataFileName })
+            .Select(report => new ReportDefinitionLookupItem 
+            { 
+                Id = report.Id, 
+                ReportName = report.DataFileName, 
+                HasFilterClientCodeColumn = !string.IsNullOrEmpty(report.FilterClientCodeColumn)  
+            })
             .ToList();
     }
 
