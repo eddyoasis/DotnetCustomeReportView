@@ -353,7 +353,7 @@
                     <span asp-validation-for="Parameters" class="text-danger"></span>
                 </div> *@
 
-                <div hidden="@(!Model.IsReport)" class="col-12" id="isUseRecurringDataDateColumnGroup">
+                <div class="col-12" id="isUseRecurringDataDateColumnGroup">
                     <div class="form-check">
                         <input asp-for="IsUseRecurringDataDateColumn" class="form-check-input" id="isUseRecurringDataDateColumnToggle" />
                         <label asp-for="IsUseRecurringDataDateColumn" class="form-check-label"></label>
@@ -361,7 +361,7 @@
                     <div class="form-text">When enabled, Select a column for the data recurring date range.</div>
                 </div>
 
-                <div hidden="@(!Model.IsUseRecurringDataDateColumn)" id="recurringDataDateColumnGroup">
+                <div id="recurringDataDateColumnGroup">
                     <label asp-for="RecurringDataDateColumn" class="form-label"></label>
                     <select asp-for="RecurringDataDateColumn" id="process-data-column-select" class="form-select form-select-sm">
                         @{
@@ -382,7 +382,7 @@
                     </select>
                 </div>
 
-                <div hidden="@(!Model.IsReport)" class="col-12 id=" isCustomGroup"">
+                <div class="col-12" id="isCustomGroup">
                     <div class="form-check">
                         <input asp-for="IsCustom" class="form-check-input" id="isCustomToggle" />
                         <label asp-for="IsCustom" class="form-check-label"></label>
@@ -390,7 +390,7 @@
                     <div class="form-text">When disabled, Date From and Date To are computed at runtime using the interval settings below.</div>
                 </div>
 
-                <div @(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn) ? "":"hidden") class="col-md-4" id="autoDateIntervalUnitGroup">
+                <div class="col-md-4" id="autoDateIntervalUnitGroup">
                     <label asp-for="AutoDateIntervalUnit" class="form-label"></label>
                     <select asp-for="AutoDateIntervalUnit" class="form-select" id="autoDateIntervalUnitSelect">
                         <option value="@ScheduledJobFormViewModel.AutoDateIntervalMinutely">Last Minutes</option>
@@ -406,25 +406,25 @@
                     <span asp-validation-for="AutoDateIntervalUnit" class="text-danger"></span>
                 </div>
 
-                <div @(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn) ? "" : "hidden") class="col-md-2" id="autoDateIntervalValueGroup">
+                <div class="col-md-2" id="autoDateIntervalValueGroup">
                     <label asp-for="AutoDateIntervalValue" class="form-label"></label>
                     <input asp-for="AutoDateIntervalValue" type="number" min="1" step="1" class="form-control" id="autoDateIntervalValueInput" />
                     <span asp-validation-for="AutoDateIntervalValue" class="text-danger"></span>
                 </div>
 
-                <div @(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn) ? "" : "hidden") class="col-md-6" id="autoDateIntervalHintGroup">
+                <div class="col-md-6" id="autoDateIntervalHintGroup">
                     <div class="form-text mt-4">
                         Examples: Last Minutes 5 = from 5 minutes ago to now, Previous Month 2 = from last 2 month start date to last month end date.
                     </div>
                 </div>
 
-                <div hidden="@(!Model.IsReport)" class="col-md-6" id="dateFromGroup">
+                <div class="col-md-6" id="dateFromGroup">
                     <label asp-for="DateFrom" class="form-label"></label>
                     <input asp-for="DateFrom" type="date" class="form-control" />
                     <span asp-validation-for="DateFrom" class="text-danger"></span>
                 </div>
 
-                <div hidden="@(!Model.IsReport)" class="col-md-6" id="dateToGroup">
+                <div class="col-md-6" id="dateToGroup">
                     <label asp-for="DateTo" class="form-label"></label>
                     <input asp-for="DateTo" type="date" class="form-control" />
                     <span asp-validation-for="DateTo" class="text-danger"></span>
@@ -450,6 +450,7 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const isCustomGroup = document.getElementById('isCustomGroup');
             const isUseRecurringDataDateColumnGroup = document.getElementById('isUseRecurringDataDateColumnGroup');
             const recurringDataDateColumnGroup = document.getElementById('recurringDataDateColumnGroup');
             const isReport = document.getElementById('IsReport');
@@ -551,12 +552,26 @@
 
                 const isUseRecurringDataDateColumn = isUseRecurringDataDateColumnToggle.checked;
 
+                console.log('setSourceMode');
+                console.log('isReportMode:' + isReportMode);
+                console.log('isUseRecurringDataDateColumn:' + isUseRecurringDataDateColumn);
+                console.log('(isReportMode || (!isReportMode && isUseRecurringDataDateColumn):' + isReportMode || (!isReportMode && isUseRecurringDataDateColumn));
+
+                //clientCodeGroup.style.display = isReportMode ? '' : 'none';
+                //isUseRecurringDataDateColumnGroup.style.display = !isReportMode ? '' : 'none';
+
                 clientCodeGroup.classList.toggle('d-none', !isReportMode);
-                isUseRecurringDataDateColumnGroup.hidden = isReportMode;
-                recurringDataDateColumnGroup.hidden = isReportMode;
-                autoDateIntervalUnitGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
-                autoDateIntervalValueGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
-                autoDateIntervalHintGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
+                isUseRecurringDataDateColumnGroup.classList.toggle('d-none', isReportMode);
+                recurringDataDateColumnGroup.classList.toggle('d-none', !(!isReportMode && isUseRecurringDataDateColumn));
+                isCustomGroup.classList.toggle('d-none', !isReportMode);
+                autoDateIntervalUnitGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));
+                autoDateIntervalValueGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));
+                autoDateIntervalHintGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));
+                
+                // autoDateIntervalUnitGroup.classList.toggle('d-none', !isReportMode || (!isUseRecurringDataDateColumn));
+                // autoDateIntervalValueGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
+                // autoDateIntervalHintGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
+
 
                 //(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn)
 
@@ -1738,11 +1753,16 @@
             if (isUseRecurringDataDateColumnToggle) {
                 isUseRecurringDataDateColumnToggle.addEventListener('change', () => {
                     const isUseRecurringDataDateColumn = isUseRecurringDataDateColumnToggle.checked
+                    const isReportMode = getSourceMode() === 'report';
 
-                    recurringDataDateColumnGroup.hidden = !isUseRecurringDataDateColumn;
-                    autoDateIntervalUnitGroup.hidden = !isUseRecurringDataDateColumn
-                    autoDateIntervalValueGroup.hidden = !isUseRecurringDataDateColumn
-                    autoDateIntervalHintGroup.hidden = !isUseRecurringDataDateColumn
+                    console.log('isUseRecurringDataDateColumnToggle');
+                    console.log('isReportMode:' + isReportMode);
+                    console.log('isUseRecurringDataDateColumn:' + isUseRecurringDataDateColumn);
+
+                    recurringDataDateColumnGroup.classList.toggle('d-none', !(!isReportMode && isUseRecurringDataDateColumn));
+                    autoDateIntervalUnitGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));
+                    autoDateIntervalValueGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));
+                    autoDateIntervalHintGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));
 
                     if(isUseRecurringDataDateColumnToggle.checked){
                         refreshProcessDataColumnOptions();
