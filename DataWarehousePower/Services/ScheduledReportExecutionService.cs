@@ -235,6 +235,7 @@ public sealed class ScheduledReportExecutionService(
                 .ToList();
 
             rows = await reportRepository.GetDataFileDataFromTableAsync(
+                userId,
                 dataFile.SourceTable,
                 dataFileExecFilterColumns,
                 dataFile.SourceDatabase,
@@ -243,6 +244,16 @@ public sealed class ScheduledReportExecutionService(
                 clientCode,
                 dateFrom,
                 dateTo);
+
+            //rows = await reportRepository.GetDataFileDataFromTableAsync(
+            //    dataFile.SourceTable,
+            //    dataFileExecFilterColumns,
+            //    dataFile.SourceDatabase,
+            //    dataFile.FilterClientCodeColumn,
+            //    recurringDataDateColumn,
+            //    clientCode,
+            //    dateFrom,
+            //    dateTo);
 
             //rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
         }

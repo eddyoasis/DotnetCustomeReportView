@@ -365,6 +365,7 @@ namespace DataWarehousePower.Controllers
             {
                 DataFilePreviewResult preview = await _service.GetPreviewDataAsync(new DataFilePreviewRequest
                 {
+                    UserId = userId,
                     SourceDatabase = form.SourceDatabase,
                     SourceTable = form.SourceTable,
                     SourceSP = form.SourceSP,

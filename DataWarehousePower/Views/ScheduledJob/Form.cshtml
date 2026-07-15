@@ -309,7 +309,7 @@
 
                 <input asp-for="FilterColumnDataJson" type="hidden" />
 
-                <div class="col-md-6 d-flex flex-column gap-1" id="clientCodeGroup">
+                <div class="col-md-12 d-flex flex-column gap-1 @(Model.IsReport ? "" : "d-none")" id="clientCodeGroup">
                     <label asp-for="ClientCode" class="form-label small fw-semibold"></label>
                     <input type="hidden" name="clientCode" id="scheduled-job-client-code-value" value="@Model.ClientCode" />
                     
@@ -549,7 +549,20 @@
                     reportDefinitionLabel.textContent = isReportMode ? 'Report' : 'Data File';
                 }
 
+                const isUseRecurringDataDateColumn = isUseRecurringDataDateColumnToggle.checked;
+
+                clientCodeGroup.classList.toggle('d-none', !isReportMode);
                 isUseRecurringDataDateColumnGroup.hidden = isReportMode;
+                recurringDataDateColumnGroup.hidden = isReportMode;
+                autoDateIntervalUnitGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
+                autoDateIntervalValueGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
+                autoDateIntervalHintGroup.classList.toggle('d-none', !isReportMode && !isUseRecurringDataDateColumn);
+
+                //(Model.IsReport || (!Model.IsReport && Model.IsUseRecurringDataDateColumn)
+
+                //autoDateIntervalUnitGroup.hidden = !isReportMode
+                //autoDateIntervalValueGroup.hidden = !isReportMode
+                //autoDateIntervalHintGroup.hidden = !isReportMode
             }
 
             function renderSourceOptions(clearSelection) {
@@ -1415,7 +1428,7 @@
                     clientCodeSelect.appendChild(defaultOption);
                     syncClientCodeUi('');
                     return;
-                }
+                }             
 
                 const selectedReportId = parseInt(reportDefinitionSelect.value, 10);
                 const reportSchemaTemplates = Number.isFinite(selectedReportId)
@@ -1680,7 +1693,7 @@
 
             if (sourceModeSelect) {
                 sourceModeSelect.addEventListener('change', () => {
-                    
+
                     setSourceMode(getSourceMode());
                     renderSourceOptions(true);
                     updateSchemaAndClientCodeFields();
