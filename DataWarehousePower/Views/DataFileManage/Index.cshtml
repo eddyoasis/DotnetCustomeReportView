@@ -64,10 +64,7 @@ else
                 <tr>
                     <th style="width:40px;">#</th>
                     <th>Data File Name</th>
-                    <th>Source Database</th>
                     <th>Source Table</th>
-                    <th>Source SP</th>
-                    <th>Departments</th>
                     <th>Columns</th>
                     <th style="width:90px;" class="text-center">Active</th>
                     <th style="width:160px;">Actions</th>
@@ -82,27 +79,29 @@ else
                             <a asp-controller="DataFile" asp-action="Index" asp-route-id="@dataFile.Id"
                                class="fw-semibold text-decoration-none">@dataFile.DataFileName</a>
                         </td>
-                        <td>@(string.IsNullOrEmpty(dataFile.SourceDatabase) ? "-" : dataFile.SourceDatabase)</td>
+                        @* <td>@(string.IsNullOrEmpty(dataFile.SourceDatabase) ? "-" : dataFile.SourceDatabase)</td> *@
                         <td>@(string.IsNullOrEmpty(dataFile.SourceTable) ? "-" : dataFile.SourceTable)</td>
-                        <td>@(string.IsNullOrEmpty(dataFile.SourceSP) ? "-" : dataFile.SourceSP)</td>
-                        <td>
+                        @* <td>@(string.IsNullOrEmpty(dataFile.SourceSP) ? "-" : dataFile.SourceSP)</td> *@
+                        @*
+                            <td>
                             @if (string.IsNullOrWhiteSpace(dataFile.Departments))
                             {
-                                @:All
+                            @:All
                             }
                             else
                             {
-                                var tokens = dataFile.Departments
-                                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                                var displayNames = tokens
-                                    .Select(token => int.TryParse(token, out int id)
-                                        ? (departmentLookup.TryGetValue(id, out var name) ? name : $"Unknown ({id})")
-                                        : token)
-                                    .ToList();
+                            var tokens = dataFile.Departments
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            var displayNames = tokens
+                            .Select(token => int.TryParse(token, out int id)
+                            ? (departmentLookup.TryGetValue(id, out var name) ? name : $"Unknown ({id})")
+                            : token)
+                            .ToList();
 
-                                @string.Join(", ", displayNames)
+                            @string.Join(", ", displayNames)
                             }
-                        </td>
+                            </td>
+                        *@
                         <td>
                             @foreach (var column in dataFile.Columns.OrderBy(column => column.DisplayOrder))
                             {

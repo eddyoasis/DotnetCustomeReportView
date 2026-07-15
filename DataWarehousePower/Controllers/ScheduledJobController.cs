@@ -75,6 +75,7 @@ public sealed class ScheduledJobController(
             viewModel.AvailableSchemaTemplates = reportSchemaTemplates;
         }
 
+        viewModel.ExportToLocalFolder = true;
         viewModel.IsReport = !isDataFile;
         viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
         viewModel.AvailableExportLocationBasePaths = viewModel.AvailableExportLocationBasePathOptions

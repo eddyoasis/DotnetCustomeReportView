@@ -265,7 +265,7 @@ else
                     <th>Report/Data File Name</th>
                     <th>Format</th>
                     <th>Action</th>
-                    <th>Export Location</th>
+                    @* <th>Export Location</th> *@
                     <th>Schema Template</th>
                     <th>Filter Client Code</th>
                     <th>Schedule</th>
@@ -296,7 +296,7 @@ else
                                 <div class="small text-muted">@job.RecipientEmail</div>
                             }
                         </td>
-                        <td>
+                        @* <td>
                             @if (string.IsNullOrWhiteSpace(job.ExportLocation))
                             {
                                 <span class="text-muted">(App Root)</span>
@@ -316,11 +316,8 @@ else
                                         <span>@exportLocationDisplay</span>
                                     }
                                 </div>
-                                @* <div class="d-flex flex-column gap-1">
-                                    <span>@exportLocationDisplay</span>
-                                </div> *@
                             }
-                        </td>
+                        </td> *@
                         <td>@(string.IsNullOrWhiteSpace(job.SchemaTemplate) ? "-" : job.SchemaTemplate)</td>
                         <td>@(string.IsNullOrWhiteSpace(job.ClientCode) ? "-" : job.ClientCode)</td>
                         <td>

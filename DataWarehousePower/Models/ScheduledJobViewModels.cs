@@ -136,7 +136,7 @@ public sealed class ScheduledJobFormViewModel
     public string? ExportLocationSubfolder { get; set; }
 
     [Display(Name = "Export to own workspace")]
-    public bool ExportToLocalFolder { get; set; }
+    public bool ExportToLocalFolder { get; set; } = true;
 
     public List<ExportLocationBasePathOptionViewModel> AvailableExportLocationBasePathOptions { get; set; } = [];
 
