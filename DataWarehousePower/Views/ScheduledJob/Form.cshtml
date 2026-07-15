@@ -309,25 +309,38 @@
 
                 <input asp-for="FilterColumnDataJson" type="hidden" />
 
-                <div class="col-md-6" id="clientCodeGroup">
-                    <label asp-for="ClientCode" class="form-label"></label>
-                    @{
-                        string selectedClientCode = (Model.ClientCode ?? string.Empty).Trim();
-                        bool hasSelectedClientCode = !string.IsNullOrWhiteSpace(selectedClientCode)
-                            && Model.AvailableClientCodes.Any(code => code.Equals(selectedClientCode, StringComparison.OrdinalIgnoreCase));
-                    }
-                    <select asp-for="ClientCode" class="form-select">
+                <div class="col-md-6 d-flex flex-column gap-1" id="clientCodeGroup">
+                    <label asp-for="ClientCode" class="form-label small fw-semibold"></label>
+                    <input type="hidden" name="clientCode" id="scheduled-job-client-code-value" value="@Model.ClientCode" />
+                    
+                    <select id="scheduled-job-client-code-select" class="d-none" aria-hidden="true">
                         <option value="">-- Select client code --</option>
-                        @foreach (string availableClientCode in Model.AvailableClientCodes)
+                        @foreach (string availableClientCode in Model.AvailableClientCodes ?? new List<string>())
                         {
                             <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
                         }
-                        @if (!hasSelectedClientCode && !string.IsNullOrWhiteSpace(selectedClientCode))
-                        {
-                            <option value="@selectedClientCode" selected="selected">@selectedClientCode</option>
-                        }
                     </select>
-                    <span asp-validation-for="ClientCode" class="text-danger"></span>
+                    
+                    <div class="dropdown w-100">
+                        <button id="scheduled-job-client-code-toggle"
+                                class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                data-bs-auto-close="outside"
+                                aria-expanded="false">
+                            @(string.IsNullOrWhiteSpace(Model.ClientCode) ? "-- Select client code --" : Model.ClientCode)
+                        </button>
+                        <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
+                            <input id="scheduled-job-client-code-search"
+                                   type="text"
+                                   class="form-control form-control-sm mb-2"
+                                   maxlength="128"
+                                   placeholder="Search client code"
+                                   autocomplete="off" />
+                            <div id="scheduled-job-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                    <div id="scheduled-job-client-code-error" class="text-danger small mt-1" style="display:none;"></div>
                 </div>
 
                @*  <div class="col-12">
@@ -1761,6 +1774,71 @@
                     select.selectedIndex = 0;
                 }
             }
+
+            // Initialize searchable client code dropdown
+            const scheduledJobClientCodeValueInput = document.getElementById('scheduled-job-client-code-value');
+            const scheduledJobClientCodeToggle = document.getElementById('scheduled-job-client-code-toggle');
+            const scheduledJobClientCodeSearchInput = document.getElementById('scheduled-job-client-code-search');
+            const scheduledJobClientCodeOptions = document.getElementById('scheduled-job-client-code-options');
+            const scheduledJobClientCodeError = document.getElementById('scheduled-job-client-code-error');
+            const scheduledJobClientCodeSelect = document.getElementById('scheduled-job-client-code-select');
+            //const clientCodeFieldInput = document.getElementById('ClientCode');
+
+            function renderScheduledJobClientCodeOptions(searchText = '') {
+                if (!scheduledJobClientCodeOptions || !scheduledJobClientCodeSelect) {
+                    return;
+                }
+
+                scheduledJobClientCodeOptions.innerHTML = '';
+                const filterLower = (searchText || '').toLowerCase();
+                let hasMatches = false;
+
+                const options = Array.from(scheduledJobClientCodeSelect.options || [])
+                    .filter(opt => opt.value !== '')
+                    .filter(opt => !filterLower || opt.textContent.toLowerCase().includes(filterLower));
+
+                options.forEach(opt => {
+                    hasMatches = true;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = `list-group-item list-group-item-action ${opt.value === (scheduledJobClientCodeValueInput?.value || '') ? 'active' : ''}`;
+                    button.textContent = opt.textContent;
+                    button.dataset.value = opt.value;
+
+                    button.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        scheduledJobClientCodeValueInput.value = opt.value;
+                        if (clientCodeFieldInput) {
+                            clientCodeFieldInput.value = opt.value;
+                        }
+                        scheduledJobClientCodeToggle.textContent = opt.textContent;
+                        scheduledJobClientCodeSearchInput.value = '';
+                        renderScheduledJobClientCodeOptions();
+
+                        const bsDropdown = bootstrap.Dropdown.getInstance(scheduledJobClientCodeToggle);
+                        if (bsDropdown) {
+                            bsDropdown.hide();
+                        }
+                    });
+
+                    scheduledJobClientCodeOptions.appendChild(button);
+                });
+
+                if (!hasMatches) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.className = 'text-muted small p-2';
+                    emptyMsg.textContent = 'No matching client codes';
+                    scheduledJobClientCodeOptions.appendChild(emptyMsg);
+                }
+            }
+
+            if (scheduledJobClientCodeSearchInput) {
+                scheduledJobClientCodeSearchInput.addEventListener('input', () => {
+                    renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput.value);
+                });
+            }
+
+            renderScheduledJobClientCodeOptions();
 
             updateScheduleFields();
             updateJobActionFields();
