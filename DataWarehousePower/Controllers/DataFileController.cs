@@ -4,6 +4,7 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -192,6 +193,58 @@ namespace DataWarehousePower.Controllers
                 returnUrl,
                 isDataFile = true
             });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> FilterValues(int id, string? columnKey = null, string? search = null, int take = 50)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string? userDepartment = ResolveUserDepartment();
+
+            DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(
+                userId,
+                userDepartment ?? string.Empty,
+                new DataFileManageFilterViewModel());
+
+            DataFileDefinition? selectedDataFile = listViewModel.DataFiles.FirstOrDefault(dataFile => dataFile.Id == id);
+            if (selectedDataFile is null)
+            {
+                return Json(Array.Empty<string>());
+            }
+
+            string normalizedColumnKey = (columnKey ?? string.Empty).Trim();
+            DataFileColumn? selectedColumn = selectedDataFile.Columns.FirstOrDefault(column =>
+                !string.IsNullOrWhiteSpace(column.PropertyName) &&
+                column.PropertyName.Equals(normalizedColumnKey, StringComparison.OrdinalIgnoreCase));
+
+            if (selectedColumn is null)
+            {
+                return Json(Array.Empty<string>());
+            }
+
+            try
+            {
+                List<string> values = await _service.GetDistinctColumnValuesAsync(
+                    selectedDataFile.SourceDatabase,
+                    selectedDataFile.SourceTable,
+                    selectedDataFile.SourceSP,
+                    selectedColumn.PropertyName,
+                    search,
+                    take);
+
+                return Json(values);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Column filter values query failed for data file {DataFileId}, database {SourceDatabase}, table {SourceTable}, column {ColumnName}",
+                    id,
+                    selectedDataFile.SourceDatabase,
+                    selectedDataFile.SourceTable,
+                    selectedColumn.PropertyName);
+
+                return Json(Array.Empty<string>());
+            }
         }
 
         [HttpPost]

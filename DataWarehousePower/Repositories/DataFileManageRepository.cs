@@ -1228,6 +1228,88 @@ namespace DataWarehousePower.Repositories
             return items;
         }
 
+        public async Task<List<string>> GetDistinctColumnValuesAsync(
+            string? sourceDatabase,
+            string? sourceTable,
+            string? sourceSP,
+            string? columnName,
+            string? search = null,
+            int take = 50)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDatabase) ||
+                string.IsNullOrWhiteSpace(sourceTable) ||
+                string.IsNullOrWhiteSpace(columnName) ||
+                !string.IsNullOrWhiteSpace(sourceSP))
+            {
+                return new();
+            }
+
+            int safeTake = Math.Clamp(take, 1, 100);
+            string normalizedDatabase = sourceDatabase.Trim();
+            string normalizedTable = sourceTable.Trim();
+            string normalizedColumn = columnName.Trim();
+            string normalizedSearch = (search ?? string.Empty).Trim();
+
+            List<SourceColumnMetadata> metadata = await GetSourceColumnMetadataAsync(normalizedDatabase, normalizedTable, null);
+            bool columnExists = metadata.Any(column =>
+                !string.IsNullOrWhiteSpace(column.Name) &&
+                column.Name.Equals(normalizedColumn, StringComparison.OrdinalIgnoreCase));
+
+            if (!columnExists)
+            {
+                return new();
+            }
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            string escapedDatabase = EscapeSqlIdentifier(normalizedDatabase);
+            string escapedTable = EscapeSqlIdentifier(normalizedTable);
+            string escapedColumn = EscapeSqlIdentifier(normalizedColumn);
+
+            await using var cmd = conn.CreateCommand();
+
+            string whereSearchSql = string.IsNullOrWhiteSpace(normalizedSearch)
+                ? string.Empty
+                : " AND CAST([" + escapedColumn + "] AS nvarchar(4000)) LIKE @search";
+
+            cmd.CommandText =
+                "SELECT DISTINCT TOP (" + safeTake + ") CAST([" + escapedColumn + "] AS nvarchar(4000)) AS [Value] " +
+                "FROM [" + escapedDatabase + "]..[" + escapedTable + "] WITH(NOLOCK) " +
+                "WHERE [" + escapedColumn + "] IS NOT NULL" +
+                whereSearchSql +
+                " ORDER BY [Value]";
+
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                AddParameter(cmd, "@search", $"%{normalizedSearch}%");
+            }
+
+            List<string> values = new();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (reader.IsDBNull(0))
+                {
+                    continue;
+                }
+
+                string value = reader.GetString(0).Trim();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    values.Add(value);
+                }
+            }
+
+            return values
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         private static async Task<List<SourceColumnMetadata>> GetSourceColumnsFromTableOrViewAsync(
             System.Data.Common.DbConnection conn,
             string safeDatabase,

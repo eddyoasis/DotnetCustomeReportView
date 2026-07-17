@@ -145,6 +145,15 @@ namespace DataWarehousePower.Services
         public Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
             => _repository.GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP);
 
+        public Task<List<string>> GetDistinctColumnValuesAsync(
+            string? sourceDatabase,
+            string? sourceTable,
+            string? sourceSP,
+            string? columnName,
+            string? search = null,
+            int take = 50)
+            => _repository.GetDistinctColumnValuesAsync(sourceDatabase, sourceTable, sourceSP, columnName, search, take);
+
         public Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request, DateTime? dateFrom = null, DateTime? dateTo = null)
             => _repository.GetPreviewDataAsync(request, dateFrom ?? request.DateFrom, dateTo ?? request.DateTo);
 

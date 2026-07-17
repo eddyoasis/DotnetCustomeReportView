@@ -190,6 +190,13 @@
                                         normalizedPropertyType.Contains("smallmoney") ||
                                         normalizedPropertyType.Contains("int") ||
                                         normalizedPropertyType.Contains("number");
+                                    var supportsSuggestionFilter =
+                                        !supportsRangeFilter &&
+                                        (
+                                            normalizedPropertyType.Contains("char") ||
+                                            normalizedPropertyType.Contains("text") ||
+                                            normalizedPropertyType.Contains("string")
+                                        );
                                     var rangeInputType = normalizedPropertyType.Contains("date") || normalizedPropertyType.Contains("time")
                                         ? "date"
                                         : "number";
@@ -215,6 +222,22 @@
                                                     <input type="@rangeInputType"
                                                            class="form-control form-control-sm column-filter-range-to"
                                                            placeholder="To" />
+                                                </div>
+                                            }
+                                            else if (supportsSuggestionFilter)
+                                            {
+                                                <div class="column-filter-suggest position-relative">
+                                                    <input id="@filterInputId"
+                                                           name="columnFilters[@filterKey]"
+                                                           type="text"
+                                                           class="form-control form-control-sm column-filter-input column-filter-suggest-input"
+                                                           value="@filterValue"
+                                                           data-filter-key="@filterKey"
+                                                           data-column-key="@availableColumn.Key"
+                                                           data-filter-values-url="@Url.Action("FilterValues", "DataFile", new { id = selectedDataFile.Id })"
+                                                           autocomplete="off"
+                                                           placeholder="Select or enter a value" />
+                                                    <div class="list-group column-filter-suggest-list position-absolute w-100 d-none"></div>
                                                 </div>
                                             }
                                             else
@@ -595,6 +618,14 @@
         background: rgba(255, 255, 255, 0.55);
         z-index: 10;
     }
+
+    .column-filter-suggest-list {
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 30;
+        top: calc(100% + 2px);
+        left: 0;
+    }
 </style>
 
 @section Scripts {
@@ -680,12 +711,14 @@
             const filterDateFromInput = document.getElementById('filter-date-from');
             const filterDateToInput = document.getElementById('filter-date-to');
             const columnFilterInputs = [...document.querySelectorAll('.column-filter-input')];
+            const columnFilterSuggestInputs = [...document.querySelectorAll('.column-filter-suggest-input')];
             const scheduleDataFileLink = document.getElementById('schedule-datafile-link');
             const exportPasswordModalElement = document.getElementById('export-password-modal');
             const exportPasswordInput = document.getElementById('export-password-input');
             const exportPasswordError = document.getElementById('export-password-error');
             const exportConfirmButton = document.getElementById('btn-export-confirm');
             const exportPasswordModal = new bootstrap.Modal(exportPasswordModalElement);
+            const columnFilterSuggestionStates = new WeakMap();
 
             let activePreferenceId = initialPreferenceId;
             let autoSaveTimer = null;
@@ -1322,6 +1355,159 @@
                 });
             }
 
+            function initializeColumnFilterSuggestions() {
+                const getState = input => {
+                    let state = columnFilterSuggestionStates.get(input);
+                    if (!state) {
+                        state = { timer: null, requestId: 0, cache: new Map() };
+                        columnFilterSuggestionStates.set(input, state);
+                    }
+
+                    return state;
+                };
+
+                const getListElement = input => {
+                    const container = input.closest('.column-filter-suggest');
+                    return container?.querySelector('.column-filter-suggest-list') ?? null;
+                };
+
+                const hideList = input => {
+                    const list = getListElement(input);
+                    if (!list) {
+                        return;
+                    }
+
+                    list.classList.add('d-none');
+                    list.innerHTML = '';
+                };
+
+                const hideAllLists = activeInput => {
+                    columnFilterSuggestInputs.forEach(input => {
+                        if (input !== activeInput) {
+                            hideList(input);
+                        }
+                    });
+                };
+
+                const renderList = (input, values) => {
+                    const list = getListElement(input);
+                    if (!list) {
+                        return;
+                    }
+
+                    list.innerHTML = '';
+                    if (!Array.isArray(values) || values.length === 0) {
+                        list.classList.add('d-none');
+                        return;
+                    }
+
+                    values.forEach(value => {
+                        const item = document.createElement('button');
+                        item.type = 'button';
+                        item.className = 'list-group-item list-group-item-action py-1 px-2';
+                        item.textContent = value;
+                        item.addEventListener('mousedown', event => {
+                            event.preventDefault();
+                        });
+                        item.addEventListener('click', () => {
+                            input.value = value;
+                            hideList(input);
+                        });
+
+                        list.appendChild(item);
+                    });
+
+                    list.classList.remove('d-none');
+                };
+
+                const loadSuggestions = async input => {
+                    const urlTemplate = (input.dataset.filterValuesUrl || '').trim();
+                    const columnKey = (input.dataset.columnKey || '').trim();
+                    if (!urlTemplate || !columnKey) {
+                        hideList(input);
+                        return;
+                    }
+
+                    const searchValue = (input.value || '').trim();
+                    const state = getState(input);
+                    const cacheKey = searchValue.toLocaleLowerCase();
+                    if (state.cache.has(cacheKey)) {
+                        renderList(input, state.cache.get(cacheKey));
+                        return;
+                    }
+
+                    state.requestId += 1;
+                    const requestId = state.requestId;
+
+                    const url = new URL(urlTemplate, window.location.origin);
+                    url.searchParams.set('columnKey', columnKey);
+                    url.searchParams.set('take', '50');
+                    if (searchValue) {
+                        url.searchParams.set('search', searchValue);
+                    }
+
+                    try {
+                        const response = await fetch(url.toString(), { method: 'GET' });
+                        const payload = await response.json().catch(() => []);
+                        if (requestId !== state.requestId) {
+                            return;
+                        }
+
+                        const values = Array.isArray(payload)
+                            ? payload
+                                .map(value => String(value || '').trim())
+                                .filter(value => value.length > 0)
+                            : [];
+
+                        state.cache.set(cacheKey, values);
+                        renderList(input, values);
+                    } catch {
+                        if (requestId === state.requestId) {
+                            hideList(input);
+                        }
+                    }
+                };
+
+                columnFilterSuggestInputs.forEach(input => {
+                    input.addEventListener('focus', () => {
+                        hideAllLists(input);
+                        loadSuggestions(input);
+                    });
+
+                    input.addEventListener('input', () => {
+                        const state = getState(input);
+                        if (state.timer) {
+                            clearTimeout(state.timer);
+                        }
+
+                        state.timer = setTimeout(() => {
+                            state.timer = null;
+                            hideAllLists(input);
+                            loadSuggestions(input);
+                        }, 200);
+                    });
+
+                    input.addEventListener('blur', () => {
+                        window.setTimeout(() => hideList(input), 120);
+                    });
+
+                    input.addEventListener('keydown', event => {
+                        if (event.key === 'Escape') {
+                            hideList(input);
+                        }
+                    });
+                });
+
+                document.addEventListener('click', event => {
+                    const target = event.target;
+                    if (!(target instanceof Element) || target.closest('.column-filter-suggest')) {
+                        return;
+                    }
+
+                    hideAllLists(null);
+                });
+            }
+
             function showExportPasswordError(message) {
                 if (!exportPasswordError) {
                     return;
@@ -1949,6 +2135,7 @@
             syncSchemaTemplateUi(initialSchemaTemplate);
             syncScheduleLink();
             initializeRangeFilterInputs();
+            initializeColumnFilterSuggestions();
 
             if (sortable) {
                 loadColumnStateFromDefaults();
