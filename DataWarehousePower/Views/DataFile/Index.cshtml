@@ -626,6 +626,12 @@
         top: calc(100% + 2px);
         left: 0;
     }
+
+    .column-filter-suggest-loading {
+        cursor: default;
+        color: #6c757d;
+        background-color: #fff;
+    }
 </style>
 
 @section Scripts {
@@ -1356,10 +1362,12 @@
             }
 
             function initializeColumnFilterSuggestions() {
+                const suggestionFetchDebounceMs = 700;
+
                 const getState = input => {
                     let state = columnFilterSuggestionStates.get(input);
                     if (!state) {
-                        state = { timer: null, requestId: 0, cache: new Map() };
+                        state = { timer: null, requestId: 0, lastRequestedKey: null, cache: new Map() };
                         columnFilterSuggestionStates.set(input, state);
                     }
 
@@ -1420,6 +1428,22 @@
                     list.classList.remove('d-none');
                 };
 
+                const showLoading = input => {
+                    const list = getListElement(input);
+                    if (!list) {
+                        return;
+                    }
+
+                    list.innerHTML = '';
+
+                    const loadingItem = document.createElement('div');
+                    loadingItem.className = 'list-group-item py-1 px-2 column-filter-suggest-loading';
+                    loadingItem.textContent = 'Loading values...';
+                    list.appendChild(loadingItem);
+
+                    list.classList.remove('d-none');
+                };
+
                 const loadSuggestions = async input => {
                     const urlTemplate = (input.dataset.filterValuesUrl || '').trim();
                     const columnKey = (input.dataset.columnKey || '').trim();
@@ -1431,13 +1455,21 @@
                     const searchValue = (input.value || '').trim();
                     const state = getState(input);
                     const cacheKey = searchValue.toLocaleLowerCase();
+
+                    if (state.lastRequestedKey === cacheKey) {
+                        return;
+                    }
+
                     if (state.cache.has(cacheKey)) {
+                        state.lastRequestedKey = cacheKey;
                         renderList(input, state.cache.get(cacheKey));
                         return;
                     }
 
                     state.requestId += 1;
                     const requestId = state.requestId;
+                    state.lastRequestedKey = cacheKey;
+                    showLoading(input);
 
                     const url = new URL(urlTemplate, window.location.origin);
                     url.searchParams.set('columnKey', columnKey);
@@ -1484,7 +1516,7 @@
                             state.timer = null;
                             hideAllLists(input);
                             loadSuggestions(input);
-                        }, 200);
+                        }, suggestionFetchDebounceMs);
                     });
 
                     input.addEventListener('blur', () => {
