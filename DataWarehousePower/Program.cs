@@ -46,6 +46,7 @@ builder.Services.AddScoped<IReportConnectionStringRepository, ReportConnectionSt
 builder.Services.AddScoped<IDepartmentConnectionRepository, DepartmentConnectionRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IDWSchemeRepository, DWSchemeRepository>();
+builder.Services.AddScoped<ISnowflakeRepository, SnowflakeRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportService,           ReportService>();
@@ -67,6 +68,7 @@ builder.Services.AddScoped<IReportConnectionStringService, ReportConnectionStrin
 builder.Services.AddScoped<IDepartmentConnectionService, DepartmentConnectionService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDWSchemeService, DWSchemeService>();
+builder.Services.AddScoped<ISnowflakeService, SnowflakeService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DepartmentAuthorizationOptions>(
     builder.Configuration.GetSection(DepartmentAuthorizationOptions.SectionName));
