@@ -9,6 +9,7 @@ using DataWarehousePower.Helper;
 using DataWarehousePower.Models.AppSettings;
 using Microsoft.Extensions.Options;
 using System.Linq;
+using Snowflake.Data.Client;
 
 namespace DataWarehousePower.Controllers
 {
@@ -25,6 +26,7 @@ namespace DataWarehousePower.Controllers
         private readonly IDepartmentConnectionService _departmentConnectionService;
         private readonly IColumnPreferenceService _prefService;
         private readonly IAuditLogService _auditLogService;
+        private readonly ISnowflakeService _snowflakeService;
         private readonly ILogger<DataFileManageController> _logger;
         private readonly GeneralAppSetting _generalAppSetting;
         private readonly ScheduledJob _scheduledJobAppSetting;
@@ -37,6 +39,7 @@ namespace DataWarehousePower.Controllers
             IDepartmentConnectionService departmentConnectionService,
             IColumnPreferenceService prefService,
             IAuditLogService auditLogService,
+            ISnowflakeService snowflakeService,
             IOptionsSnapshot<GeneralAppSetting> generalAppSetting,
             ILogger<DataFileManageController> logger)
         {
@@ -47,6 +50,7 @@ namespace DataWarehousePower.Controllers
             _departmentConnectionService = departmentConnectionService;
             _prefService = prefService;
             _auditLogService = auditLogService;
+            _snowflakeService = snowflakeService;
             _logger = logger;
             _generalAppSetting = generalAppSetting.Value;
         }
@@ -492,7 +496,8 @@ namespace DataWarehousePower.Controllers
                 var userId = HttpHelper.ResolveUserId(HttpContext);
                 request.UserId = userId;
 
-                DataFilePreviewResult preview = await _service.GetPreviewDataAsync(request);
+                //DataFilePreviewResult preview = await _service.GetPreviewDataAsync(request);
+                DataFilePreviewResult preview = await _snowflakeService.GetPreviewDataAsync(request);
                 return Json(new
                 {
                     columns = preview.Columns,
@@ -508,6 +513,15 @@ namespace DataWarehousePower.Controllers
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.LogWarning(ex,
+                    "Snowflake preview query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
+                    request?.SourceDatabase,
+                    request?.SourceTable,
+                    request?.SourceSP);
+                return BadRequest(new { message = "Failed to load preview data from Snowflake." });
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
             {
