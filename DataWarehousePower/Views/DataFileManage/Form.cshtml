@@ -334,6 +334,111 @@
     </div>
 </form>
 
+<style>
+    .mapping-parameter-suggest {
+        position: relative;
+    }
+
+    .mapping-parameter-suggest-box {
+        min-height: calc(1.5em + .5rem + 2px);
+        display: flex;
+        flex-direction: column;
+        gap: .4rem;
+        padding: .45rem .55rem;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: .25rem;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .mapping-parameter-suggest-box:focus-within {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 .15rem rgba(13, 110, 253, .15);
+    }
+
+    .mapping-parameter-suggest-summary {
+        display: none;
+        font-size: .72rem;
+        color: #6c757d;
+    }
+
+    .mapping-parameter-suggest-summary.has-value {
+        display: block;
+    }
+
+    .mapping-parameter-suggest-selected {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+    }
+
+    .mapping-parameter-suggest-selected.is-empty {
+        display: none;
+    }
+
+    .mapping-parameter-suggest-input {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: none;
+        box-shadow: none;
+        background: transparent;
+        padding: 0;
+        font-size: .875rem;
+    }
+
+    .mapping-parameter-suggest-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        max-width: 100%;
+        border-radius: 999px;
+        padding: .35rem .55rem;
+        background: #e7f1ff;
+        color: #0a58ca;
+        border: 1px solid #b6d4fe;
+        font-size: .78rem;
+        font-weight: 500;
+    }
+
+    .mapping-parameter-suggest-chip-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+    }
+
+    .mapping-parameter-suggest-chip-remove {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+        padding: 0;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        opacity: .8;
+    }
+
+    .mapping-parameter-suggest-chip-remove:hover {
+        background: rgba(10, 88, 202, .12);
+        opacity: 1;
+    }
+
+    .mapping-parameter-suggest-list {
+        position: absolute;
+        top: calc(100% + 2px);
+        left: 0;
+        right: 0;
+        z-index: 20;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+</style>
+
 @section Scripts {
     <script>
         let rowIndex = @Model.Columns.Count;
@@ -867,6 +972,27 @@
             return `${normalizedStart}|${normalizedEnd}`;
         }
 
+        function parseMappingParameterTokens(value) {
+            const raw = (value || '').trim();
+            if (!raw) {
+                return [];
+            }
+
+            return raw
+                .split(/[,;|]/)
+                .map(token => token.trim())
+                .filter(Boolean)
+                .filter((token, index, tokens) =>
+                    tokens.findIndex(item => item.localeCompare(token, undefined, { sensitivity: 'accent' }) === 0) === index);
+        }
+
+        function serializeMappingParameterTokens(values) {
+            return (Array.isArray(values) ? values : [])
+                .map(value => String(value || '').trim())
+                .filter(Boolean)
+                .join(',');
+        }
+
         function renderTextMappingEditor(mappingCell, mappingInput) {
             const editor = mappingCell.querySelector('.mapping-parameter-editor');
             if (!editor) {
@@ -875,16 +1001,247 @@
 
             editor.innerHTML = '';
 
-            const textInput = document.createElement('input');
-            textInput.type = 'text';
-            textInput.className = 'form-control form-control-sm';
-            textInput.placeholder = 'Enter mapping value';
-            textInput.value = mappingInput.value || '';
-            textInput.addEventListener('input', () => {
-                mappingInput.value = textInput.value;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mapping-parameter-suggest';
+
+            const box = document.createElement('div');
+            box.className = 'mapping-parameter-suggest-box';
+
+            const summary = document.createElement('div');
+            summary.className = 'mapping-parameter-suggest-summary';
+
+            const selectedContainer = document.createElement('div');
+            selectedContainer.className = 'mapping-parameter-suggest-selected';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'mapping-parameter-suggest-input';
+            input.autocomplete = 'off';
+
+            const list = document.createElement('div');
+            list.className = 'list-group mapping-parameter-suggest-list d-none';
+
+            let selectedValues = parseMappingParameterTokens(mappingInput.value || '');
+            let debounceTimer = null;
+            let requestId = 0;
+            const cache = new Map();
+
+            const syncHiddenValue = () => {
+                mappingInput.value = serializeMappingParameterTokens(selectedValues);
+            };
+
+            const hideList = () => {
+                list.classList.add('d-none');
+                list.innerHTML = '';
+            };
+
+            const showLoading = () => {
+                list.innerHTML = '';
+
+                const loadingItem = document.createElement('div');
+                loadingItem.className = 'list-group-item py-1 px-2 text-muted small';
+                loadingItem.textContent = 'Loading values...';
+                list.appendChild(loadingItem);
+
+                list.classList.remove('d-none');
+            };
+
+            const renderSelectedValues = () => {
+                selectedContainer.innerHTML = '';
+                selectedContainer.classList.toggle('is-empty', selectedValues.length === 0);
+                summary.textContent = selectedValues.length > 0 ? `${selectedValues.length} selected` : '';
+                summary.classList.toggle('has-value', selectedValues.length > 0);
+                input.placeholder = selectedValues.length > 0 ? 'Add another mapping value' : 'Select or enter mapping value';
+
+                selectedValues.forEach(value => {
+                    const chip = document.createElement('span');
+                    chip.className = 'mapping-parameter-suggest-chip';
+
+                    const label = document.createElement('span');
+                    label.className = 'mapping-parameter-suggest-chip-label';
+                    label.textContent = value;
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'mapping-parameter-suggest-chip-remove';
+                    removeButton.setAttribute('aria-label', `Remove ${value}`);
+                    removeButton.innerHTML = '&times;';
+                    removeButton.addEventListener('click', () => {
+                        selectedValues = selectedValues.filter(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) !== 0);
+                        syncHiddenValue();
+                        renderSelectedValues();
+                        fetchAndRenderSuggestions();
+                        input.focus();
+                    });
+
+                    chip.appendChild(label);
+                    chip.appendChild(removeButton);
+                    selectedContainer.appendChild(chip);
+                });
+            };
+
+            const addValue = value => {
+                const normalizedValue = String(value || '').trim();
+                if (!normalizedValue) {
+                    return;
+                }
+
+                if (selectedValues.some(item => item.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0)) {
+                    input.value = '';
+                    hideList();
+                    return;
+                }
+
+                selectedValues.push(normalizedValue);
+                input.value = '';
+                syncHiddenValue();
+                renderSelectedValues();
+                fetchAndRenderSuggestions();
+            };
+
+            const renderList = availableOptions => {
+                list.innerHTML = '';
+                if (availableOptions.length === 0) {
+                    hideList();
+                    return;
+                }
+
+                availableOptions.forEach(option => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'list-group-item list-group-item-action py-1 px-2';
+                    item.textContent = option;
+                    item.addEventListener('mousedown', event => event.preventDefault());
+                    item.addEventListener('click', () => {
+                        addValue(option);
+                        input.focus();
+                    });
+                    list.appendChild(item);
+                });
+
+                list.classList.remove('d-none');
+            };
+
+            const fetchAndRenderSuggestions = async () => {
+                const dbName = (databaseInput?.value || '').trim();
+                const sourceTable = (tableInput?.value || '').trim();
+                const sourceSP = (spInput?.value || '').trim();
+                const row = mappingCell.closest('tr.col-row');
+                const propertyInput = row?.querySelector('input[name$=".PropertyName"]');
+                const columnName = (propertyInput?.value || '').trim();
+                const searchValue = (input.value || '').trim();
+
+                const hasValidSource = !!dbName && ((!!sourceTable && !sourceSP) || (!!sourceSP && !sourceTable));
+                if (!hasValidSource || !columnName) {
+                    hideList();
+                    return;
+                }
+
+                const cacheKey = `${dbName}|${sourceTable}|${sourceSP}|${columnName}|${searchValue.toLowerCase()}`;
+                if (cache.has(cacheKey)) {
+                    const cachedOptions = cache.get(cacheKey)
+                        .filter(option => !selectedValues.some(item => item.localeCompare(option, undefined, { sensitivity: 'accent' }) === 0));
+                    renderList(cachedOptions);
+                    return;
+                }
+
+                requestId += 1;
+                const currentRequestId = requestId;
+                showLoading();
+
+                const url = new URL(mappingParameterValuesUrl, window.location.origin);
+                url.searchParams.set('sourceDatabase', dbName);
+                url.searchParams.set('sourceTable', sourceTable);
+                url.searchParams.set('sourceSP', sourceSP);
+                url.searchParams.set('columnName', columnName);
+                url.searchParams.set('take', '50');
+                if (searchValue) {
+                    url.searchParams.set('search', searchValue);
+                }
+
+                try {
+                    const response = await fetch(url.toString(), { cache: 'no-store' });
+                    const payload = await response.json().catch(() => []);
+                    if (currentRequestId !== requestId) {
+                        return;
+                    }
+
+                    const options = Array.isArray(payload)
+                        ? payload
+                            .map(value => String(value || '').trim())
+                            .filter(Boolean)
+                            .filter((value, index, values) =>
+                                values.findIndex(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) === 0) === index)
+                        : [];
+
+                    cache.set(cacheKey, options);
+
+                    const availableOptions = options
+                        .filter(option => !selectedValues.some(item => item.localeCompare(option, undefined, { sensitivity: 'accent' }) === 0));
+                    renderList(availableOptions);
+                } catch {
+                    if (currentRequestId === requestId) {
+                        hideList();
+                    }
+                }
+            };
+
+            box.addEventListener('click', event => {
+                if (event.target instanceof Element && event.target.closest('.mapping-parameter-suggest-chip-remove')) {
+                    return;
+                }
+
+                input.focus();
             });
 
-            editor.appendChild(textInput);
+            input.addEventListener('focus', () => {
+                fetchAndRenderSuggestions();
+            });
+            input.addEventListener('input', () => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+
+                debounceTimer = setTimeout(() => {
+                    debounceTimer = null;
+                    fetchAndRenderSuggestions();
+                }, 700);
+            });
+            input.addEventListener('blur', () => {
+                window.setTimeout(hideList, 120);
+            });
+            input.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addValue(input.value);
+                    return;
+                }
+
+                if (event.key === 'Backspace' && !input.value.trim()) {
+                    const latestValue = selectedValues.at(-1);
+                    if (latestValue) {
+                        selectedValues.pop();
+                        syncHiddenValue();
+                        renderSelectedValues();
+                        fetchAndRenderSuggestions();
+                    }
+                    return;
+                }
+
+                if (event.key === 'Escape') {
+                    hideList();
+                }
+            });
+
+            box.appendChild(summary);
+            box.appendChild(selectedContainer);
+            box.appendChild(input);
+            wrapper.appendChild(box);
+            wrapper.appendChild(list);
+            editor.appendChild(wrapper);
+
+            syncHiddenValue();
+            renderSelectedValues();
         }
 
         function renderDateRangeMappingEditor(mappingCell, mappingInput) {
@@ -1139,6 +1496,7 @@
         const sourceProceduresUrl = '@Url.Action("SourceProcedures", "DataFileManage")';
         const sourceColumnMetadataUrl = '@Url.Action("SourceColumnMetadata", "DataFileManage")';
         const sourceParametersUrl = '@Url.Action("SourceParameters", "DataFileManage")';
+        const mappingParameterValuesUrl = '@Url.Action("MappingParameterValues", "DataFileManage")';
         const previewUrl = '@Url.Action("Preview", "DataFileManage")';
         const scheduleDataFileButton = document.getElementById('btn-schedule-data-file');
         const scheduleDataFileUrl = '@Url.Action("ScheduleDataFile", "DataFileManage")';

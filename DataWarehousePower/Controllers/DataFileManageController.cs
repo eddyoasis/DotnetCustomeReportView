@@ -446,6 +446,40 @@ namespace DataWarehousePower.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<IActionResult> MappingParameterValues(
+            string? sourceDatabase,
+            string? sourceTable,
+            string? sourceSP,
+            string? columnName,
+            string? search = null,
+            int take = 50)
+        {
+            try
+            {
+                var items = await _service.GetDistinctColumnValuesAsync(
+                    sourceDatabase,
+                    sourceTable,
+                    sourceSP,
+                    columnName,
+                    search,
+                    take);
+
+                return Json(items);
+            }
+            catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
+            {
+                _logger.LogWarning(ex,
+                    "Mapping parameter values query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}, column {ColumnName}",
+                    sourceDatabase,
+                    sourceTable,
+                    sourceSP,
+                    columnName);
+
+                return Json(Array.Empty<string>());
+            }
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Preview([FromBody] DataFilePreviewRequest request)
