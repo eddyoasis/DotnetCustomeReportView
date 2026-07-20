@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
+using System.Text.Json;
 
 namespace DataWarehousePower.Repositories
 {
@@ -507,8 +508,15 @@ namespace DataWarehousePower.Repositories
                 }
                 else
                 {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
-                    AddParameter(cmd, parameterName, $"%{filterValue}%");
+                    if (TryParseMultiSelectFilter(filterValue, out List<string> selectedValues))
+                    {
+                        whereClauses.Add(BuildMultiSelectStringClause(cmd, columnName, selectedValues, ref parameterIndex));
+                    }
+                    else
+                    {
+                        whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                        AddParameter(cmd, parameterName, $"%{filterValue}%");
+                    }
                 }
             }
 
@@ -826,8 +834,15 @@ namespace DataWarehousePower.Repositories
                 }
                 else
                 {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
-                    AddParameter(cmd, parameterName, $"%{filterValue}%");
+                    if (TryParseMultiSelectFilter(filterValue, out List<string> selectedValues))
+                    {
+                        whereClauses.Add(BuildMultiSelectStringClause(cmd, columnName, selectedValues, ref parameterIndex));
+                    }
+                    else
+                    {
+                        whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                        AddParameter(cmd, parameterName, $"%{filterValue}%");
+                    }
                 }
             }
 
@@ -1088,8 +1103,15 @@ namespace DataWarehousePower.Repositories
                 }
                 else
                 {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
-                    AddParameter(cmd, parameterName, $"%{filterValue}%");
+                    if (TryParseMultiSelectFilter(filterValue, out List<string> selectedValues))
+                    {
+                        whereClauses.Add(BuildMultiSelectStringClause(cmd, columnName, selectedValues, ref parameterIndex));
+                    }
+                    else
+                    {
+                        whereClauses.Add($"CAST([{EscapeSqlIdentifier(columnName)}] AS nvarchar(4000)) LIKE {parameterName}");
+                        AddParameter(cmd, parameterName, $"%{filterValue}%");
+                    }
                 }
             }
 
@@ -1648,6 +1670,57 @@ namespace DataWarehousePower.Repositories
             }
 
             return bool.TryParse(normalized, out parsed);
+        }
+
+        private static bool TryParseMultiSelectFilter(string value, out List<string> selectedValues)
+        {
+            selectedValues = new List<string>();
+            string normalized = (value ?? string.Empty).Trim();
+            if (!normalized.StartsWith("[", StringComparison.Ordinal) ||
+                !normalized.EndsWith("]", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            try
+            {
+                List<string>? parsed = JsonSerializer.Deserialize<List<string>>(normalized);
+                if (parsed is null)
+                {
+                    return false;
+                }
+
+                selectedValues = parsed
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Select(item => item.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return selectedValues.Count > 0;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+
+        private static string BuildMultiSelectStringClause(
+            DbCommand cmd,
+            string columnName,
+            IEnumerable<string> selectedValues,
+            ref int parameterIndex)
+        {
+            List<string> predicates = new();
+            string escapedColumnName = EscapeSqlIdentifier(columnName);
+
+            foreach (string selectedValue in selectedValues)
+            {
+                string parameterName = $"@f{parameterIndex++}";
+                predicates.Add($"CAST([{escapedColumnName}] AS nvarchar(4000)) = {parameterName}");
+                AddParameter(cmd, parameterName, selectedValue);
+            }
+
+            return "(" + string.Join(" OR ", predicates) + ")";
         }
 
         private static void AddParameter(System.Data.Common.DbCommand cmd, string name, object? value)

@@ -229,14 +229,22 @@
                                                 <div class="column-filter-suggest position-relative">
                                                     <input id="@filterInputId"
                                                            name="columnFilters[@filterKey]"
-                                                           type="text"
-                                                           class="form-control form-control-sm column-filter-input column-filter-suggest-input"
+                                                           type="hidden"
+                                                           class="column-filter-input column-filter-suggest-hidden"
                                                            value="@filterValue"
                                                            data-filter-key="@filterKey"
-                                                           data-column-key="@availableColumn.Key"
+                                                           data-column-key="@availableColumn.Key" />
+                                                    <div class="column-filter-suggest-box form-control form-control-sm">
+                                                        <div class="column-filter-suggest-summary small text-muted d-none"></div>
+                                                        <div class="column-filter-suggest-selected d-flex flex-wrap gap-1"></div>
+                                                        <input id="@(filterInputId + "-search")"
+                                                           type="text"
+                                                           class="column-filter-suggest-input border-0 p-0"
+                                                                              data-column-key="@availableColumn.Key"
                                                            data-filter-values-url="@Url.Action("FilterValues", "DataFile", new { id = selectedDataFile.Id })"
                                                            autocomplete="off"
                                                            placeholder="Select or enter a value" />
+                                                    </div>
                                                     <div class="list-group column-filter-suggest-list position-absolute w-100 d-none"></div>
                                                 </div>
                                             }
@@ -631,6 +639,93 @@
         cursor: default;
         color: #6c757d;
         background-color: #fff;
+    }
+
+    .column-filter-suggest-box {
+        min-height: calc(1.5em + .5rem + 2px);
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: .4rem;
+        padding: .45rem .55rem;
+        background: #fff;
+        border: 1px solid #ced4da;
+        transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+    }
+
+    .column-filter-suggest-box:focus-within {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 .15rem rgba(13, 110, 253, .15);
+        background: #fff;
+    }
+
+    .column-filter-suggest-summary {
+        font-size: .72rem;
+        letter-spacing: .01em;
+    }
+
+    .column-filter-suggest-selected {
+        min-height: 0;
+    }
+
+    .column-filter-suggest-selected.is-empty {
+        display: none !important;
+    }
+
+    .column-filter-suggest-input {
+        width: 100%;
+        min-width: 0;
+        box-shadow: none;
+        outline: none;
+        background: transparent;
+        font-size: .875rem;
+    }
+
+    .column-filter-suggest-input:focus {
+        outline: none;
+        box-shadow: none;
+    }
+
+    .column-filter-suggest-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        max-width: 100%;
+        border-radius: 999px;
+        padding: .35rem .55rem;
+        background: #e7f1ff;
+        color: #0a58ca;
+        border: 1px solid #b6d4fe;
+        font-size: .78rem;
+        font-weight: 500;
+    }
+
+    .column-filter-suggest-chip-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+    }
+
+    .column-filter-suggest-chip-remove {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+        padding: 0;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        opacity: .8;
+    }
+
+    .column-filter-suggest-chip-remove:hover {
+        background: rgba(10, 88, 202, .12);
+        opacity: 1;
     }
 </style>
 
@@ -1367,7 +1462,7 @@
                 const getState = input => {
                     let state = columnFilterSuggestionStates.get(input);
                     if (!state) {
-                        state = { timer: null, requestId: 0, lastRequestedKey: null, cache: new Map() };
+                        state = { timer: null, requestId: 0, lastRequestedKey: null, cache: new Map(), selectedValues: [] };
                         columnFilterSuggestionStates.set(input, state);
                     }
 
@@ -1387,6 +1482,120 @@
 
                     list.classList.add('d-none');
                     list.innerHTML = '';
+                };
+
+                const getSuggestContainer = input => input.closest('.column-filter-suggest');
+
+                const getHiddenInput = input => getSuggestContainer(input)?.querySelector('.column-filter-suggest-hidden') ?? null;
+
+                const getSelectedContainer = input => getSuggestContainer(input)?.querySelector('.column-filter-suggest-selected') ?? null;
+
+                const getSummaryElement = input => getSuggestContainer(input)?.querySelector('.column-filter-suggest-summary') ?? null;
+
+                const parseSelectedValues = raw => {
+                    const normalized = String(raw || '').trim();
+                    if (!normalized) {
+                        return [];
+                    }
+
+                    try {
+                        const parsed = JSON.parse(normalized);
+                        if (Array.isArray(parsed)) {
+                            return parsed
+                                .map(value => String(value || '').trim())
+                                .filter(value => value.length > 0)
+                                .filter((value, index, values) => values.findIndex(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) === 0) === index);
+                        }
+                    } catch {
+                        // Fall back to legacy single-value filters.
+                    }
+
+                    return [normalized];
+                };
+
+                const syncHiddenValue = input => {
+                    const hiddenInput = getHiddenInput(input);
+                    if (!(hiddenInput instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    const state = getState(input);
+                    hiddenInput.value = state.selectedValues.length > 0
+                        ? JSON.stringify(state.selectedValues)
+                        : '';
+                };
+
+                const renderSelectedValues = input => {
+                    const selectedContainer = getSelectedContainer(input);
+                    const summaryElement = getSummaryElement(input);
+                    if (!selectedContainer) {
+                        return;
+                    }
+
+                    const state = getState(input);
+                    selectedContainer.innerHTML = '';
+                    selectedContainer.classList.toggle('is-empty', state.selectedValues.length === 0);
+
+                    if (summaryElement) {
+                        if (state.selectedValues.length === 0) {
+                            summaryElement.textContent = '';
+                            summaryElement.classList.add('d-none');
+                        } else {
+                            summaryElement.textContent = `${state.selectedValues.length} selected`;
+                            summaryElement.classList.remove('d-none');
+                        }
+                    }
+
+                    input.placeholder = state.selectedValues.length > 0
+                        ? 'Add another value'
+                        : 'Select or enter a value';
+
+                    state.selectedValues.forEach(value => {
+                        const chip = document.createElement('span');
+                        chip.className = 'column-filter-suggest-chip';
+
+                        const label = document.createElement('span');
+                        label.className = 'column-filter-suggest-chip-label';
+                        label.textContent = value;
+
+                        const removeButton = document.createElement('button');
+                        removeButton.type = 'button';
+                        removeButton.className = 'column-filter-suggest-chip-remove';
+                        removeButton.setAttribute('aria-label', `Remove ${value}`);
+                        removeButton.innerHTML = '&times;';
+                        removeButton.addEventListener('click', () => {
+                            state.selectedValues = state.selectedValues.filter(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) !== 0);
+                            state.lastRequestedKey = null;
+                            syncHiddenValue(input);
+                            renderSelectedValues(input);
+                            input.focus();
+                        });
+
+                        chip.appendChild(label);
+                        chip.appendChild(removeButton);
+                        selectedContainer.appendChild(chip);
+                    });
+                };
+
+                const addSelectedValue = (input, value) => {
+                    const normalizedValue = String(value || '').trim();
+                    if (!normalizedValue) {
+                        return;
+                    }
+
+                    const state = getState(input);
+                    if (state.selectedValues.some(item => item.localeCompare(normalizedValue, undefined, { sensitivity: 'accent' }) === 0)) {
+                        input.value = '';
+                        hideList(input);
+                        return;
+                    }
+
+                    state.selectedValues.push(normalizedValue);
+                    state.lastRequestedKey = null;
+                    input.value = '';
+                    syncHiddenValue(input);
+                    renderSelectedValues(input);
+                    hideList(input);
                 };
 
                 const hideAllLists = activeInput => {
@@ -1418,8 +1627,7 @@
                             event.preventDefault();
                         });
                         item.addEventListener('click', () => {
-                            input.value = value;
-                            hideList(input);
+                            addSelectedValue(input, value);
                         });
 
                         list.appendChild(item);
@@ -1489,6 +1697,7 @@
                             ? payload
                                 .map(value => String(value || '').trim())
                                 .filter(value => value.length > 0)
+                                .filter(value => !state.selectedValues.some(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) === 0))
                             : [];
 
                         state.cache.set(cacheKey, values);
@@ -1501,6 +1710,21 @@
                 };
 
                 columnFilterSuggestInputs.forEach(input => {
+                    const state = getState(input);
+                    const hiddenInput = getHiddenInput(input);
+                    const suggestBox = getSuggestContainer(input)?.querySelector('.column-filter-suggest-box');
+                    state.selectedValues = parseSelectedValues(hiddenInput?.value || '');
+                    syncHiddenValue(input);
+                    renderSelectedValues(input);
+
+                    suggestBox?.addEventListener('click', event => {
+                        if (!(event.target instanceof Element) || event.target.closest('.column-filter-suggest-chip-remove')) {
+                            return;
+                        }
+
+                        input.focus();
+                    });
+
                     input.addEventListener('focus', () => {
                         hideAllLists(input);
                         loadSuggestions(input);
@@ -1524,6 +1748,23 @@
                     });
 
                     input.addEventListener('keydown', event => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            addSelectedValue(input, input.value);
+                            return;
+                        }
+
+                        if (event.key === 'Backspace' && !input.value.trim()) {
+                            const latestValue = state.selectedValues.at(-1);
+                            if (latestValue) {
+                                state.selectedValues.pop();
+                                state.lastRequestedKey = null;
+                                syncHiddenValue(input);
+                                renderSelectedValues(input);
+                            }
+                            return;
+                        }
+
                         if (event.key === 'Escape') {
                             hideList(input);
                         }
