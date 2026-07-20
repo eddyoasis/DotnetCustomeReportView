@@ -1,5 +1,7 @@
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Models;
+using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace DataWarehousePower.Services
@@ -83,29 +85,121 @@ namespace DataWarehousePower.Services
 
             int offset = (page - 1) * take;
 
-            string whereClause = string.Empty;
-            string clientCode = (request.ClientCode ?? string.Empty).Trim();
-            if (!string.IsNullOrWhiteSpace(clientCode))
-            {
-                DataFilePreviewColumnRequest? clientCodeColumn = (request.Columns ?? new List<DataFilePreviewColumnRequest>())
-                    .FirstOrDefault(column =>
-                        string.Equals(column.MappingParameter?.Trim(), "ClientCode", StringComparison.OrdinalIgnoreCase) &&
-                        !string.IsNullOrWhiteSpace(column.PropertyName));
+            bool hasExplicitParameters = request.Parameters is not null && request.Parameters.Count > 0;
+            Dictionary<string, string?> parameters = (request.Parameters ?? new Dictionary<string, string?>())
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value?.Trim(),
+                    StringComparer.OrdinalIgnoreCase);
 
-                if (clientCodeColumn is not null)
+            var whereClauses = new List<string>();
+            foreach (DataFilePreviewColumnRequest requestedColumn in (request.Columns ?? new List<DataFilePreviewColumnRequest>())
+                         .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                         .GroupBy(column => column.PropertyName.Trim(), StringComparer.OrdinalIgnoreCase)
+                         .Select(group => group.First()))
+            {
+                string columnName = requestedColumn.PropertyName.Trim();
+
+                if (IsClientCodeMapping(requestedColumn.MappingParameter))
                 {
-                    string escapedClientCode = clientCode.Replace("'", "''", StringComparison.Ordinal);
-                    whereClause = $" WHERE CAST({QuoteIdentifier(clientCodeColumn.PropertyName.Trim())} AS STRING) ILIKE '%{escapedClientCode}%'";
+                    string clientCode = (request.ClientCode ?? string.Empty).Trim();
+                    if (!string.IsNullOrWhiteSpace(clientCode))
+                    {
+                        whereClauses.Add($"CAST({QuoteIdentifier(columnName)} AS STRING) ILIKE '%{EscapeSqlLiteral(clientCode)}%'");
+                    }
+
+                    continue;
                 }
+
+                string parameterKey = (requestedColumn.MappingParameter ?? string.Empty).Trim();
+                string filterValue = string.Empty;
+
+                if (hasExplicitParameters && !string.IsNullOrWhiteSpace(parameterKey) && parameters.TryGetValue(parameterKey, out string? parameterFilterValue))
+                {
+                    filterValue = (parameterFilterValue ?? string.Empty).Trim();
+                }
+
+                if (hasExplicitParameters && string.IsNullOrWhiteSpace(parameterKey) && parameters.TryGetValue(columnName, out string? parameterColumnFilterValue))
+                {
+                    filterValue = (parameterColumnFilterValue ?? string.Empty).Trim();
+                }
+
+                if (!hasExplicitParameters && string.IsNullOrWhiteSpace(filterValue) && !string.IsNullOrWhiteSpace(parameterKey))
+                {
+                    filterValue = parameterKey;
+                }
+
+                if (string.IsNullOrWhiteSpace(filterValue))
+                {
+                    continue;
+                }
+
+                if (TryParseMultiSelectFilter(filterValue, out List<string> selectedValues))
+                {
+                    whereClauses.Add(BuildMultiSelectStringClause(columnName, selectedValues));
+                    continue;
+                }
+
+                if (TryParseDateTimeRangeFilter(filterValue, out DateTime? startDateTime, out DateTime? endDateTime))
+                {
+                    string timestampExpression = $"TRY_TO_TIMESTAMP_NTZ(CAST({QuoteIdentifier(columnName)} AS STRING))";
+
+                    if (startDateTime.HasValue)
+                    {
+                        whereClauses.Add($"{timestampExpression} >= {ToTimestampLiteral(startDateTime.Value)}");
+                    }
+
+                    if (endDateTime.HasValue)
+                    {
+                        whereClauses.Add($"{timestampExpression} <= {ToTimestampLiteral(endDateTime.Value)}");
+                    }
+
+                    continue;
+                }
+
+                if (TryParseDecimalRangeFilter(filterValue, out decimal? fromValue, out decimal? toValue))
+                {
+                    string decimalExpression = $"TRY_TO_DECIMAL(CAST({QuoteIdentifier(columnName)} AS STRING), 38, 10)";
+
+                    if (fromValue.HasValue)
+                    {
+                        whereClauses.Add($"{decimalExpression} >= {ToDecimalLiteral(fromValue.Value)}");
+                    }
+
+                    if (toValue.HasValue)
+                    {
+                        whereClauses.Add($"{decimalExpression} <= {ToDecimalLiteral(toValue.Value)}");
+                    }
+
+                    continue;
+                }
+
+                if (TryParseIntegerFilter(filterValue, out long intValue))
+                {
+                    whereClauses.Add($"TRY_TO_NUMBER(CAST({QuoteIdentifier(columnName)} AS STRING), 38, 0) = {intValue.ToString(CultureInfo.InvariantCulture)}");
+                    continue;
+                }
+
+                if (TryParseBooleanFilter(filterValue, out bool boolValue))
+                {
+                    whereClauses.Add($"TRY_TO_BOOLEAN(CAST({QuoteIdentifier(columnName)} AS STRING)) = {(boolValue ? "TRUE" : "FALSE")}");
+                    continue;
+                }
+
+                whereClauses.Add($"CAST({QuoteIdentifier(columnName)} AS STRING) ILIKE '%{EscapeSqlLiteral(filterValue)}%'");
             }
 
-            //string countSql = $"SELECT COUNT(1) AS TOTAL_COUNT FROM {tableExpression}{whereClause}";
-            string countSql = $"SELECT TOP 10 * FROM VW_AUM_MASTER;";
+            string whereClause = whereClauses.Count > 0
+                ? " WHERE " + string.Join(" AND ", whereClauses)
+                : string.Empty;
+
+            string countSql = $"SELECT COUNT(1) AS TOTAL_COUNT FROM {tableExpression}{whereClause}";
             IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(countSql, cancellationToken);
             int totalCount = 0;
             if (countRows.Count > 0 && countRows[0].TryGetValue("TOTAL_COUNT", out object? totalCountObj) && totalCountObj is not null)
             {
-                totalCount = Convert.ToInt32(totalCountObj);
+                totalCount = Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
             }
 
             string querySql =
@@ -120,6 +214,234 @@ namespace DataWarehousePower.Services
                 TotalRowCount = totalCount
             };
         }
+
+        private static bool IsClientCodeMapping(string? mappingParameter)
+        {
+            string normalized = (mappingParameter ?? string.Empty).Trim();
+            return !string.IsNullOrWhiteSpace(normalized)
+                && (normalized.Contains("ClientCode", StringComparison.OrdinalIgnoreCase)
+                    || normalized.Contains("ClintCode", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool TryParseDateTimeRangeFilter(string value, out DateTime? start, out DateTime? end)
+        {
+            start = null;
+            end = null;
+
+            string raw = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return true;
+            }
+
+            if (raw.Contains('|', StringComparison.Ordinal))
+            {
+                string[] parts = raw.Split('|', 2, StringSplitOptions.None);
+
+                if (!string.IsNullOrWhiteSpace(parts[0]))
+                {
+                    if (!TryParseDateTime(parts[0], out DateTime parsedStart))
+                    {
+                        return false;
+                    }
+
+                    start = parsedStart;
+                }
+
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    if (!TryParseDateTime(parts[1], out DateTime parsedEnd))
+                    {
+                        return false;
+                    }
+
+                    end = parsedEnd;
+                }
+
+                return true;
+            }
+
+            if (!TryParseDateTime(raw, out DateTime singleValue))
+            {
+                return false;
+            }
+
+            start = singleValue;
+            end = singleValue;
+            return true;
+        }
+
+        private static bool TryParseDateTime(string value, out DateTime parsed)
+        {
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out parsed))
+            {
+                return true;
+            }
+
+            return DateTime.TryParse(value, out parsed);
+        }
+
+        private static bool TryParseDecimalRangeFilter(string value, out decimal? from, out decimal? to)
+        {
+            from = null;
+            to = null;
+
+            string raw = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return true;
+            }
+
+            if (raw.Contains('|', StringComparison.Ordinal))
+            {
+                string[] parts = raw.Split('|', 2, StringSplitOptions.None);
+
+                if (!string.IsNullOrWhiteSpace(parts[0]))
+                {
+                    if (!decimal.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedFrom) &&
+                        !decimal.TryParse(parts[0], NumberStyles.Any, CultureInfo.CurrentCulture, out parsedFrom))
+                    {
+                        return false;
+                    }
+
+                    from = parsedFrom;
+                }
+
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    if (!decimal.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedTo) &&
+                        !decimal.TryParse(parts[1], NumberStyles.Any, CultureInfo.CurrentCulture, out parsedTo))
+                    {
+                        return false;
+                    }
+
+                    to = parsedTo;
+                }
+
+                return true;
+            }
+
+            if (!decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal singleValue) &&
+                !decimal.TryParse(raw, NumberStyles.Any, CultureInfo.CurrentCulture, out singleValue))
+            {
+                return false;
+            }
+
+            from = singleValue;
+            to = singleValue;
+            return true;
+        }
+
+        private static bool TryParseIntegerFilter(string value, out long parsed)
+        {
+            string raw = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                parsed = 0;
+                return false;
+            }
+
+            if (raw.Contains('|', StringComparison.Ordinal))
+            {
+                string[] parts = raw.Split('|', 2, StringSplitOptions.None);
+                raw = !string.IsNullOrWhiteSpace(parts[0]) ? parts[0].Trim() : (parts.Length > 1 ? parts[1].Trim() : string.Empty);
+            }
+
+            return long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) ||
+                long.TryParse(raw, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsed);
+        }
+
+        private static bool TryParseBooleanFilter(string value, out bool parsed)
+        {
+            string normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                parsed = false;
+                return false;
+            }
+
+            if (normalized is "1" or "true" or "yes" or "y")
+            {
+                parsed = true;
+                return true;
+            }
+
+            if (normalized is "0" or "false" or "no" or "n")
+            {
+                parsed = false;
+                return true;
+            }
+
+            return bool.TryParse(normalized, out parsed);
+        }
+
+        private static bool TryParseMultiSelectFilter(string value, out List<string> selectedValues)
+        {
+            selectedValues = new List<string>();
+            string normalized = (value ?? string.Empty).Trim();
+
+            if (normalized.StartsWith("[", StringComparison.Ordinal) &&
+                normalized.EndsWith("]", StringComparison.Ordinal))
+            {
+                try
+                {
+                    List<string>? parsed = JsonSerializer.Deserialize<List<string>>(normalized);
+                    if (parsed is not null)
+                    {
+                        selectedValues = parsed
+                            .Where(item => !string.IsNullOrWhiteSpace(item))
+                            .Select(item => item.Trim())
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        if (selectedValues.Count > 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            if (!normalized.Contains(',', StringComparison.Ordinal) &&
+                !normalized.Contains(';', StringComparison.Ordinal) &&
+                !normalized.Contains('|', StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            selectedValues = normalized
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return selectedValues.Count > 1;
+        }
+
+        private static string BuildMultiSelectStringClause(string columnName, IEnumerable<string> selectedValues)
+        {
+            List<string> predicates = new();
+            string escapedColumnName = QuoteIdentifier(columnName);
+
+            foreach (string selectedValue in selectedValues)
+            {
+                predicates.Add($"CAST({escapedColumnName} AS STRING) = '{EscapeSqlLiteral(selectedValue)}'");
+            }
+
+            return "(" + string.Join(" OR ", predicates) + ")";
+        }
+
+        private static string EscapeSqlLiteral(string value)
+            => value.Replace("'", "''", StringComparison.Ordinal);
+
+        private static string ToTimestampLiteral(DateTime value)
+            => $"TO_TIMESTAMP_NTZ('{value.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)}')";
+
+        private static string ToDecimalLiteral(decimal value)
+            => value.ToString(CultureInfo.InvariantCulture);
 
         private static string BuildTableExpression(string? sourceDatabase, string sourceTable)
         {
