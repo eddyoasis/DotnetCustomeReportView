@@ -4,6 +4,7 @@ using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Data.SqlClient;
 
 namespace DataWarehousePower.Controllers;
 
@@ -217,6 +218,59 @@ public sealed class ScheduledJobController(
         }
 
         return Json(detail);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> FilterValues([FromQuery] int dataFileId, [FromQuery] string? columnKey = null, [FromQuery] string? search = null, [FromQuery] int take = 50)
+    {
+        if (dataFileId <= 0)
+        {
+            return Json(Array.Empty<string>());
+        }
+
+        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        string? userDepartment = ResolveUserDepartment();
+        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+
+        DataFileDefinition? selectedDataFile = dataFileList.DataFiles.FirstOrDefault(dataFile => dataFile.Id == dataFileId);
+        if (selectedDataFile is null)
+        {
+            return Json(Array.Empty<string>());
+        }
+
+        string normalizedColumnKey = (columnKey ?? string.Empty).Trim();
+        DataFileColumn? selectedColumn = selectedDataFile.Columns.FirstOrDefault(column =>
+            !string.IsNullOrWhiteSpace(column.PropertyName) &&
+            column.PropertyName.Equals(normalizedColumnKey, StringComparison.OrdinalIgnoreCase));
+
+        if (selectedColumn is null)
+        {
+            return Json(Array.Empty<string>());
+        }
+
+        try
+        {
+            List<string> values = await dataFileManageService.GetDistinctColumnValuesAsync(
+                selectedDataFile.SourceDatabase,
+                selectedDataFile.SourceTable,
+                selectedDataFile.SourceSP,
+                selectedColumn.PropertyName,
+                search,
+                take);
+
+            return Json(values);
+        }
+        catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
+        {
+            logger.LogWarning(ex,
+                "Scheduled job filter values query failed for data file {DataFileId}, database {SourceDatabase}, table {SourceTable}, column {ColumnName}",
+                dataFileId,
+                selectedDataFile.SourceDatabase,
+                selectedDataFile.SourceTable,
+                selectedColumn.PropertyName);
+
+            return Json(Array.Empty<string>());
+        }
     }
 
     [HttpGet]

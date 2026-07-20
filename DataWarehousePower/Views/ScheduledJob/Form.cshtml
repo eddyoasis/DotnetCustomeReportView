@@ -446,6 +446,109 @@
     </div>
 </div>
 
+<style>
+    .column-filter-suggest-list {
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 30;
+        top: calc(100% + 2px);
+        left: 0;
+    }
+
+    .column-filter-suggest-loading {
+        cursor: default;
+        color: #6c757d;
+        background-color: #fff;
+    }
+
+    .column-filter-suggest-box {
+        min-height: calc(1.5em + .5rem + 2px);
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: .4rem;
+        padding: .45rem .55rem;
+        background: #fff;
+        border: 1px solid #ced4da;
+        transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+    }
+
+    .column-filter-suggest-box:focus-within {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 .15rem rgba(13, 110, 253, .15);
+        background: #fff;
+    }
+
+    .column-filter-suggest-summary {
+        font-size: .72rem;
+        letter-spacing: .01em;
+    }
+
+    .column-filter-suggest-selected {
+        min-height: 0;
+    }
+
+    .column-filter-suggest-selected.is-empty {
+        display: none !important;
+    }
+
+    .column-filter-suggest-input {
+        width: 100%;
+        min-width: 0;
+        box-shadow: none;
+        outline: none;
+        background: transparent;
+        font-size: .875rem;
+    }
+
+    .column-filter-suggest-input:focus {
+        outline: none;
+        box-shadow: none;
+    }
+
+    .column-filter-suggest-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        max-width: 100%;
+        border-radius: 999px;
+        padding: .35rem .55rem;
+        background: #e7f1ff;
+        color: #0a58ca;
+        border: 1px solid #b6d4fe;
+        font-size: .78rem;
+        font-weight: 500;
+    }
+
+    .column-filter-suggest-chip-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+    }
+
+    .column-filter-suggest-chip-remove {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+        padding: 0;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        opacity: .8;
+    }
+
+    .column-filter-suggest-chip-remove:hover {
+        background: rgba(10, 88, 202, .12);
+        opacity: 1;
+    }
+</style>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
@@ -502,6 +605,7 @@
             const exportToLocalFolderHint = document.getElementById('exportToLocalFolderHint');
             const openExportLocationButton = document.getElementById('openExportLocationButton');
             const openExportLocationUrl = '@Url.Action("OpenExportLocation", "ScheduledJob")';
+            const scheduledFilterValuesUrl = '@Url.Action("FilterValues", "ScheduledJob")';
             const clientCodeSelect = document.getElementById('scheduled-client-code-select');
             const clientCodeSearchInput = document.getElementById('scheduled-client-code-search');
             const clientCodeDropdownToggle = document.getElementById('scheduled-client-code-dropdown-toggle');
@@ -810,17 +914,50 @@
                             rangeContainer.appendChild(toInput);
                             card.appendChild(rangeContainer);
                         } else {
+                            const suggestContainer = document.createElement('div');
+                            suggestContainer.className = 'column-filter-suggest position-relative';
+
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.id = filterInputId;
+                            hiddenInput.name = `columnFilters[${filterKey}]`;
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.className = 'column-filter-input column-filter-suggest-hidden';
+                            hiddenInput.value = initialFilterValue;
+                            hiddenInput.dataset.filterKey = filterKey;
+                            hiddenInput.dataset.columnKey = column.propertyName;
+                            hiddenInput.dataset.columnType = (column.propertyType || '').trim().toLowerCase();
+                            hiddenInput.dataset.dataFileId = String(selectedSourceId || '');
+                            hiddenInput.dataset.filterValuesUrl = scheduledFilterValuesUrl;
+
+                            const box = document.createElement('div');
+                            box.className = 'column-filter-suggest-box form-control form-control-sm';
+
+                            const summary = document.createElement('div');
+                            summary.className = 'column-filter-suggest-summary small text-muted d-none';
+
+                            const selectedValues = document.createElement('div');
+                            selectedValues.className = 'column-filter-suggest-selected d-flex flex-wrap gap-1';
+
                             const textInput = document.createElement('input');
-                            textInput.id = filterInputId;
-                            textInput.name = `columnFilters[${filterKey}]`;
+                            textInput.id = `${filterInputId}-search`;
                             textInput.type = 'text';
-                            textInput.className = 'form-control form-control-sm column-filter-input';
-                            textInput.value = initialFilterValue;
-                            textInput.dataset.filterKey = filterKey;
+                            textInput.className = 'column-filter-suggest-input border-0 p-0';
+                            textInput.autocomplete = 'off';
                             textInput.dataset.columnKey = column.propertyName;
-                            textInput.dataset.columnType = (column.propertyType || '').trim().toLowerCase();
-                            textInput.placeholder = 'Optional filter value';
-                            card.appendChild(textInput);
+                            textInput.dataset.dataFileId = String(selectedSourceId || '');
+                            textInput.dataset.filterValuesUrl = scheduledFilterValuesUrl;
+                            textInput.placeholder = 'Select or enter value';
+
+                            const list = document.createElement('div');
+                            list.className = 'list-group column-filter-suggest-list position-absolute w-100 d-none';
+
+                            box.appendChild(summary);
+                            box.appendChild(selectedValues);
+                            box.appendChild(textInput);
+                            suggestContainer.appendChild(hiddenInput);
+                            suggestContainer.appendChild(box);
+                            suggestContainer.appendChild(list);
+                            card.appendChild(suggestContainer);
                         }
 
                         columnWrap.appendChild(card);
@@ -836,6 +973,315 @@
                 }
 
                 columnsFilterGroup.appendChild(columnsContainer);
+                initializeColumnFilterSuggestions();
+            }
+
+            function initializeColumnFilterSuggestions() {
+                const suggestInputs = [...columnsFilterGroup.querySelectorAll('.column-filter-suggest-input')]
+                    .filter(input => input instanceof HTMLInputElement);
+
+                if (!suggestInputs.length) {
+                    return;
+                }
+
+                const states = new WeakMap();
+                const debounceMs = 700;
+
+                const getState = input => {
+                    let state = states.get(input);
+                    if (!state) {
+                        state = { timer: null, requestId: 0, cache: new Map(), selectedValues: [] };
+                        states.set(input, state);
+                    }
+
+                    return state;
+                };
+
+                const getContainer = input => input.closest('.column-filter-suggest');
+                const getList = input => getContainer(input)?.querySelector('.column-filter-suggest-list') ?? null;
+                const getHiddenInput = input => getContainer(input)?.querySelector('.column-filter-suggest-hidden') ?? null;
+                const getSelectedContainer = input => getContainer(input)?.querySelector('.column-filter-suggest-selected') ?? null;
+                const getSummary = input => getContainer(input)?.querySelector('.column-filter-suggest-summary') ?? null;
+                const getBox = input => getContainer(input)?.querySelector('.column-filter-suggest-box') ?? null;
+
+                const hideList = input => {
+                    const list = getList(input);
+                    if (!list) {
+                        return;
+                    }
+
+                    list.classList.add('d-none');
+                    list.innerHTML = '';
+                };
+
+                const parseSelectedValues = raw => {
+                    const normalized = String(raw || '').trim();
+                    if (!normalized) {
+                        return [];
+                    }
+
+                    try {
+                        const parsed = JSON.parse(normalized);
+                        if (Array.isArray(parsed)) {
+                            return parsed
+                                .map(value => String(value || '').trim())
+                                .filter(Boolean)
+                                .filter((value, index, values) =>
+                                    values.findIndex(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) === 0) === index);
+                        }
+                    } catch {
+                        // Fallback for legacy single-string filters.
+                    }
+
+                    return [normalized];
+                };
+
+                const syncHiddenValue = input => {
+                    const state = getState(input);
+                    const hiddenInput = getHiddenInput(input);
+                    if (!(hiddenInput instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    hiddenInput.value = state.selectedValues.length ? JSON.stringify(state.selectedValues) : '';
+                };
+
+                const renderSelectedValues = input => {
+                    const state = getState(input);
+                    const selectedContainer = getSelectedContainer(input);
+                    const summary = getSummary(input);
+                    if (!(selectedContainer instanceof HTMLElement) || !(summary instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    selectedContainer.innerHTML = '';
+                    selectedContainer.classList.toggle('is-empty', state.selectedValues.length === 0);
+
+                    if (!state.selectedValues.length) {
+                        summary.textContent = '';
+                        summary.classList.add('d-none');
+                        input.placeholder = 'Select or enter value';
+                        return;
+                    }
+
+                    summary.textContent = `${state.selectedValues.length} selected`;
+                    summary.classList.remove('d-none');
+                    input.placeholder = 'Add another value';
+
+                    state.selectedValues.forEach(value => {
+                        const chip = document.createElement('span');
+                        chip.className = 'column-filter-suggest-chip';
+
+                        const label = document.createElement('span');
+                        label.className = 'column-filter-suggest-chip-label';
+                        label.textContent = value;
+
+                        const removeButton = document.createElement('button');
+                        removeButton.type = 'button';
+                        removeButton.className = 'column-filter-suggest-chip-remove';
+                        removeButton.setAttribute('aria-label', `Remove ${value}`);
+                        removeButton.textContent = 'x';
+                        removeButton.addEventListener('click', () => {
+                            state.selectedValues = state.selectedValues.filter(item =>
+                                item.localeCompare(value, undefined, { sensitivity: 'accent' }) !== 0);
+                            syncHiddenValue(input);
+                            renderSelectedValues(input);
+                            requestOptions(input);
+                            serializeFilterColumnDataJson();
+                            input.focus();
+                        });
+
+                        chip.appendChild(label);
+                        chip.appendChild(removeButton);
+                        selectedContainer.appendChild(chip);
+                    });
+                };
+
+                const addSelectedValue = (input, value) => {
+                    const normalized = String(value || '').trim();
+                    if (!normalized) {
+                        return;
+                    }
+
+                    const state = getState(input);
+                    const exists = state.selectedValues.some(item =>
+                        item.localeCompare(normalized, undefined, { sensitivity: 'accent' }) === 0);
+                    if (!exists) {
+                        state.selectedValues.push(normalized);
+                    }
+
+                    input.value = '';
+                    syncHiddenValue(input);
+                    renderSelectedValues(input);
+                    requestOptions(input);
+                    serializeFilterColumnDataJson();
+                };
+
+                const showLoading = input => {
+                    const list = getList(input);
+                    if (!(list instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    list.innerHTML = '';
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item py-1 px-2 text-muted small';
+                    item.textContent = 'Loading values...';
+                    list.appendChild(item);
+                    list.classList.remove('d-none');
+                };
+
+                const renderOptionList = (input, options) => {
+                    const list = getList(input);
+                    if (!(list instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    list.innerHTML = '';
+                    if (!options.length) {
+                        hideList(input);
+                        return;
+                    }
+
+                    options.forEach(option => {
+                        const item = document.createElement('button');
+                        item.type = 'button';
+                        item.className = 'list-group-item list-group-item-action py-1 px-2';
+                        item.textContent = option;
+                        item.addEventListener('mousedown', event => event.preventDefault());
+                        item.addEventListener('click', () => {
+                            addSelectedValue(input, option);
+                            input.focus();
+                        });
+                        list.appendChild(item);
+                    });
+
+                    list.classList.remove('d-none');
+                };
+
+                const requestOptions = async input => {
+                    const state = getState(input);
+                    const hiddenInput = getHiddenInput(input);
+                    if (!(hiddenInput instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    const endpoint = (input.dataset.filterValuesUrl || hiddenInput.dataset.filterValuesUrl || '').trim();
+                    const dataFileId = (input.dataset.dataFileId || hiddenInput.dataset.dataFileId || '').trim();
+                    const columnKey = (input.dataset.columnKey || hiddenInput.dataset.columnKey || '').trim();
+                    const search = (input.value || '').trim();
+
+                    if (!endpoint || !dataFileId || !columnKey) {
+                        hideList(input);
+                        return;
+                    }
+
+                    const cacheKey = `${dataFileId}|${columnKey}|${search.toLowerCase()}`;
+                    if (state.cache.has(cacheKey)) {
+                        const options = state.cache.get(cacheKey)
+                            .filter(option => !state.selectedValues.some(item => item.localeCompare(option, undefined, { sensitivity: 'accent' }) === 0));
+                        renderOptionList(input, options);
+                        return;
+                    }
+
+                    state.requestId += 1;
+                    const currentRequestId = state.requestId;
+                    showLoading(input);
+
+                    const url = new URL(endpoint, window.location.origin);
+                    url.searchParams.set('dataFileId', dataFileId);
+                    url.searchParams.set('columnKey', columnKey);
+                    url.searchParams.set('take', '50');
+                    if (search) {
+                        url.searchParams.set('search', search);
+                    }
+
+                    try {
+                        const response = await fetch(url.toString(), { cache: 'no-store' });
+                        const payload = await response.json().catch(() => []);
+                        if (currentRequestId !== state.requestId) {
+                            return;
+                        }
+
+                        const options = Array.isArray(payload)
+                            ? payload
+                                .map(value => String(value || '').trim())
+                                .filter(Boolean)
+                                .filter((value, index, values) =>
+                                    values.findIndex(item => item.localeCompare(value, undefined, { sensitivity: 'accent' }) === 0) === index)
+                            : [];
+
+                        state.cache.set(cacheKey, options);
+
+                        const availableOptions = options
+                            .filter(option => !state.selectedValues.some(item => item.localeCompare(option, undefined, { sensitivity: 'accent' }) === 0));
+                        renderOptionList(input, availableOptions);
+                    } catch {
+                        if (currentRequestId === state.requestId) {
+                            hideList(input);
+                        }
+                    }
+                };
+
+                suggestInputs.forEach(input => {
+                    const hiddenInput = getHiddenInput(input);
+                    const box = getBox(input);
+                    const state = getState(input);
+                    state.selectedValues = parseSelectedValues(hiddenInput?.value || '');
+                    syncHiddenValue(input);
+                    renderSelectedValues(input);
+
+                    box?.addEventListener('click', event => {
+                        if (!(event.target instanceof Element) || event.target.closest('.column-filter-suggest-chip-remove')) {
+                            return;
+                        }
+
+                        input.focus();
+                    });
+
+                    input.addEventListener('focus', () => {
+                        requestOptions(input);
+                    });
+
+                    input.addEventListener('input', () => {
+                        if (state.timer) {
+                            clearTimeout(state.timer);
+                        }
+
+                        state.timer = setTimeout(() => {
+                            state.timer = null;
+                            requestOptions(input);
+                        }, debounceMs);
+                    });
+
+                    input.addEventListener('blur', () => {
+                        window.setTimeout(() => hideList(input), 120);
+                    });
+
+                    input.addEventListener('keydown', event => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            addSelectedValue(input, input.value);
+                            return;
+                        }
+
+                        if (event.key === 'Backspace' && !input.value.trim()) {
+                            const latest = state.selectedValues.at(-1);
+                            if (latest) {
+                                state.selectedValues.pop();
+                                syncHiddenValue(input);
+                                renderSelectedValues(input);
+                                requestOptions(input);
+                                serializeFilterColumnDataJson();
+                            }
+                            return;
+                        }
+
+                        if (event.key === 'Escape') {
+                            hideList(input);
+                        }
+                    });
+                });
             }
 
             function normalizeColumnFilterKey(value) {
