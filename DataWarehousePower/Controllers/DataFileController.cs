@@ -20,6 +20,7 @@ namespace DataWarehousePower.Controllers
         private readonly IDepartmentService _departmentService;
         private readonly IReportExportService _exportService;
         private readonly IReportRepository _reportRepository;
+        private readonly ISnowflakeService _snowflakeService;
         private readonly ILogger<DataFileController> _logger;
         private readonly ScheduledJob _scheduledJobAppSetting;
 
@@ -31,6 +32,7 @@ namespace DataWarehousePower.Controllers
             IDepartmentService departmentService,
             IReportExportService exportService,
             IReportRepository reportRepository,
+            ISnowflakeService snowflakeService,
             ILogger<DataFileController> logger)
         {
             _scheduledJobAppSetting = scheduledJobAppSetting.Value;
@@ -40,6 +42,7 @@ namespace DataWarehousePower.Controllers
             _departmentService = departmentService;
             _exportService = exportService;
             _reportRepository = reportRepository;
+            _snowflakeService = snowflakeService;
             _logger = logger;
         }
 
@@ -416,7 +419,8 @@ namespace DataWarehousePower.Controllers
 
             try
             {
-                DataFilePreviewResult preview = await _service.GetPreviewDataAsync(new DataFilePreviewRequest
+                //DataFilePreviewResult preview = await _service.GetPreviewDataAsync(new DataFilePreviewRequest
+                DataFilePreviewResult preview = await _snowflakeService.GetPreviewDataAsync(new DataFilePreviewRequest
                 {
                     UserId = userId,
                     SourceDatabase = form.SourceDatabase,

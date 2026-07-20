@@ -445,20 +445,25 @@ namespace DataWarehousePower.Services
 
         private static string BuildTableExpression(string? sourceDatabase, string sourceTable)
         {
-            string table = sourceTable.Trim();
-            if (table.Contains('.'))
-            {
-                return string.Join('.', table.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(QuoteIdentifier));
-            }
-
-            string database = (sourceDatabase ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(database))
-            {
-                return QuoteIdentifier(table);
-            }
-
-            return $"{QuoteIdentifier(database)}.{QuoteIdentifier(table)}";
+            return sourceTable.Replace("TBL_", "");
         }
+
+        //private static string BuildTableExpression(string? sourceDatabase, string sourceTable)
+        //{
+        //    string table = sourceTable.Trim();
+        //    if (table.Contains('.'))
+        //    {
+        //        return string.Join('.', table.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(QuoteIdentifier));
+        //    }
+
+        //    string database = (sourceDatabase ?? string.Empty).Trim();
+        //    if (string.IsNullOrWhiteSpace(database))
+        //    {
+        //        return QuoteIdentifier(table);
+        //    }
+
+        //    return $"{QuoteIdentifier(database)}.{QuoteIdentifier(table)}";
+        //}
 
         private static string QuoteIdentifier(string value)
         {
