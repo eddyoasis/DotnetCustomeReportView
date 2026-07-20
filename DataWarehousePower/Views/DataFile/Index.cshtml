@@ -601,11 +601,20 @@
     }
 
     #report-table {
-        table-layout: fixed;
-        width: 100%;
+        table-layout: auto;
+        width: max-content;
+        min-width: 100%;
     }
 
     #report-table th,
+    #report-table td {
+        min-width: 180px;
+    }
+
+    #report-table th {
+        white-space: nowrap;
+    }
+
     #report-table td {
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -949,9 +958,9 @@
                 }
 
                 if (colgroup) {
-                    const widthPercent = (100 / columnDefinitions.length).toFixed(4);
+                    const minColumnWidthPx = 180;
                     colgroup.innerHTML = columnDefinitions
-                        .map(() => `<col style="width:${widthPercent}%">`)
+                        .map(() => `<col style="width:${minColumnWidthPx}px">`)
                         .join('');
                 }
 
