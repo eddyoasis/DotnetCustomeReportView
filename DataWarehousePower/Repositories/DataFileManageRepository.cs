@@ -1676,32 +1676,46 @@ namespace DataWarehousePower.Repositories
         {
             selectedValues = new List<string>();
             string normalized = (value ?? string.Empty).Trim();
-            if (!normalized.StartsWith("[", StringComparison.Ordinal) ||
-                !normalized.EndsWith("]", StringComparison.Ordinal))
+            if (normalized.StartsWith("[", StringComparison.Ordinal) &&
+                normalized.EndsWith("]", StringComparison.Ordinal))
             {
-                return false;
-            }
-
-            try
-            {
-                List<string>? parsed = JsonSerializer.Deserialize<List<string>>(normalized);
-                if (parsed is null)
+                try
                 {
-                    return false;
+                    List<string>? parsed = JsonSerializer.Deserialize<List<string>>(normalized);
+                    if (parsed is not null)
+                    {
+                        selectedValues = parsed
+                            .Where(item => !string.IsNullOrWhiteSpace(item))
+                            .Select(item => item.Trim())
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        if (selectedValues.Count > 0)
+                        {
+                            return true;
+                        }
+                    }
                 }
-
-                selectedValues = parsed
-                    .Where(item => !string.IsNullOrWhiteSpace(item))
-                    .Select(item => item.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                return selectedValues.Count > 0;
+                catch (JsonException)
+                {
+                    // Fall through to delimited parsing.
+                }
             }
-            catch (JsonException)
+
+            if (!normalized.Contains(',', StringComparison.Ordinal) &&
+                !normalized.Contains(';', StringComparison.Ordinal) &&
+                !normalized.Contains('|', StringComparison.Ordinal))
             {
                 return false;
             }
+
+            selectedValues = normalized
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return selectedValues.Count > 1;
         }
 
         private static string BuildMultiSelectStringClause(
