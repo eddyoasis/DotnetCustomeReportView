@@ -159,6 +159,52 @@ namespace DataWarehousePower.Repositories
             return result.Rows;
         }
 
+        public async Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableSnowflakeAsync(
+            string userId,
+            string sourceTable,
+            IEnumerable<DataFileColumn> columnNames,
+            string? sourceDatabase,
+            string? filterClientCodeColumn,
+            string? filterDateColumn,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            DataFilePreviewRequest request = BuildSnowflakeDataFilePreviewRequest(
+                userId,
+                sourceTable,
+                columnNames,
+                sourceDatabase,
+                filterClientCodeColumn,
+                filterDateColumn,
+                clientCode,
+                dateFrom,
+                dateTo);
+
+            DataFilePreviewResult result = await _snowflakeService.GetPreviewDataAsync(request);
+            return result.Rows;
+        }
+
+        public Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableSnowflakeAsync(
+            string sourceTable,
+            IEnumerable<DataFileColumn> columnNames,
+            string? sourceDatabase,
+            string? filterClientCodeColumn,
+            string? filterDateColumn,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+            => GetDataFileDataFromTableSnowflakeAsync(
+                string.Empty,
+                sourceTable,
+                columnNames,
+                sourceDatabase,
+                filterClientCodeColumn,
+                filterDateColumn,
+                clientCode,
+                dateFrom,
+                dateTo);
+
         public async Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableAsync(
             string sourceTable,
             IEnumerable<DataFileColumn> columnNames,
@@ -978,6 +1024,84 @@ namespace DataWarehousePower.Repositories
                         MappingParameterFilter = null
                     })
                     .ToList(),
+                IsExport = true
+            };
+        }
+
+        private static DataFilePreviewRequest BuildSnowflakeDataFilePreviewRequest(
+            string userId,
+            string sourceTable,
+            IEnumerable<DataFileColumn> columns,
+            string? sourceDatabase,
+            string? filterClientCodeColumn,
+            string? filterDateColumn,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            List<DataFilePreviewColumnRequest> previewColumns = columns
+                .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                .Select(column => new DataFilePreviewColumnRequest
+                {
+                    PropertyName = column.PropertyName,
+                    MappingParameter = column.MappingParameter,
+                    MappingParameterFilter = column.MappingParameterFilter
+                })
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(filterClientCodeColumn) &&
+                !previewColumns.Any(column => column.PropertyName.Equals(filterClientCodeColumn, StringComparison.OrdinalIgnoreCase)))
+            {
+                previewColumns.Add(new DataFilePreviewColumnRequest
+                {
+                    PropertyName = filterClientCodeColumn,
+                    MappingParameter = "ClientCode"
+                });
+            }
+
+            string dateFilterKey = string.Empty;
+            if (!string.IsNullOrWhiteSpace(filterDateColumn))
+            {
+                DataFilePreviewColumnRequest? dateFilterColumn = previewColumns
+                    .FirstOrDefault(column => column.PropertyName.Equals(filterDateColumn, StringComparison.OrdinalIgnoreCase));
+
+                if (dateFilterColumn is null)
+                {
+                    dateFilterColumn = new DataFilePreviewColumnRequest
+                    {
+                        PropertyName = filterDateColumn
+                    };
+                    previewColumns.Add(dateFilterColumn);
+                }
+
+                dateFilterColumn.MappingParameter = string.IsNullOrWhiteSpace(dateFilterColumn.MappingParameter)
+                    ? "FilterDateRange"
+                    : dateFilterColumn.MappingParameter;
+                dateFilterKey = dateFilterColumn.MappingParameter;
+            }
+
+            Dictionary<string, string?> parameters = new(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(dateFilterKey) && (dateFrom.HasValue || dateTo.HasValue))
+            {
+                string start = dateFrom.HasValue
+                    ? dateFrom.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                    : string.Empty;
+                string end = dateTo.HasValue
+                    ? dateTo.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                    : string.Empty;
+                parameters[dateFilterKey] = $"{start}|{end}";
+            }
+
+            return new DataFilePreviewRequest
+            {
+                UserId = userId,
+                SourceDatabase = sourceDatabase,
+                SourceTable = sourceTable,
+                ClientCode = clientCode,
+                DateFrom = dateFrom,
+                DateTo = dateTo,
+                Parameters = parameters,
+                Columns = previewColumns,
                 IsExport = true
             };
         }

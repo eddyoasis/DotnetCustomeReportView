@@ -22,6 +22,7 @@ public sealed class ScheduledReportExecutionService(
     ILogger<ScheduledReportExecutionService> logger) : IScheduledReportExecutionService
 {
     private const string LocalExportBasePathSection = "ScheduledJob:LocalExportBasePath";
+    private const string UseSnowflakeForDataFileSection = "ScheduledJob:UseSnowflakeForDataFile";
 
     public async Task ExecuteAsync(int scheduledJobId)
     {
@@ -234,16 +235,44 @@ public sealed class ScheduledReportExecutionService(
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            rows = await reportRepository.GetDataFileDataFromTableAsync(
-                userId,
-                dataFile.SourceTable,
-                dataFileExecFilterColumns,
-                dataFile.SourceDatabase,
-                dataFile.FilterClientCodeColumn,
-                recurringDataDateColumn,
-                clientCode,
-                dateFrom,
-                dateTo);
+            bool useSnowflakeForDataFile = configuration.GetValue<bool>(UseSnowflakeForDataFileSection);
+            if (useSnowflakeForDataFile)
+            {
+                rows = await reportRepository.GetDataFileDataFromTableSnowflakeAsync(
+                    userId,
+                    dataFile.SourceTable,
+                    dataFileExecFilterColumns,
+                    dataFile.SourceDatabase,
+                    dataFile.FilterClientCodeColumn,
+                    recurringDataDateColumn,
+                    clientCode,
+                    dateFrom,
+                    dateTo);
+            }
+            else
+            {
+                rows = await reportRepository.GetDataFileDataFromTableAsync(
+                    userId,
+                    dataFile.SourceTable,
+                    dataFileExecFilterColumns,
+                    dataFile.SourceDatabase,
+                    dataFile.FilterClientCodeColumn,
+                    recurringDataDateColumn,
+                    clientCode,
+                    dateFrom,
+                    dateTo);
+            }
+
+            //rows = await reportRepository.GetDataFileDataFromTableAsync(
+            //    userId,
+            //    dataFile.SourceTable,
+            //    dataFileExecFilterColumns,
+            //    dataFile.SourceDatabase,
+            //    dataFile.FilterClientCodeColumn,
+            //    recurringDataDateColumn,
+            //    clientCode,
+            //    dateFrom,
+            //    dateTo);
 
             //rows = await reportRepository.GetDataFileDataFromTableAsync(
             //    dataFile.SourceTable,
@@ -331,15 +360,31 @@ public sealed class ScheduledReportExecutionService(
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            rows = await reportRepository.GetDataFileDataFromTableAsync(
-                dataFile.SourceTable,
-                dataFile.Columns,
-                dataFile.SourceDatabase,
-                dataFile.FilterClientCodeColumn,
-                dataFile.FilterDateColumn,
-                clientCode,
-                dateFrom,
-                dateTo);
+            bool useSnowflakeForDataFile = configuration.GetValue<bool>(UseSnowflakeForDataFileSection);
+            if (useSnowflakeForDataFile)
+            {
+                rows = await reportRepository.GetDataFileDataFromTableSnowflakeAsync(
+                    dataFile.SourceTable,
+                    dataFile.Columns,
+                    dataFile.SourceDatabase,
+                    dataFile.FilterClientCodeColumn,
+                    dataFile.FilterDateColumn,
+                    clientCode,
+                    dateFrom,
+                    dateTo);
+            }
+            else
+            {
+                rows = await reportRepository.GetDataFileDataFromTableAsync(
+                    dataFile.SourceTable,
+                    dataFile.Columns,
+                    dataFile.SourceDatabase,
+                    dataFile.FilterClientCodeColumn,
+                    dataFile.FilterDateColumn,
+                    clientCode,
+                    dateFrom,
+                    dateTo);
+            }
 
             //rows = ApplyMappedDataFileFilters(rows, dataFile.Columns, clientCode, dateFrom, dateTo, parameterValues);
         }
