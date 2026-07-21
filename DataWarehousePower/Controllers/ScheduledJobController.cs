@@ -15,6 +15,7 @@ public sealed class ScheduledJobController(
     IDataFileManageService dataFileManageService,
     IColumnPreferenceService columnPreferenceService,
     IConfiguration configuration,
+    ISnowflakeService snowflakeService,
     ILogger<ScheduledJobController> logger) : Controller
 {
     private const string ExportLocationBasePathsSection = "ScheduledJob:ExportLocationBasePaths";
@@ -250,7 +251,8 @@ public sealed class ScheduledJobController(
 
         try
         {
-            List<string> values = await dataFileManageService.GetDistinctColumnValuesAsync(
+            //List<string> values = await dataFileManageService.GetDistinctColumnValuesAsync(
+            List<string> values = await snowflakeService.GetDistinctColumnValuesAsync(
                 selectedDataFile.SourceDatabase,
                 selectedDataFile.SourceTable,
                 selectedDataFile.SourceSP,
