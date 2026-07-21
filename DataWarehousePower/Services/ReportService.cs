@@ -175,7 +175,7 @@ namespace DataWarehousePower.Services
             {
                 var columnNames = report.Columns.Select(c => c.PropertyName);
 
-                rows = await _reportRepo.GetReportDataFromTableAsync(
+                rows = await _reportRepo.GetReportDataFromTableSnowflakeAsync(
                     userId,
                     report.SourceTable,
                     report.Columns,
@@ -183,6 +183,15 @@ namespace DataWarehousePower.Services
                     normalizedClientCode,
                     dateFrom,
                     dateTo);
+
+                //rows = await _reportRepo.GetReportDataFromTableAsync(
+                //    userId,
+                //    report.SourceTable,
+                //    report.Columns,
+                //    report.SourceDatabase,
+                //    normalizedClientCode,
+                //    dateFrom,
+                //    dateTo);
 
                 //rows = await _reportRepo.GetReportDataFromTableAsync(
                 //    report.SourceTable,

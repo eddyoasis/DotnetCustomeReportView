@@ -521,7 +521,7 @@
             const columnType = (tr?.dataset?.columnType || '').trim() || metadataType || postedType;
             const targetType = inferMappingInputType(propertyName, columnType);
 
-            return targetType === 'datetime-local' ||
+            return targetType === 'date' ||
                 targetType === 'decimal-range' ||
                 targetType === 'number';
         }
@@ -812,7 +812,7 @@
             }
 
             if (isDateLikeColumnType(columnType)) {
-                return 'datetime-local';
+                return 'date';
             }
 
             if (isDecimalColumnType(columnType)) {
@@ -829,7 +829,7 @@
             }
 
             if (normalizedName.includes('date') || normalizedName.includes('time') || normalizedName.includes('dob')) {
-                return 'datetime-local';
+                return 'date';
             }
 
             return 'text';
@@ -860,7 +860,8 @@
             const dd = String(parsed.getDate()).padStart(2, '0');
             const hh = String(parsed.getHours()).padStart(2, '0');
             const mi = String(parsed.getMinutes()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+            return `${yyyy}-${mm}-${dd}`;
+            // return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
         }
 
         function parseDateRangeMappingValue(value) {
@@ -1257,13 +1258,13 @@
             wrapper.className = 'd-flex flex-column gap-1';
 
             const startInput = document.createElement('input');
-            startInput.type = 'datetime-local';
+            startInput.type = 'date';
             startInput.className = 'form-control form-control-sm';
             startInput.placeholder = 'Start date and time';
             startInput.value = parsed.start;
 
             const endInput = document.createElement('input');
-            endInput.type = 'datetime-local';
+            endInput.type = 'date';
             endInput.className = 'form-control form-control-sm';
             endInput.placeholder = 'End date and time';
             endInput.value = parsed.end;
@@ -1402,7 +1403,7 @@
                 const targetType = inferMappingInputType(propertyName, columnType);
                 const previousEditorType = tr.dataset.mappingEditorType || '';
                 if (previousEditorType !== targetType || !mappingCell.querySelector('.mapping-parameter-editor')?.children.length) {
-                    if (targetType === 'datetime-local') {
+                    if (targetType === 'date') {
                         renderDateRangeMappingEditor(mappingCell, mappingInput);
                     } else if (targetType === 'decimal-range') {
                         renderDecimalMappingEditor(mappingCell, mappingInput);

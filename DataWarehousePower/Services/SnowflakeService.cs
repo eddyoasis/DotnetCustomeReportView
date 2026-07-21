@@ -135,12 +135,6 @@ namespace DataWarehousePower.Services
                     continue;
                 }
 
-                if (TryParseMultiSelectFilter(filterValue, out List<string> selectedValues))
-                {
-                    whereClauses.Add(BuildMultiSelectStringClause(columnName, selectedValues));
-                    continue;
-                }
-
                 if (TryParseDateTimeRangeFilter(filterValue, out DateTime? startDateTime, out DateTime? endDateTime))
                 {
                     string timestampExpression = $"TRY_TO_TIMESTAMP_NTZ(CAST({QuoteIdentifier(columnName)} AS STRING))";
@@ -155,6 +149,12 @@ namespace DataWarehousePower.Services
                         whereClauses.Add($"{timestampExpression} <= {ToTimestampLiteral(endDateTime.Value)}");
                     }
 
+                    continue;
+                }
+
+                if (TryParseMultiSelectFilter(filterValue, out List<string> selectedValues))
+                {
+                    whereClauses.Add(BuildMultiSelectStringClause(columnName, selectedValues));
                     continue;
                 }
 

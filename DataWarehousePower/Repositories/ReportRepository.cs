@@ -2,10 +2,12 @@ using Azure.Core;
 using DataWarehousePower.Data;
 using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
+using DataWarehousePower.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 
 namespace DataWarehousePower.Repositories
 {
@@ -15,17 +17,20 @@ namespace DataWarehousePower.Repositories
         private readonly ClientCodeLookupOptions _clientCodeLookupOptions;
         private readonly ClientCodeFolderLookupOptions _clientCodeFolderLookupOptions;
         private readonly IDataFileManageRepository _dataFileManageRepository;
+        private readonly ISnowflakeService _snowflakeService;
 
         public ReportRepository(
             AppDbContext context,
             IOptionsSnapshot<ClientCodeLookupOptions> clientCodeLookupOptions,
             IOptionsSnapshot<ClientCodeFolderLookupOptions> clientCodeFolderLookupOptions,
-            IDataFileManageRepository dataFileManageRepository)
+            IDataFileManageRepository dataFileManageRepository,
+            ISnowflakeService snowflakeService)
         {
             _context = context;
             _clientCodeLookupOptions = clientCodeLookupOptions.Value;
             _clientCodeFolderLookupOptions = clientCodeFolderLookupOptions.Value;
             _dataFileManageRepository = dataFileManageRepository;
+            _snowflakeService = snowflakeService;
         }
 
         public async Task<List<ReportDefinition>> GetAllReportsAsync(string? userDepartment = null)
@@ -423,6 +428,44 @@ namespace DataWarehousePower.Repositories
 
             return await ExecuteReaderAsync(conn, sql, CommandType.Text, parameters);
         }
+
+        public async Task<List<Dictionary<string, object?>>> GetReportDataFromTableSnowflakeAsync(
+            string userId,
+            string sourceTable,
+            IEnumerable<ReportColumn> columns,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            DataFilePreviewRequest request = BuildSnowflakeReportPreviewRequest(
+                userId,
+                sourceTable,
+                columns,
+                sourceDatabase,
+                clientCode,
+                dateFrom,
+                dateTo);
+
+            DataFilePreviewResult result = await _snowflakeService.GetPreviewDataAsync(request);
+            return result.Rows;
+        }
+
+        public Task<List<Dictionary<string, object?>>> GetReportDataFromTableSnowflakeAsync(
+            string sourceTable,
+            IEnumerable<ReportColumn> columns,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+            => GetReportDataFromTableSnowflakeAsync(
+                string.Empty,
+                sourceTable,
+                columns,
+                sourceDatabase,
+                clientCode,
+                dateFrom,
+                dateTo);
 
         public async Task<List<Dictionary<string, object?>>> GetReportDataFromTableAsync(
             string sourceTable,
@@ -880,6 +923,63 @@ namespace DataWarehousePower.Repositories
             }
 
             return normalized.StartsWith("@", StringComparison.Ordinal) ? normalized : "@" + normalized;
+        }
+
+        private static DataFilePreviewRequest BuildSnowflakeReportPreviewRequest(
+            string userId,
+            string sourceTable,
+            IEnumerable<ReportColumn> columns,
+            string? sourceDatabase,
+            string? clientCode,
+            DateTime? dateFrom,
+            DateTime? dateTo)
+        {
+            List<ReportColumn> materializedColumns = columns
+                .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                .ToList();
+
+            Dictionary<string, string?> parameters = new(StringComparer.OrdinalIgnoreCase);
+            if (dateFrom.HasValue || dateTo.HasValue)
+            {
+                string start = dateFrom.HasValue
+                    ? dateFrom.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                    : string.Empty;
+                string end = dateTo.HasValue
+                    ? dateTo.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                    : string.Empty;
+                string dateRangeFilter = $"{start}|{end}";
+
+                foreach (ReportColumn mappedColumn in materializedColumns.Where(column =>
+                             !string.IsNullOrWhiteSpace(column.MappingParameter) &&
+                             !column.MappingParameter.Contains("ClientCode", StringComparison.OrdinalIgnoreCase)))
+                {
+                    string mappingKey = mappedColumn.MappingParameter.Trim();
+                    if (!parameters.ContainsKey(mappingKey))
+                    {
+                        parameters[mappingKey] = dateRangeFilter;
+                    }
+                }
+            }
+
+            return new DataFilePreviewRequest
+            {
+                UserId = userId,
+                SourceDatabase = sourceDatabase,
+                SourceTable = sourceTable,
+                ClientCode = clientCode,
+                DateFrom = dateFrom,
+                DateTo = dateTo,
+                Parameters = parameters,
+                Columns = materializedColumns
+                    .Select(column => new DataFilePreviewColumnRequest
+                    {
+                        PropertyName = column.PropertyName,
+                        MappingParameter = column.MappingParameter,
+                        MappingParameterFilter = null
+                    })
+                    .ToList(),
+                IsExport = true
+            };
         }
 
         private static void AddParam(System.Data.Common.DbCommand cmd, string name, object? value)
