@@ -481,29 +481,52 @@ namespace DataWarehousePower.Controllers
 
             try
             {
-                //DataFilePreviewResult preview = await _service.GetPreviewDataAsync(new DataFilePreviewRequest
-                DataFilePreviewResult preview = await _snowflakeService.GetPreviewDataAsync(new DataFilePreviewRequest
-                {
-                    UserId = userId,
-                    SourceDatabase = form.SourceDatabase,
-                    SourceTable = form.SourceTable,
-                    SourceSP = form.SourceSP,
-                    ClientCode = request.ClientCode,
-                    DateFrom = request.DateFrom,
-                    DateTo = request.DateTo,
-                    Parameters = request.Parameters,
-                    Columns = form.Columns
-                        .Where(column => !column.IsDeleted)
-                        .OrderBy(column => column.DisplayOrder)
-                        .Select(column => new DataFilePreviewColumnRequest
-                        {
-                            PropertyName = column.PropertyName,
-                            MappingParameter = column.MappingParameter,
-                            MappingParameterFilter = column.MappingParameterFilter
-                        })
-                        .ToList(),
-                    IsExport = true
-                });
+                DataFilePreviewResult preview = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
+                    await _snowflakeService.GetPreviewDataAsync(new DataFilePreviewRequest
+                    {
+                        UserId = userId,
+                        SourceDatabase = form.SourceDatabase,
+                        SourceTable = form.SourceTable,
+                        SourceSP = form.SourceSP,
+                        ClientCode = request.ClientCode,
+                        DateFrom = request.DateFrom,
+                        DateTo = request.DateTo,
+                        Parameters = request.Parameters,
+                        Columns = form.Columns
+                            .Where(column => !column.IsDeleted)
+                            .OrderBy(column => column.DisplayOrder)
+                            .Select(column => new DataFilePreviewColumnRequest
+                            {
+                                PropertyName = column.PropertyName,
+                                MappingParameter = column.MappingParameter,
+                                MappingParameterFilter = column.MappingParameterFilter
+                            })
+                            .ToList(),
+                        IsExport = true
+                    })
+                    :
+                    await _service.GetPreviewDataAsync(new DataFilePreviewRequest
+                    {
+                        UserId = userId,
+                        SourceDatabase = form.SourceDatabase,
+                        SourceTable = form.SourceTable,
+                        SourceSP = form.SourceSP,
+                        ClientCode = request.ClientCode,
+                        DateFrom = request.DateFrom,
+                        DateTo = request.DateTo,
+                        Parameters = request.Parameters,
+                        Columns = form.Columns
+                            .Where(column => !column.IsDeleted)
+                            .OrderBy(column => column.DisplayOrder)
+                            .Select(column => new DataFilePreviewColumnRequest
+                            {
+                                PropertyName = column.PropertyName,
+                                MappingParameter = column.MappingParameter,
+                                MappingParameterFilter = column.MappingParameterFilter
+                            })
+                            .ToList(),
+                        IsExport = true
+                    });
 
                 var vm = new ReportViewModel
                 {
