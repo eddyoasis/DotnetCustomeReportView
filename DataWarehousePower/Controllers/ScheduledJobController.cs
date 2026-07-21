@@ -1,10 +1,12 @@
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Models;
+using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Data.SqlClient;
+using Snowflake.Data.Client;
 
 namespace DataWarehousePower.Controllers;
 
@@ -13,6 +15,7 @@ public sealed class ScheduledJobController(
     IScheduledReportJobService scheduledReportJobService,
     IHangfireJobDetailService hangfireJobDetailService,
     IDataFileManageService dataFileManageService,
+    IReportRepository reportRepository,
     IColumnPreferenceService columnPreferenceService,
     IConfiguration configuration,
     ISnowflakeService snowflakeService,
@@ -272,6 +275,130 @@ public sealed class ScheduledJobController(
                 selectedColumn.PropertyName);
 
             return Json(Array.Empty<string>());
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Preview([FromBody] ScheduledJobPreviewRequest request)
+    {
+        if (request is null)
+        {
+            return BadRequest(new { message = "Preview request is required." });
+        }
+
+        if (request.SourceId <= 0)
+        {
+            return BadRequest(new { message = "Please select a source before preview." });
+        }
+
+        string mode = (request.SourceMode ?? string.Empty).Trim().ToLowerInvariant();
+        if (mode is not ("report" or "datafile"))
+        {
+            return BadRequest(new { message = "Invalid source mode." });
+        }
+
+        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        string? userDepartment = ResolveUserDepartment();
+
+        try
+        {
+            string? sourceDatabase;
+            string? sourceTable;
+            string? sourceSP;
+            List<DataFilePreviewColumnRequest> allowedColumns;
+
+            if (mode == "datafile")
+            {
+                DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+                DataFileDefinition? selectedDataFile = dataFileList.DataFiles.FirstOrDefault(dataFile => dataFile.Id == request.SourceId);
+                if (selectedDataFile is null)
+                {
+                    return BadRequest(new { message = "Selected data file was not found." });
+                }
+
+                sourceDatabase = selectedDataFile.SourceDatabase;
+                sourceTable = selectedDataFile.SourceTable;
+                sourceSP = selectedDataFile.SourceSP;
+                allowedColumns = selectedDataFile.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .Select(column => new DataFilePreviewColumnRequest
+                    {
+                        PropertyName = column.PropertyName,
+                        MappingParameter = column.MappingParameter,
+                        MappingParameterFilter = column.MappingParameterFilter
+                    })
+                    .ToList();
+            }
+            else
+            {
+                ReportDefinition? reportDefinition = await reportRepository.GetReportWithColumnsAsync(request.SourceId, userDepartment);
+                if (reportDefinition is null)
+                {
+                    return BadRequest(new { message = "Selected report was not found." });
+                }
+
+                sourceDatabase = reportDefinition.SourceDatabase;
+                sourceTable = reportDefinition.SourceTable;
+                sourceSP = reportDefinition.SourceSP;
+                allowedColumns = reportDefinition.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .Select(column => new DataFilePreviewColumnRequest
+                    {
+                        PropertyName = column.PropertyName,
+                        MappingParameter = column.MappingParameter
+                    })
+                    .ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceSP))
+            {
+                return BadRequest(new { message = "Preview currently supports Source Table only." });
+            }
+
+            List<DataFilePreviewColumnRequest> selectedColumns = ResolvePreviewColumns(allowedColumns, request.Columns);
+            if (selectedColumns.Count == 0)
+            {
+                return BadRequest(new { message = "No columns available for preview." });
+            }
+
+            DataFilePreviewRequest previewRequest = new()
+            {
+                UserId = userId,
+                SourceDatabase = sourceDatabase,
+                SourceTable = sourceTable,
+                SourceSP = sourceSP,
+                ClientCode = (request.ClientCode ?? string.Empty).Trim(),
+                Parameters = NormalizePreviewParameters(request.Parameters),
+                Page = 1,
+                Take = request.Take,
+                Columns = selectedColumns
+            };
+
+            DataFilePreviewResult preview = await snowflakeService.GetPreviewDataAsync(previewRequest);
+            return Json(new
+            {
+                columns = preview.Columns,
+                rows = preview.Rows,
+                count = preview.TotalRowCount
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (SnowflakeDbException ex)
+        {
+            logger.LogWarning(ex,
+                "Scheduled job preview query failed for source mode {SourceMode}, source ID {SourceId}",
+                mode,
+                request.SourceId);
+
+            return BadRequest(new { message = "Failed to load preview data from Snowflake." });
         }
     }
 
@@ -625,6 +752,66 @@ public sealed class ScheduledJobController(
         }
     }
 
+    private static List<DataFilePreviewColumnRequest> ResolvePreviewColumns(
+        List<DataFilePreviewColumnRequest> allowedColumns,
+        List<ScheduledJobPreviewColumnRequest>? requestedColumns)
+    {
+        List<DataFilePreviewColumnRequest> effectiveRequestedColumns = requestedColumns
+            ?.Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+            .Select(column => new DataFilePreviewColumnRequest
+            {
+                PropertyName = column.PropertyName.Trim(),
+                MappingParameter = string.IsNullOrWhiteSpace(column.MappingParameter) ? null : column.MappingParameter.Trim()
+            })
+            .ToList()
+            ?? [];
+
+        if (effectiveRequestedColumns.Count == 0)
+        {
+            return allowedColumns;
+        }
+
+        Dictionary<string, DataFilePreviewColumnRequest> allowedByPropertyName = allowedColumns
+            .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+            .GroupBy(column => column.PropertyName.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        return effectiveRequestedColumns
+            .Where(column => allowedByPropertyName.ContainsKey(column.PropertyName))
+            .Select(column =>
+            {
+                DataFilePreviewColumnRequest allowedColumn = allowedByPropertyName[column.PropertyName];
+                return new DataFilePreviewColumnRequest
+                {
+                    PropertyName = allowedColumn.PropertyName,
+                    MappingParameter = string.IsNullOrWhiteSpace(column.MappingParameter)
+                        ? allowedColumn.MappingParameter
+                        : column.MappingParameter,
+                    MappingParameterFilter = allowedColumn.MappingParameterFilter
+                };
+            })
+            .GroupBy(column => column.PropertyName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    private static Dictionary<string, string?>? NormalizePreviewParameters(Dictionary<string, string?>? parameters)
+    {
+        if (parameters is null || parameters.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string?> normalized = parameters
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+            .ToDictionary(
+                pair => pair.Key.Trim(),
+                pair => string.IsNullOrWhiteSpace(pair.Value) ? null : pair.Value.Trim(),
+                StringComparer.OrdinalIgnoreCase);
+
+        return normalized.Count == 0 ? null : normalized;
+    }
+
     private void ValidateExportLocation(ScheduledJobFormViewModel form)
     {
         if (form.JobAction == ScheduledJobActions.EmailToUser)
@@ -699,5 +886,21 @@ public sealed class ScheduledJobController(
         }
 
         return normalizedPath.EndsWith('\\') ? normalizedPath : $"{normalizedPath}\\";
+    }
+
+    public sealed class ScheduledJobPreviewRequest
+    {
+        public string? SourceMode { get; set; }
+        public int SourceId { get; set; }
+        public int Take { get; set; } = 10;
+        public string? ClientCode { get; set; }
+        public List<ScheduledJobPreviewColumnRequest> Columns { get; set; } = [];
+        public Dictionary<string, string?>? Parameters { get; set; }
+    }
+
+    public sealed class ScheduledJobPreviewColumnRequest
+    {
+        public string PropertyName { get; set; } = string.Empty;
+        public string? MappingParameter { get; set; }
     }
 }
