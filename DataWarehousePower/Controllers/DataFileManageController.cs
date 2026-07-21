@@ -451,7 +451,7 @@ namespace DataWarehousePower.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> MappingParameterValues(
+        public async Task<IActionResult> MappingParameterValues2(
             string? sourceDatabase,
             string? sourceTable,
             string? sourceSP,
@@ -475,6 +475,40 @@ namespace DataWarehousePower.Controllers
             {
                 _logger.LogWarning(ex,
                     "Mapping parameter values query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}, column {ColumnName}",
+                    sourceDatabase,
+                    sourceTable,
+                    sourceSP,
+                    columnName);
+
+                return Json(Array.Empty<string>());
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> MappingParameterValues(
+            string? sourceDatabase,
+            string? sourceTable,
+            string? sourceSP,
+            string? columnName,
+            string? search = null,
+            int take = 50)
+        {
+            try
+            {
+                var items = await _snowflakeService.GetDistinctColumnValuesAsync(
+                    sourceDatabase,
+                    sourceTable,
+                    sourceSP,
+                    columnName,
+                    search,
+                    take);
+
+                return Json(items);
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.LogWarning(ex,
+                    "Snowflake mapping parameter values query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}, column {ColumnName}",
                     sourceDatabase,
                     sourceTable,
                     sourceSP,
