@@ -215,6 +215,58 @@ namespace DataWarehousePower.Services
             };
         }
 
+        public async Task<List<string>> GetDistinctColumnValuesAsync(
+            string? sourceDatabase,
+            string? sourceTable,
+            string? sourceSP,
+            string? columnName,
+            string? search = null,
+            int take = 50,
+            CancellationToken cancellationToken = default)
+        {
+            if (!string.IsNullOrWhiteSpace(sourceSP))
+            {
+                throw new InvalidOperationException("Snowflake filter values currently supports Source Table only.");
+            }
+
+            string normalizedTable = (sourceTable ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedTable))
+            {
+                throw new ArgumentException("Source table is required.", nameof(sourceTable));
+            }
+
+            string normalizedColumn = (columnName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedColumn))
+            {
+                throw new ArgumentException("Column name is required.", nameof(columnName));
+            }
+
+            int effectiveTake = take <= 0 ? 50 : Math.Min(take, 200);
+            string tableExpression = BuildTableExpression(sourceDatabase, normalizedTable);
+            string escapedSearch = EscapeSqlLiteral((search ?? string.Empty).Trim());
+            string columnExpression = $"CAST({QuoteIdentifier(normalizedColumn)} AS STRING)";
+
+            string searchClause = string.IsNullOrWhiteSpace(escapedSearch)
+                ? string.Empty
+                : $" AND {columnExpression} ILIKE '%{escapedSearch}%'";
+
+            string sql =
+                $"SELECT DISTINCT {columnExpression} AS VALUE " +
+                $"FROM {tableExpression} " +
+                $"WHERE {QuoteIdentifier(normalizedColumn)} IS NOT NULL{searchClause} " +
+                "ORDER BY VALUE " +
+                $"LIMIT {effectiveTake}";
+
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(sql, cancellationToken);
+
+            return rows
+                .Select(row => row.TryGetValue("VALUE", out object? value) ? value?.ToString() : null)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         private static bool IsClientCodeMapping(string? mappingParameter)
         {
             string normalized = (mappingParameter ?? string.Empty).Trim();

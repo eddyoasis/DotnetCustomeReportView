@@ -8,6 +8,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Snowflake.Data.Client;
 
 namespace DataWarehousePower.Controllers
 {
@@ -199,7 +200,7 @@ namespace DataWarehousePower.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> FilterValues(int id, string? columnKey = null, string? search = null, int take = 50)
+        public async Task<IActionResult> FilterValues2(int id, string? columnKey = null, string? search = null, int take = 50)
         {
             string userId = _prefService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
@@ -241,6 +242,58 @@ namespace DataWarehousePower.Controllers
             {
                 _logger.LogWarning(ex,
                     "Column filter values query failed for data file {DataFileId}, database {SourceDatabase}, table {SourceTable}, column {ColumnName}",
+                    id,
+                    selectedDataFile.SourceDatabase,
+                    selectedDataFile.SourceTable,
+                    selectedColumn.PropertyName);
+
+                return Json(Array.Empty<string>());
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> FilterValues(int id, string? columnKey = null, string? search = null, int take = 50)
+        {
+            string userId = _prefService.ResolveUserId(HttpContext);
+            string? userDepartment = ResolveUserDepartment();
+
+            DataFileManageListViewModel listViewModel = await _service.GetListViewModelAsync(
+                userId,
+                userDepartment ?? string.Empty,
+                new DataFileManageFilterViewModel());
+
+            DataFileDefinition? selectedDataFile = listViewModel.DataFiles.FirstOrDefault(dataFile => dataFile.Id == id);
+            if (selectedDataFile is null)
+            {
+                return Json(Array.Empty<string>());
+            }
+
+            string normalizedColumnKey = (columnKey ?? string.Empty).Trim();
+            DataFileColumn? selectedColumn = selectedDataFile.Columns.FirstOrDefault(column =>
+                !string.IsNullOrWhiteSpace(column.PropertyName) &&
+                column.PropertyName.Equals(normalizedColumnKey, StringComparison.OrdinalIgnoreCase));
+
+            if (selectedColumn is null)
+            {
+                return Json(Array.Empty<string>());
+            }
+
+            try
+            {
+                List<string> values = await _snowflakeService.GetDistinctColumnValuesAsync(
+                    selectedDataFile.SourceDatabase,
+                    selectedDataFile.SourceTable,
+                    selectedDataFile.SourceSP,
+                    selectedColumn.PropertyName,
+                    search,
+                    take);
+
+                return Json(values);
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.LogWarning(ex,
+                    "Snowflake column filter values query failed for data file {DataFileId}, database {SourceDatabase}, table {SourceTable}, column {ColumnName}",
                     id,
                     selectedDataFile.SourceDatabase,
                     selectedDataFile.SourceTable,
