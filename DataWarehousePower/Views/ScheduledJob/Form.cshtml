@@ -609,7 +609,7 @@
             const clientCodeFieldInput = document.getElementById('ClientCode');
             const isCustomToggle = document.getElementById('isCustomToggle');
             const isUseRecurringDataDateColumnToggle = document.getElementById('isUseRecurringDataDateColumnToggle');
-            const recurringDataDateColumn = document.getElementById('RecurringDataDateColumn');
+            const recurringDataDateColumn = document.getElementById('process-data-column-select');
             const autoDateIntervalUnitWholeGroup = document.getElementById('autoDateIntervalUnitWholeGroup');
             const dateFromGroup = document.getElementById('dateFromGroup');
             const dateToGroup = document.getElementById('dateToGroup');
@@ -1651,6 +1651,87 @@
                     .filter(Boolean);
             }
 
+            function formatDateTimeForFilter(date) {
+                if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+                    return '';
+                }
+
+                const pad = value => String(value).padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+            }
+
+            function addDays(date, days) {
+                const next = new Date(date.getTime());
+                next.setDate(next.getDate() + days);
+                return next;
+            }
+
+            function addMonths(date, months) {
+                const next = new Date(date.getTime());
+                next.setMonth(next.getMonth() + months);
+                return next;
+            }
+
+            function addYears(date, years) {
+                const next = new Date(date.getTime());
+                next.setFullYear(next.getFullYear() + years);
+                return next;
+            }
+
+            function computeAutoDateRangeFilter(unit, value) {
+                const normalizedUnit = String(unit || '').trim().toLowerCase();
+                const intervalValue = Number.parseInt(String(value || '').trim(), 10);
+                if (!Number.isFinite(intervalValue) || intervalValue <= 0) {
+                    return null;
+                }
+
+                const now = new Date();
+                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+                const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+
+                let from = null;
+                let to = new Date(now.getTime());
+
+                switch (normalizedUnit) {
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalMinutely':
+                        from = new Date(now.getTime() - (intervalValue * 60 * 1000));
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalHourly':
+                        from = new Date(now.getTime() - (intervalValue * 60 * 60 * 1000));
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalDaily':
+                        from = addDays(now, -intervalValue);
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalWeekly':
+                        from = addDays(now, -(7 * intervalValue));
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalMonthly':
+                        from = addMonths(now, -intervalValue);
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalYearly':
+                        from = addYears(now, -intervalValue);
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalLastDay':
+                        from = addDays(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0), -intervalValue);
+                        to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, -1, 0);
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalLastMonth':
+                        from = addMonths(monthStart, -intervalValue);
+                        to = new Date(monthStart.getTime() - 1000);
+                        break;
+                    case '@ScheduledJobFormViewModel.AutoDateIntervalLastYear':
+                        from = addYears(yearStart, -intervalValue);
+                        to = new Date(yearStart.getTime() - 1000);
+                        break;
+                    default:
+                        return null;
+                }
+
+                const fromText = formatDateTimeForFilter(from);
+                const toText = formatDateTimeForFilter(to);
+                return fromText && toText ? `${fromText}|${toText}` : null;
+            }
+
             function getPreviewParameters(mode) {
                 const parameters = {};
 
@@ -1686,6 +1767,21 @@
                     const dateToValue = (dateToInput.value || '').trim();
                     if (dateToValue) {
                         parameters.FilterDateTo = dateToValue;
+                    }
+                }
+
+                if (mode === 'datafile' && isUseRecurringDataDateColumnToggle instanceof HTMLInputElement && isUseRecurringDataDateColumnToggle.checked) {
+                    const recurringColumnName = (recurringDataDateColumn?.value || '').trim();
+                    if (recurringColumnName) {
+                        const matchingColumnFilter = [...(columnsFilterGroup?.querySelectorAll('.column-filter-input[data-column-key]') || [])]
+                            .find(input => (input.getAttribute('data-column-key') || '').trim().localeCompare(recurringColumnName, undefined, { sensitivity: 'accent' }) === 0);
+
+                        const recurringFilterKey = (matchingColumnFilter?.getAttribute('data-filter-key') || recurringColumnName).trim();
+                        const recurringRange = computeAutoDateRangeFilter(autoDateIntervalUnitSelect?.value, autoDateIntervalValueInput?.value);
+
+                        if (recurringFilterKey && recurringRange) {
+                            parameters[recurringFilterKey] = recurringRange;
+                        }
                     }
                 }
 
