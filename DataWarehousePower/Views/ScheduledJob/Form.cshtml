@@ -1798,7 +1798,7 @@
 
                 const take = Number.parseInt(previewTakeSelect?.value || '10', 10) || 10;
                 const columns = getPreviewColumnRequests(selectedSource.selectedSource);
-                if (!columns.length) {
+                if (selectedSource.mode === 'datafile' && !columns.length) {
                     setPreviewStatus('No columns are available for the selected source.', true);
                     clearPreviewTable();
                     return;
@@ -1830,7 +1830,12 @@
                                 propertyName: column.propertyName,
                                 mappingParameter: column.mappingParameter || null
                             })),
-                            parameters
+                            parameters,
+                            isCustom: !!(isCustomToggle instanceof HTMLInputElement ? isCustomToggle.checked : true),
+                            autoDateIntervalUnit: autoDateIntervalUnitSelect?.value || null,
+                            autoDateIntervalValue: Number.parseInt(autoDateIntervalValueInput?.value || '', 10) || null,
+                            dateFrom: dateFromInput?.value || null,
+                            dateTo: dateToInput?.value || null
                         })
                     });
 

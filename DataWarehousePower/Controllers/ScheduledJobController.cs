@@ -1,4 +1,5 @@
 using DataWarehousePower.Authorization;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
@@ -307,6 +308,8 @@ public sealed class ScheduledJobController(
             string? sourceTable;
             string? sourceSP;
             List<DataFilePreviewColumnRequest> allowedColumns;
+            string? filterClientCodeColumn = null;
+            string? filterDateColumn = null;
 
             if (mode == "datafile")
             {
@@ -341,6 +344,9 @@ public sealed class ScheduledJobController(
                 sourceDatabase = reportDefinition.SourceDatabase;
                 sourceTable = reportDefinition.SourceTable;
                 sourceSP = reportDefinition.SourceSP;
+                filterClientCodeColumn = reportDefinition.FilterClientCodeColumn;
+                //filterDateColumn = reportDefinition.FilterDateColumn;
+                filterDateColumn = reportDefinition.Columns.FirstOrDefault(x => x.MappingParameter == "FilterDateFrom,FilterDateTo")?.PropertyName;
                 allowedColumns = reportDefinition.Columns
                     .OrderBy(column => column.DisplayOrder)
                     .Select(column => new DataFilePreviewColumnRequest
@@ -362,6 +368,57 @@ public sealed class ScheduledJobController(
                 return BadRequest(new { message = "No columns available for preview." });
             }
 
+            Dictionary<string, string?>? normalizedParameters = NormalizePreviewParameters(request.Parameters);
+            HashSet<string> hiddenFilterColumns = new(StringComparer.OrdinalIgnoreCase);
+
+            if (mode == "report")
+            {
+                if (!string.IsNullOrWhiteSpace(filterClientCodeColumn) && !string.IsNullOrWhiteSpace(request.ClientCode))
+                {
+                    DataFilePreviewColumnRequest? existingClientCodeFilterColumn = selectedColumns.FirstOrDefault(column =>
+                        column.PropertyName.Equals(filterClientCodeColumn, StringComparison.OrdinalIgnoreCase));
+
+                    if (existingClientCodeFilterColumn is null)
+                    {
+                        selectedColumns.Add(new DataFilePreviewColumnRequest
+                        {
+                            PropertyName = filterClientCodeColumn,
+                            MappingParameter = "ClientCode"
+                        });
+                        hiddenFilterColumns.Add(filterClientCodeColumn);
+                    }
+                    else
+                    {
+                        existingClientCodeFilterColumn.MappingParameter = "ClientCode";
+                    }
+                }
+
+                string? dateRangeFilterValue = BuildReportPreviewDateRangeFilter(request);
+                if (!string.IsNullOrWhiteSpace(filterDateColumn) && !string.IsNullOrWhiteSpace(dateRangeFilterValue))
+                {
+                    const string previewDateParameterKey = "__preview_date_range__";
+                    normalizedParameters ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                    normalizedParameters[previewDateParameterKey] = dateRangeFilterValue;
+
+                    DataFilePreviewColumnRequest? existingDateFilterColumn = selectedColumns.FirstOrDefault(column =>
+                        column.PropertyName.Equals(filterDateColumn, StringComparison.OrdinalIgnoreCase));
+
+                    if (existingDateFilterColumn is null)
+                    {
+                        selectedColumns.Add(new DataFilePreviewColumnRequest
+                        {
+                            PropertyName = filterDateColumn,
+                            MappingParameter = previewDateParameterKey
+                        });
+                        hiddenFilterColumns.Add(filterDateColumn);
+                    }
+                    else
+                    {
+                        existingDateFilterColumn.MappingParameter = previewDateParameterKey;
+                    }
+                }
+            }
+
             DataFilePreviewRequest previewRequest = new()
             {
                 UserId = userId,
@@ -369,17 +426,38 @@ public sealed class ScheduledJobController(
                 SourceTable = sourceTable,
                 SourceSP = sourceSP,
                 ClientCode = (request.ClientCode ?? string.Empty).Trim(),
-                Parameters = NormalizePreviewParameters(request.Parameters),
+                Parameters = normalizedParameters,
                 Page = 1,
                 Take = request.Take,
                 Columns = selectedColumns
             };
 
             DataFilePreviewResult preview = await snowflakeService.GetPreviewDataAsync(previewRequest);
+
+            List<string> responseColumns = preview.Columns
+                .Where(column => !hiddenFilterColumns.Contains(column))
+                .ToList();
+
+            List<Dictionary<string, object?>> responseRows = preview.Rows
+                .Select(row =>
+                {
+                    Dictionary<string, object?> cleaned = new(StringComparer.OrdinalIgnoreCase);
+                    foreach ((string key, object? value) in row)
+                    {
+                        if (!hiddenFilterColumns.Contains(key))
+                        {
+                            cleaned[key] = value;
+                        }
+                    }
+
+                    return cleaned;
+                })
+                .ToList();
+
             return Json(new
             {
-                columns = preview.Columns,
-                rows = preview.Rows,
+                columns = responseColumns,
+                rows = responseRows,
                 count = preview.TotalRowCount
             });
         }
@@ -812,6 +890,63 @@ public sealed class ScheduledJobController(
         return normalized.Count == 0 ? null : normalized;
     }
 
+    private static string? BuildReportPreviewDateRangeFilter(ScheduledJobPreviewRequest request)
+    {
+        if (request.IsCustom)
+        {
+            if (!request.DateFrom.HasValue && !request.DateTo.HasValue)
+            {
+                return null;
+            }
+
+            string fromText = request.DateFrom.HasValue
+                ? request.DateFrom.Value.Date.ToString("yyyy-MM-dd")
+                : string.Empty;
+            string toText = request.DateTo.HasValue
+                ? request.DateTo.Value.Date.ToString("yyyy-MM-dd")
+                : string.Empty;
+
+            return $"{fromText}|{toText}";
+        }
+
+        if (request.AutoDateIntervalValue is not > 0)
+        {
+            return null;
+        }
+
+        DateTime now = DateTimeHelper.GetCurrentLocalTime();
+        string normalizedIntervalUnit = (request.AutoDateIntervalUnit ?? string.Empty).Trim().ToLowerInvariant();
+
+        DateTime? intervalDateFrom = normalizedIntervalUnit switch
+        {
+            ScheduledJobFormViewModel.AutoDateIntervalMinutely => now.AddMinutes(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalHourly => now.AddHours(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalDaily => now.AddDays(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalWeekly => now.AddDays(-(7 * request.AutoDateIntervalValue.Value)),
+            ScheduledJobFormViewModel.AutoDateIntervalMonthly => now.AddMonths(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalYearly => now.AddYears(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalLastDay => now.Date.AddDays(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalLastMonth => new DateTime(now.Year, now.Month, 1).AddMonths(-request.AutoDateIntervalValue.Value),
+            ScheduledJobFormViewModel.AutoDateIntervalLastYear => new DateTime(now.Year, 1, 1).AddYears(-request.AutoDateIntervalValue.Value),
+            _ => null
+        };
+
+        if (!intervalDateFrom.HasValue)
+        {
+            return null;
+        }
+
+        DateTime intervalDateTo = normalizedIntervalUnit switch
+        {
+            ScheduledJobFormViewModel.AutoDateIntervalLastDay => now.Date.AddSeconds(-1),
+            ScheduledJobFormViewModel.AutoDateIntervalLastMonth => new DateTime(now.Year, now.Month, 1).AddSeconds(-1),
+            ScheduledJobFormViewModel.AutoDateIntervalLastYear => new DateTime(now.Year, 1, 1).AddSeconds(-1),
+            _ => now
+        };
+
+        return $"{intervalDateFrom.Value:yyyy-MM-ddTHH:mm:ss}|{intervalDateTo:yyyy-MM-ddTHH:mm:ss}";
+    }
+
     private void ValidateExportLocation(ScheduledJobFormViewModel form)
     {
         if (form.JobAction == ScheduledJobActions.EmailToUser)
@@ -896,6 +1031,11 @@ public sealed class ScheduledJobController(
         public string? ClientCode { get; set; }
         public List<ScheduledJobPreviewColumnRequest> Columns { get; set; } = [];
         public Dictionary<string, string?>? Parameters { get; set; }
+        public bool IsCustom { get; set; }
+        public string? AutoDateIntervalUnit { get; set; }
+        public int? AutoDateIntervalValue { get; set; }
+        public DateTime? DateFrom { get; set; }
+        public DateTime? DateTo { get; set; }
     }
 
     public sealed class ScheduledJobPreviewColumnRequest
