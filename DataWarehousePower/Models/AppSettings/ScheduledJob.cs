@@ -2,6 +2,7 @@
 {
     public class ScheduledJob
     {
+        public bool UseSnowflakeForDataFile { get; set; }
         public ExportSplit ExportSplit { get; set; }
     }
 

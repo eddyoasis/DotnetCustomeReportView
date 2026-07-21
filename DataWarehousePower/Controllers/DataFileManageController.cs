@@ -451,40 +451,6 @@ namespace DataWarehousePower.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> MappingParameterValues2(
-            string? sourceDatabase,
-            string? sourceTable,
-            string? sourceSP,
-            string? columnName,
-            string? search = null,
-            int take = 50)
-        {
-            try
-            {
-                var items = await _service.GetDistinctColumnValuesAsync(
-                    sourceDatabase,
-                    sourceTable,
-                    sourceSP,
-                    columnName,
-                    search,
-                    take);
-
-                return Json(items);
-            }
-            catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
-            {
-                _logger.LogWarning(ex,
-                    "Mapping parameter values query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}, column {ColumnName}",
-                    sourceDatabase,
-                    sourceTable,
-                    sourceSP,
-                    columnName);
-
-                return Json(Array.Empty<string>());
-            }
-        }
-
-        [HttpGet]
         public async Task<IActionResult> MappingParameterValues(
             string? sourceDatabase,
             string? sourceTable,
@@ -495,7 +461,16 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var items = await _snowflakeService.GetDistinctColumnValuesAsync(
+                var items = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
+                    await _snowflakeService.GetDistinctColumnValuesAsync(
+                    sourceDatabase,
+                    sourceTable,
+                    sourceSP,
+                    columnName,
+                    search,
+                    take)
+                    :
+                    await _service.GetDistinctColumnValuesAsync(
                     sourceDatabase,
                     sourceTable,
                     sourceSP,
@@ -530,8 +505,9 @@ namespace DataWarehousePower.Controllers
                 var userId = HttpHelper.ResolveUserId(HttpContext);
                 request.UserId = userId;
 
-                //DataFilePreviewResult preview = await _service.GetPreviewDataAsync(request);
-                DataFilePreviewResult preview = await _snowflakeService.GetPreviewDataAsync(request);
+                DataFilePreviewResult preview = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
+                    await _snowflakeService.GetPreviewDataAsync(request):
+                    await _service.GetPreviewDataAsync(request);
                 return Json(new
                 {
                     columns = preview.Columns,

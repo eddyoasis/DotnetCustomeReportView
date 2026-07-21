@@ -687,11 +687,6 @@
 
                 const isUseRecurringDataDateColumn = isUseRecurringDataDateColumnToggle.checked;
 
-                console.log('setSourceMode');
-                console.log('isReportMode:' + isReportMode);
-                console.log('isUseRecurringDataDateColumn:' + isUseRecurringDataDateColumn);
-                console.log('(isReportMode || (!isReportMode && isUseRecurringDataDateColumn):' + isReportMode || (!isReportMode && isUseRecurringDataDateColumn));
-
                 //clientCodeGroup.style.display = isReportMode ? '' : 'none';
                 //isUseRecurringDataDateColumnGroup.style.display = !isReportMode ? '' : 'none';
 
@@ -773,8 +768,6 @@
                 if (clientCodeFieldInput) {
                     clientCodeFieldInput.required = (isReport?.value || '').toLowerCase() === 'true' && isRequired;
                     clientCodeFieldInput.disabled = !isRequired;
-
-                    console.log(clientCodeFieldInput);
 
                     if (!isRequired) {
                         clientCodeFieldInput.value = '';
@@ -2567,10 +2560,6 @@
                 isUseRecurringDataDateColumnToggle.addEventListener('change', () => {
                     const isUseRecurringDataDateColumn = isUseRecurringDataDateColumnToggle.checked
                     const isReportMode = getSourceMode() === 'report';
-
-                    console.log('isUseRecurringDataDateColumnToggle');
-                    console.log('isReportMode:' + isReportMode);
-                    console.log('isUseRecurringDataDateColumn:' + isUseRecurringDataDateColumn);
 
                     recurringDataDateColumnGroup.classList.toggle('d-none', !(!isReportMode && isUseRecurringDataDateColumn));
                     autoDateIntervalUnitGroup.classList.toggle('d-none', !(isReportMode || (!isReportMode && isUseRecurringDataDateColumn)));

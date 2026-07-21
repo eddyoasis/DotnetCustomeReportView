@@ -1,7 +1,7 @@
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
-using DocumentFormat.OpenXml.Bibliography;
-using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Text.Json;
 
@@ -30,12 +30,15 @@ namespace DataWarehousePower.Services
         private readonly IReportRepository              _reportRepo;
         private readonly IColumnPreferenceRepository    _prefRepo;
         private readonly ILogger<ReportService>         _logger;
+        private readonly ScheduledJob _scheduledJobAppSetting;
 
         public ReportService(
+            IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
             IReportRepository reportRepo,
             IColumnPreferenceRepository prefRepo,
             ILogger<ReportService> logger)
         {
+            _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _reportRepo = reportRepo;
             _prefRepo   = prefRepo;
             _logger     = logger;
@@ -175,7 +178,17 @@ namespace DataWarehousePower.Services
             {
                 var columnNames = report.Columns.Select(c => c.PropertyName);
 
-                rows = await _reportRepo.GetReportDataFromTableSnowflakeAsync(
+                rows = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
+                    await _reportRepo.GetReportDataFromTableSnowflakeAsync(
+                    userId,
+                    report.SourceTable,
+                    report.Columns,
+                    report.SourceDatabase,
+                    normalizedClientCode,
+                    dateFrom,
+                    dateTo)
+                    :
+                    await _reportRepo.GetReportDataFromTableAsync(
                     userId,
                     report.SourceTable,
                     report.Columns,

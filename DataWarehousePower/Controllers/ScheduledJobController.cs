@@ -1,44 +1,70 @@
 using DataWarehousePower.Authorization;
 using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Options;
 using Snowflake.Data.Client;
 
 namespace DataWarehousePower.Controllers;
 
 [Authorize(Policy = DepartmentAuthorizationPolicies.SchedulerAccess)]
-public sealed class ScheduledJobController(
-    IScheduledReportJobService scheduledReportJobService,
-    IHangfireJobDetailService hangfireJobDetailService,
-    IDataFileManageService dataFileManageService,
-    IReportRepository reportRepository,
-    IColumnPreferenceService columnPreferenceService,
-    IConfiguration configuration,
-    ISnowflakeService snowflakeService,
-    ILogger<ScheduledJobController> logger) : Controller
+public class ScheduledJobController : Controller
 {
+    private readonly ScheduledJob _scheduledJobAppSetting;
+    private readonly IScheduledReportJobService _scheduledReportJobService;
+    private readonly IHangfireJobDetailService _hangfireJobDetailService;
+    private readonly IDataFileManageService _dataFileManageService;
+    private readonly IReportRepository _reportRepository;
+    private readonly IColumnPreferenceService _columnPreferenceService;
+    private readonly IConfiguration _configuration;
+    private readonly ISnowflakeService _snowflakeService;
+    private readonly ILogger _logger;
+
     private const string ExportLocationBasePathsSection = "ScheduledJob:ExportLocationBasePaths";
     private const int DefaultBrowsePageSize = 20;
     private static readonly FileExtensionContentTypeProvider ContentTypeProvider = new();
 
+    public ScheduledJobController(
+        IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
+        IScheduledReportJobService scheduledReportJobService,
+        IHangfireJobDetailService hangfireJobDetailService,
+        IDataFileManageService dataFileManageService,
+        IReportRepository reportRepository,
+        IColumnPreferenceService columnPreferenceService,
+        IConfiguration configuration,
+        ISnowflakeService snowflakeService,
+        ILogger<ScheduledJobController> logger)
+    {
+        _scheduledJobAppSetting = scheduledJobAppSetting.Value;
+        _scheduledReportJobService = scheduledReportJobService;
+        _hangfireJobDetailService = hangfireJobDetailService;
+        _dataFileManageService = dataFileManageService;
+        _reportRepository = reportRepository;
+        _columnPreferenceService = columnPreferenceService;
+        _configuration = configuration;
+        _snowflakeService = snowflakeService;
+        _logger = logger;
+    }
+
     public async Task<IActionResult> Index(ScheduledJobFilterViewModel? filter)
     {
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
-        ScheduledJobListViewModel viewModel = await scheduledReportJobService.GetListViewModelAsync(userId, filter);
+        string userId = _columnPreferenceService.ResolveUserId(HttpContext);
+        ScheduledJobListViewModel viewModel = await _scheduledReportJobService.GetListViewModelAsync(userId, filter);
         viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
         return View(viewModel);
     }
 
     public async Task<IActionResult> Create(int? reportDefinitionId = null, string? schemaTemplate = null, string? clientCode = null, List<string>? formats = null, string? returnUrl = null, bool isDataFile = false)
     {
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        string userId = _columnPreferenceService.ResolveUserId(HttpContext);
         string? userDepartment = ResolveUserDepartment();
-        ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
+        ScheduledJobFormViewModel viewModel = await _scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         viewModel.RequiresSchemaTemplateAndClientCode = !isDataFile;
         await PopulateDataFileOptionsAsync(viewModel, userId, userDepartment);
 
@@ -95,9 +121,9 @@ public sealed class ScheduledJobController(
     {
         try
         {
-            string userId = columnPreferenceService.ResolveUserId(HttpContext);
+            string userId = _columnPreferenceService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
-            ScheduledJobFormViewModel viewModel = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
+            ScheduledJobFormViewModel viewModel = await _scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
             await PopulateDataFileOptionsAsync(viewModel, userId, userDepartment);
             viewModel.AvailableExportLocationBasePathOptions = GetAvailableExportLocationBasePathOptions();
             viewModel.AvailableExportLocationBasePaths = viewModel.AvailableExportLocationBasePathOptions
@@ -115,7 +141,7 @@ public sealed class ScheduledJobController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save(ScheduledJobFormViewModel form)
     {
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        string userId = _columnPreferenceService.ResolveUserId(HttpContext);
 
         ProcessForm(form);
         ValidateExportLocation(form);
@@ -134,7 +160,7 @@ public sealed class ScheduledJobController(
         {
             if (form.Id == 0)
             {
-                int id = await scheduledReportJobService.CreateAsync(form, userId, username, userDepartment);
+                int id = await _scheduledReportJobService.CreateAsync(form, userId, username, userDepartment);
                 TempData["Success"] = $"Scheduled job created (ID: {id}).";
 
                 if (Url.IsLocalUrl(form.ReturnUrl))
@@ -144,7 +170,7 @@ public sealed class ScheduledJobController(
             }
             else
             {
-                await scheduledReportJobService.UpdateAsync(form, userId, username, userDepartment);
+                await _scheduledReportJobService.UpdateAsync(form, userId, username, userDepartment);
                 TempData["Success"] = "Scheduled job updated.";
             }
 
@@ -152,14 +178,14 @@ public sealed class ScheduledJobController(
         }
         catch (InvalidOperationException ex)
         {
-            logger.LogWarning(ex, "Validation failed when saving scheduled job {JobId}", form.Id);
+            _logger.LogWarning(ex, "Validation failed when saving scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, ex.Message);
             await PopulateFormLookupsAsync(form, userId, ResolveUserDepartment());
             return View("Form", form);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to save scheduled job {JobId}", form.Id);
+            _logger.LogError(ex, "Failed to save scheduled job {JobId}", form.Id);
             ModelState.AddModelError(string.Empty, "An unexpected error occurred while saving the job.");
             await PopulateFormLookupsAsync(form, userId, ResolveUserDepartment());
             return View("Form", form);
@@ -172,13 +198,13 @@ public sealed class ScheduledJobController(
     {
         try
         {
-            string userId = columnPreferenceService.ResolveUserId(HttpContext);
-            await scheduledReportJobService.DeleteAsync(id, userId);
+            string userId = _columnPreferenceService.ResolveUserId(HttpContext);
+            await _scheduledReportJobService.DeleteAsync(id, userId);
             TempData["Success"] = "Scheduled job deleted.";
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to delete scheduled job {JobId}", id);
+            _logger.LogError(ex, "Failed to delete scheduled job {JobId}", id);
             TempData["Error"] = "Failed to delete scheduled job.";
         }
 
@@ -191,11 +217,11 @@ public sealed class ScheduledJobController(
     {
         try
         {
-            string userId = columnPreferenceService.ResolveUserId(HttpContext);
+            string userId = _columnPreferenceService.ResolveUserId(HttpContext);
             string? userDepartment = ResolveUserDepartment();
-            ScheduledJobFormViewModel form = await scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
+            ScheduledJobFormViewModel form = await _scheduledReportJobService.GetEditFormAsync(id, userId, userDepartment);
             form.IsActive = !form.IsActive;
-            await scheduledReportJobService.UpdateAsync(
+            await _scheduledReportJobService.UpdateAsync(
                 form,
                 userId,
                 ResolveAuditUsername(),
@@ -204,7 +230,7 @@ public sealed class ScheduledJobController(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to toggle scheduled job {JobId}", id);
+            _logger.LogError(ex, "Failed to toggle scheduled job {JobId}", id);
             TempData["Error"] = "Failed to update scheduled job status.";
         }
 
@@ -214,8 +240,8 @@ public sealed class ScheduledJobController(
     [HttpGet]
     public async Task<IActionResult> JobDetail([FromQuery] int id)
     {
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
-        HangfireJobDetailViewModel? detail = await hangfireJobDetailService.GetJobDetailAsync(id, userId);
+        string userId = _columnPreferenceService.ResolveUserId(HttpContext);
+        HangfireJobDetailViewModel? detail = await _hangfireJobDetailService.GetJobDetailAsync(id, userId);
 
         if (detail is null)
         {
@@ -233,9 +259,9 @@ public sealed class ScheduledJobController(
             return Json(Array.Empty<string>());
         }
 
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        string userId = _columnPreferenceService.ResolveUserId(HttpContext);
         string? userDepartment = ResolveUserDepartment();
-        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+        DataFileManageListViewModel dataFileList = await _dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
 
         DataFileDefinition? selectedDataFile = dataFileList.DataFiles.FirstOrDefault(dataFile => dataFile.Id == dataFileId);
         if (selectedDataFile is null)
@@ -255,8 +281,16 @@ public sealed class ScheduledJobController(
 
         try
         {
-            //List<string> values = await dataFileManageService.GetDistinctColumnValuesAsync(
-            List<string> values = await snowflakeService.GetDistinctColumnValuesAsync(
+            List<string> values = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
+                await _snowflakeService.GetDistinctColumnValuesAsync(
+                selectedDataFile.SourceDatabase,
+                selectedDataFile.SourceTable,
+                selectedDataFile.SourceSP,
+                selectedColumn.PropertyName,
+                search,
+                take)
+                :
+                await _dataFileManageService.GetDistinctColumnValuesAsync(
                 selectedDataFile.SourceDatabase,
                 selectedDataFile.SourceTable,
                 selectedDataFile.SourceSP,
@@ -268,7 +302,7 @@ public sealed class ScheduledJobController(
         }
         catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
         {
-            logger.LogWarning(ex,
+            _logger.LogWarning(ex,
                 "Scheduled job filter values query failed for data file {DataFileId}, database {SourceDatabase}, table {SourceTable}, column {ColumnName}",
                 dataFileId,
                 selectedDataFile.SourceDatabase,
@@ -299,7 +333,7 @@ public sealed class ScheduledJobController(
             return BadRequest(new { message = "Invalid source mode." });
         }
 
-        string userId = columnPreferenceService.ResolveUserId(HttpContext);
+        string userId = _columnPreferenceService.ResolveUserId(HttpContext);
         string? userDepartment = ResolveUserDepartment();
 
         try
@@ -313,7 +347,7 @@ public sealed class ScheduledJobController(
 
             if (mode == "datafile")
             {
-                DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+                DataFileManageListViewModel dataFileList = await _dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
                 DataFileDefinition? selectedDataFile = dataFileList.DataFiles.FirstOrDefault(dataFile => dataFile.Id == request.SourceId);
                 if (selectedDataFile is null)
                 {
@@ -335,7 +369,7 @@ public sealed class ScheduledJobController(
             }
             else
             {
-                ReportDefinition? reportDefinition = await reportRepository.GetReportWithColumnsAsync(request.SourceId, userDepartment);
+                ReportDefinition? reportDefinition = await _reportRepository.GetReportWithColumnsAsync(request.SourceId, userDepartment);
                 if (reportDefinition is null)
                 {
                     return BadRequest(new { message = "Selected report was not found." });
@@ -432,7 +466,10 @@ public sealed class ScheduledJobController(
                 Columns = selectedColumns
             };
 
-            DataFilePreviewResult preview = await snowflakeService.GetPreviewDataAsync(previewRequest);
+            //DataFilePreviewResult preview = await _snowflakeService.GetPreviewDataAsync(previewRequest);
+            DataFilePreviewResult preview = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
+                await _snowflakeService.GetPreviewDataAsync(previewRequest):
+                await _dataFileManageService.GetPreviewDataAsync(previewRequest);
 
             List<string> responseColumns = preview.Columns
                 .Where(column => !hiddenFilterColumns.Contains(column))
@@ -471,7 +508,7 @@ public sealed class ScheduledJobController(
         }
         catch (SnowflakeDbException ex)
         {
-            logger.LogWarning(ex,
+            _logger.LogWarning(ex,
                 "Scheduled job preview query failed for source mode {SourceMode}, source ID {SourceId}",
                 mode,
                 request.SourceId);
@@ -698,7 +735,7 @@ public sealed class ScheduledJobController(
 
     private async Task PopulateFormLookupsAsync(ScheduledJobFormViewModel form, string userId, string? userDepartment)
     {
-        ScheduledJobFormViewModel lookupForm = await scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
+        ScheduledJobFormViewModel lookupForm = await _scheduledReportJobService.GetCreateFormAsync(userId, userDepartment);
         form.AvailableReports = lookupForm.AvailableReports;
         await PopulateDataFileOptionsAsync(form, userId, userDepartment);
         form.AvailableClientCodes = lookupForm.AvailableClientCodes;
@@ -716,14 +753,14 @@ public sealed class ScheduledJobController(
 
         if (form.Id > 0 && string.IsNullOrWhiteSpace(form.ExistingPassword))
         {
-            ScheduledJobFormViewModel editForm = await scheduledReportJobService.GetEditFormAsync(form.Id, userId, userDepartment);
+            ScheduledJobFormViewModel editForm = await _scheduledReportJobService.GetEditFormAsync(form.Id, userId, userDepartment);
             form.ExistingPassword = editForm.ExistingPassword;
         }
     }
 
     private async Task PopulateDataFileOptionsAsync(ScheduledJobFormViewModel form, string userId, string? userDepartment)
     {
-        DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
+        DataFileManageListViewModel dataFileList = await _dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
         //DataFileManageListViewModel dataFileList = await dataFileManageService.GetListViewModelAsync(userId);
 
         form.AvailableDataFiles = dataFileList.DataFiles
@@ -733,7 +770,7 @@ public sealed class ScheduledJobController(
             {
                 Id = dataFile.Id,
                 //ReportName = dataFile.DataFileName,
-                ReportName = string.IsNullOrEmpty(dataFile.Departments) ? dataFile.DataFileName : $"{dataFile.DataFileName} (Default)" ,
+                ReportName = string.IsNullOrEmpty(dataFile.Departments) ? dataFile.DataFileName : $"{dataFile.DataFileName} (Default)",
                 HasFilterClientCodeColumn = !string.IsNullOrEmpty(dataFile.FilterClientCodeColumn),
                 Columns = dataFile.Columns
                 .OrderBy(column => column.DisplayOrder)
@@ -781,7 +818,7 @@ public sealed class ScheduledJobController(
 
     private List<ExportLocationBasePathOptionViewModel> GetAvailableExportLocationBasePathOptions()
     {
-        IConfigurationSection section = configuration.GetSection(ExportLocationBasePathsSection);
+        IConfigurationSection section = _configuration.GetSection(ExportLocationBasePathsSection);
         List<ExportLocationBasePathOptionViewModel> configuredOptions = section
             .GetChildren()
             .Select(child =>
