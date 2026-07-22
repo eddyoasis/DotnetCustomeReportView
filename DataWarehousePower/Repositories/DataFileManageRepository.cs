@@ -1250,6 +1250,7 @@ namespace DataWarehousePower.Repositories
         }
 
         public async Task<List<string>> GetDistinctColumnValuesAsync(
+            string? userId,
             string? sourceDatabase,
             string? sourceTable,
             string? sourceSP,
@@ -1291,17 +1292,27 @@ namespace DataWarehousePower.Repositories
             string escapedTable = EscapeSqlIdentifier(normalizedTable);
             string escapedColumn = EscapeSqlIdentifier(normalizedColumn);
 
+            var trList = await GetTRIDsByUserIdAsync(userId);
+            var trListForSql = $"({string.Join(",", trList.Select(code => $"'{code}'"))})";
+
             await using var cmd = conn.CreateCommand();
 
             string whereSearchSql = string.IsNullOrWhiteSpace(normalizedSearch)
                 ? string.Empty
                 : " AND CAST([" + escapedColumn + "] AS nvarchar(4000)) LIKE @search";
 
+            string whereTRClauses = string.Empty;
+            if (!string.IsNullOrEmpty(trListForSql))
+            {
+                whereTRClauses = $" AND TR_ID in {trListForSql}";
+            }
+
             cmd.CommandText =
                 "SELECT DISTINCT TOP (" + safeTake + ") CAST([" + escapedColumn + "] AS nvarchar(4000)) AS [Value] " +
                 "FROM [" + escapedDatabase + "]..[" + escapedTable + "] WITH(NOLOCK) " +
                 "WHERE [" + escapedColumn + "] IS NOT NULL" +
                 whereSearchSql +
+                whereTRClauses +
                 " ORDER BY [Value]";
 
             if (!string.IsNullOrWhiteSpace(normalizedSearch))

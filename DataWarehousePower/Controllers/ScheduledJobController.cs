@@ -283,6 +283,7 @@ public class ScheduledJobController : Controller
         try
         {
             List<string> values = await _dataFileManageService.GetDistinctColumnValuesAsync(
+                userId,
                 selectedDataFile.SourceDatabase,
                 selectedDataFile.SourceTable,
                 selectedDataFile.SourceSP,

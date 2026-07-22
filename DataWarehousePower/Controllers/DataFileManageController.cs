@@ -460,10 +460,12 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
+                string userId = _prefService.ResolveUserId(HttpContext);
                 var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
                 take = _scheduledJobAppSetting.MaxDistinctRecord;
 
                 var items = await _service.GetDistinctColumnValuesAsync(
+                    userId,
                     sourceDatabase,
                     sourceTable,
                     sourceSP,

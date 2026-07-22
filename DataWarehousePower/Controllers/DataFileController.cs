@@ -229,6 +229,7 @@ namespace DataWarehousePower.Controllers
             try
             {
                 List<string> values = await _service.GetDistinctColumnValuesAsync(
+                    userId,
                     selectedDataFile.SourceDatabase,
                     selectedDataFile.SourceTable,
                     selectedDataFile.SourceSP,
