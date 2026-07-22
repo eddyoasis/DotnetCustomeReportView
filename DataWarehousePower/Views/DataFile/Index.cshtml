@@ -1682,6 +1682,10 @@
                     const cacheKey = searchValue.toLocaleLowerCase();
 
                     if (state.lastRequestedKey === cacheKey) {
+                        if (state.cache.has(cacheKey)) {
+                            renderList(input, state.cache.get(cacheKey));
+                        }
+
                         return;
                     }
 
