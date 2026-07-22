@@ -1,15 +1,14 @@
 using DataWarehousePower.Authorization;
+using DataWarehousePower.Helper;
 using DataWarehousePower.Models;
+using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Services;
-using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using DataWarehousePower.Helper;
-using DataWarehousePower.Models.AppSettings;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
-using System.Linq;
 using Snowflake.Data.Client;
+using System.Text.Json;
 
 namespace DataWarehousePower.Controllers
 {
@@ -462,18 +461,9 @@ namespace DataWarehousePower.Controllers
             try
             {
                 var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                take = _scheduledJobAppSetting.MaxDistinctRecord;
 
-                var items = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
-                    await _snowflakeService.GetDistinctColumnValuesAsync(
-                    userDepartment,
-                    sourceDatabase,
-                    sourceTable,
-                    sourceSP,
-                    columnName,
-                    search,
-                    take)
-                    :
-                    await _service.GetDistinctColumnValuesAsync(
+                var items = await _service.GetDistinctColumnValuesAsync(
                     sourceDatabase,
                     sourceTable,
                     sourceSP,

@@ -3,6 +3,7 @@
     public class ScheduledJob
     {
         public bool UseSnowflakeForDataFile { get; set; }
+        public int MaxDistinctRecord { get; set; }
         public ExportSplit ExportSplit { get; set; }
     }
 

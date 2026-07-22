@@ -4,7 +4,6 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Options;
 using System.Data;
 using System.Data.Common;

@@ -261,6 +261,7 @@ public class ScheduledJobController : Controller
 
         string userId = _columnPreferenceService.ResolveUserId(HttpContext);
         string? userDepartment = ResolveUserDepartment();
+        take = _scheduledJobAppSetting.MaxDistinctRecord;
         DataFileManageListViewModel dataFileList = await _dataFileManageService.GetListViewModelAsync(userId, userDepartment ?? string.Empty);
 
         DataFileDefinition? selectedDataFile = dataFileList.DataFiles.FirstOrDefault(dataFile => dataFile.Id == dataFileId);
@@ -281,17 +282,7 @@ public class ScheduledJobController : Controller
 
         try
         {
-            List<string> values = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
-                await _snowflakeService.GetDistinctColumnValuesAsync(
-                userDepartment,
-                selectedDataFile.SourceDatabase,
-                selectedDataFile.SourceTable,
-                selectedDataFile.SourceSP,
-                selectedColumn.PropertyName,
-                search,
-                take)
-                :
-                await _dataFileManageService.GetDistinctColumnValuesAsync(
+            List<string> values = await _dataFileManageService.GetDistinctColumnValuesAsync(
                 selectedDataFile.SourceDatabase,
                 selectedDataFile.SourceTable,
                 selectedDataFile.SourceSP,
