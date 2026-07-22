@@ -1058,6 +1058,14 @@
                 status.classList.toggle('text-muted', !isError);
             }
 
+            function redirectToErrorPage(message) {
+                const text = (message || '').toString().trim();
+                const target = text
+                    ? `/Home/Error?message=${encodeURIComponent(text)}`
+                    : '/Home/Error';
+                window.location.assign(target);
+            }
+
             function setPreviewLoading(isLoading) {
                 if (previewTableContainer) {
                     previewTableContainer.classList.toggle('preview-loading', !!isLoading);
@@ -1944,11 +1952,13 @@
 
                     const payload = await response.json().catch(() => ({}));
                     if (!response.ok) {
-                        setPreviewStatus(payload?.message || 'Failed to load preview data.', true);
+                        const errorMessage = payload?.message || 'Failed to load preview data.';
+                        setPreviewStatus(errorMessage, true);
                         previewRows = [];
                         previewTotalRows = 0;
                         previewCurrentPage = 1;
                         renderPreviewPlaceholder('Failed to load preview data.');
+                        redirectToErrorPage(errorMessage);
                         return;
                     }
 
@@ -1976,11 +1986,13 @@
                         setPreviewStatus(`Showing ${previewRows.length} row(s).`, false);
                     }
                 } catch {
-                    setPreviewStatus('Failed to load preview data.', true);
+                    const errorMessage = 'Failed to load preview data.';
+                    setPreviewStatus(errorMessage, true);
                     previewRows = [];
                     previewTotalRows = 0;
                     previewCurrentPage = 1;
                     renderPreviewPlaceholder('Failed to load preview data.');
+                    redirectToErrorPage(errorMessage);
                 } finally {
                     button.disabled = false;
                     setPreviewLoading(false);

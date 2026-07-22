@@ -2061,6 +2061,14 @@
             status.classList.toggle('text-muted', !isError);
         }
 
+        function redirectToErrorPage(message) {
+            const text = (message || '').toString().trim();
+            const target = text
+                ? `/Home/Error?message=${encodeURIComponent(text)}`
+                : '/Home/Error';
+            window.location.assign(target);
+        }
+
         function clearPreviewTable() {
             document.getElementById('preview-table-head').innerHTML = '';
             document.getElementById('preview-table-body').innerHTML = '';
@@ -2143,8 +2151,10 @@
 
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    setPreviewStatus(payload?.message || 'Failed to load preview data.', true);
+                    const errorMessage = payload?.message || 'Failed to load preview data.';
+                    setPreviewStatus(errorMessage, true);
                     clearPreviewTable();
+                    redirectToErrorPage(errorMessage);
                     return;
                 }
 
@@ -2171,8 +2181,10 @@
                 renderPreviewTable(previewColumnDefinitions, previewRows);
                 setPreviewStatus(`Showing ${previewRows.length} of ${totalCount} row(s).`, false);
             } catch {
-                setPreviewStatus('Failed to load preview data.', true);
+                const errorMessage = 'Failed to load preview data.';
+                setPreviewStatus(errorMessage, true);
                 clearPreviewTable();
+                redirectToErrorPage(errorMessage);
             }
         }
 

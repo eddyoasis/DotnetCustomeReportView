@@ -32,6 +32,12 @@ namespace DataWarehousePower.Services
                 throw new ArgumentException("Preview request UserDepartment is required.", nameof(request.UserDepartment));
             }
 
+            var snowflakeConnectionString = await _departmentSnowflakeConnectionService.GetConnectionStringByUserDepartmentAsync(request.UserDepartment);
+            if (string.IsNullOrEmpty(snowflakeConnectionString))
+            {
+                throw new ArgumentException($"No Snowflake connection is configured for your department({request.UserDepartment}). Kindly reach out to the administrator for support.");
+            }
+
             string sourceTable = (request.SourceTable ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(sourceTable))
             {
@@ -184,7 +190,7 @@ namespace DataWarehousePower.Services
 
             string countSql = $"SELECT COUNT(1) AS TOTAL_COUNT FROM {tableExpression}{whereClause}";
             //IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(countSql, cancellationToken);
-            var snowflakeConnectionString = await _departmentSnowflakeConnectionService.GetConnectionStringByUserDepartmentAsync(request.UserDepartment);
+            
             IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(snowflakeConnectionString, countSql, cancellationToken);
             int totalCount = 0;
             if (countRows.Count > 0 && countRows[0].TryGetValue("TOTAL_COUNT", out object? totalCountObj) && totalCountObj is not null)
