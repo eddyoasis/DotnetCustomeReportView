@@ -477,6 +477,7 @@ namespace DataWarehousePower.Repositories
 
         public async Task<List<Dictionary<string, object?>>> GetReportDataFromTableSnowflakeAsync(
             string userId,
+            string userDepartment,
             string sourceTable,
             IEnumerable<ReportColumn> columns,
             string? sourceDatabase,
@@ -486,6 +487,7 @@ namespace DataWarehousePower.Repositories
         {
             DataFilePreviewRequest request = BuildSnowflakeReportPreviewRequest(
                 userId,
+                userDepartment,
                 sourceTable,
                 columns,
                 sourceDatabase,
@@ -498,6 +500,7 @@ namespace DataWarehousePower.Repositories
         }
 
         public Task<List<Dictionary<string, object?>>> GetReportDataFromTableSnowflakeAsync(
+            string userDepartment,
             string sourceTable,
             IEnumerable<ReportColumn> columns,
             string? sourceDatabase,
@@ -506,6 +509,7 @@ namespace DataWarehousePower.Repositories
             DateTime? dateTo)
             => GetReportDataFromTableSnowflakeAsync(
                 string.Empty,
+                userDepartment,
                 sourceTable,
                 columns,
                 sourceDatabase,
@@ -973,6 +977,7 @@ namespace DataWarehousePower.Repositories
 
         private static DataFilePreviewRequest BuildSnowflakeReportPreviewRequest(
             string userId,
+            string userDepartment,
             string sourceTable,
             IEnumerable<ReportColumn> columns,
             string? sourceDatabase,
@@ -1010,6 +1015,7 @@ namespace DataWarehousePower.Repositories
             return new DataFilePreviewRequest
             {
                 UserId = userId,
+                UserDepartment = userDepartment,
                 SourceDatabase = sourceDatabase,
                 SourceTable = sourceTable,
                 ClientCode = clientCode,

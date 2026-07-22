@@ -10,31 +10,14 @@ namespace DataWarehousePower.Services
     {
         private static readonly Regex _identifierPattern = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
         private readonly ISnowflakeRepository _snowflakeRepository;
+        private readonly IDepartmentSnowflakeConnectionService _departmentSnowflakeConnectionService;
 
-        public SnowflakeService(ISnowflakeRepository snowflakeRepository)
+        public SnowflakeService(
+            IDepartmentSnowflakeConnectionService departmentSnowflakeConnectionService,
+            ISnowflakeRepository snowflakeRepository)
         {
             _snowflakeRepository = snowflakeRepository;
-        }
-
-        public Task<IReadOnlyList<Dictionary<string, object?>>> GetAumMasterPreviewAsync(int limit = 10, CancellationToken cancellationToken = default)
-        {
-            if (limit < 1 || limit > 1000)
-            {
-                throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be between 1 and 1000.");
-            }
-
-            string sql = $"SELECT * FROM VW_AUM_MASTER LIMIT {limit}";
-            return _snowflakeRepository.ExecuteQueryAsync(sql, cancellationToken);
-        }
-
-        public Task<IReadOnlyList<Dictionary<string, object?>>> RunQueryAsync(string sql, CancellationToken cancellationToken = default)
-        {
-            if (string.IsNullOrWhiteSpace(sql))
-            {
-                throw new ArgumentException("SQL cannot be empty.", nameof(sql));
-            }
-
-            return _snowflakeRepository.ExecuteQueryAsync(sql, cancellationToken);
+            _departmentSnowflakeConnectionService = departmentSnowflakeConnectionService;
         }
 
         public async Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request, CancellationToken cancellationToken = default)
@@ -42,6 +25,11 @@ namespace DataWarehousePower.Services
             if (request is null)
             {
                 throw new ArgumentException("Preview request is required.", nameof(request));
+            }
+
+            if (string.IsNullOrEmpty(request.UserDepartment))
+            {
+                throw new ArgumentException("Preview request UserDepartment is required.", nameof(request.UserDepartment));
             }
 
             string sourceTable = (request.SourceTable ?? string.Empty).Trim();
@@ -195,7 +183,9 @@ namespace DataWarehousePower.Services
                 : string.Empty;
 
             string countSql = $"SELECT COUNT(1) AS TOTAL_COUNT FROM {tableExpression}{whereClause}";
-            IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(countSql, cancellationToken);
+            //IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(countSql, cancellationToken);
+            var snowflakeConnectionString = await _departmentSnowflakeConnectionService.GetConnectionStringByUserDepartmentAsync(request.UserDepartment);
+            IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(snowflakeConnectionString, countSql, cancellationToken);
             int totalCount = 0;
             if (countRows.Count > 0 && countRows[0].TryGetValue("TOTAL_COUNT", out object? totalCountObj) && totalCountObj is not null)
             {
@@ -205,7 +195,8 @@ namespace DataWarehousePower.Services
             string querySql =
                 $"SELECT {selectColumns} FROM {tableExpression}{whereClause} LIMIT {take} OFFSET {offset}";
 
-            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(querySql, cancellationToken);
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(snowflakeConnectionString, querySql, cancellationToken);
+            //IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(querySql, cancellationToken);
 
             return new DataFilePreviewResult
             {
@@ -216,6 +207,7 @@ namespace DataWarehousePower.Services
         }
 
         public async Task<List<string>> GetDistinctColumnValuesAsync(
+            string? userDepartment,
             string? sourceDatabase,
             string? sourceTable,
             string? sourceSP,
@@ -227,6 +219,11 @@ namespace DataWarehousePower.Services
             if (!string.IsNullOrWhiteSpace(sourceSP))
             {
                 throw new InvalidOperationException("Snowflake filter values currently supports Source Table only.");
+            }
+
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                throw new ArgumentException("userDepartment is required.", nameof(userDepartment));
             }
 
             string normalizedTable = (sourceTable ?? string.Empty).Trim();
@@ -257,7 +254,8 @@ namespace DataWarehousePower.Services
                 "ORDER BY VALUE " +
                 $"LIMIT {effectiveTake}";
 
-            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(sql, cancellationToken);
+            var snowflakeConnectionString = await _departmentSnowflakeConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(snowflakeConnectionString, sql, cancellationToken);
 
             return rows
                 .Select(row => row.TryGetValue("VALUE", out object? value) ? value?.ToString() : null)

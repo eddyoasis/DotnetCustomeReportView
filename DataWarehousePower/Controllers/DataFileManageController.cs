@@ -461,8 +461,11 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
+                var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+
                 var items = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
                     await _snowflakeService.GetDistinctColumnValuesAsync(
+                    userDepartment,
                     sourceDatabase,
                     sourceTable,
                     sourceSP,
@@ -503,7 +506,9 @@ namespace DataWarehousePower.Controllers
                     request.DateTo = request.DateTo.Value.AddDays(1).AddSeconds(-1);
 
                 var userId = HttpHelper.ResolveUserId(HttpContext);
+                var userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
                 request.UserId = userId;
+                request.UserDepartment = userDepartment;
 
                 DataFilePreviewResult preview = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
                     await _snowflakeService.GetPreviewDataAsync(request):

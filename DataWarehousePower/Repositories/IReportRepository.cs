@@ -82,6 +82,7 @@ namespace DataWarehousePower.Repositories
 
         Task<List<Dictionary<string, object?>>> GetReportDataFromTableSnowflakeAsync(
             string userId,
+            string userDepartment,
             string sourceTable,
             IEnumerable<ReportColumn> columns,
             string? sourceDatabase,
@@ -98,6 +99,7 @@ namespace DataWarehousePower.Repositories
             DateTime? dateTo);
 
         Task<List<Dictionary<string, object?>>> GetReportDataFromTableSnowflakeAsync(
+            string userDepartment,
             string sourceTable,
             IEnumerable<ReportColumn> columns,
             string? sourceDatabase,

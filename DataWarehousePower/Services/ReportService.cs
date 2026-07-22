@@ -181,6 +181,7 @@ namespace DataWarehousePower.Services
                 rows = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
                     await _reportRepo.GetReportDataFromTableSnowflakeAsync(
                     userId,
+                    userDepartment,
                     report.SourceTable,
                     report.Columns,
                     report.SourceDatabase,

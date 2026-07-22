@@ -282,6 +282,7 @@ namespace DataWarehousePower.Controllers
             {
                 List<string> values = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
                     await _snowflakeService.GetDistinctColumnValuesAsync(
+                    userDepartment,
                     selectedDataFile.SourceDatabase,
                     selectedDataFile.SourceTable,
                     selectedDataFile.SourceSP,

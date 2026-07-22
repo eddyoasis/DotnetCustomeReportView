@@ -283,6 +283,7 @@ public class ScheduledJobController : Controller
         {
             List<string> values = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
                 await _snowflakeService.GetDistinctColumnValuesAsync(
+                userDepartment,
                 selectedDataFile.SourceDatabase,
                 selectedDataFile.SourceTable,
                 selectedDataFile.SourceSP,
@@ -456,6 +457,7 @@ public class ScheduledJobController : Controller
             DataFilePreviewRequest previewRequest = new()
             {
                 UserId = userId,
+                UserDepartment = userDepartment,
                 SourceDatabase = sourceDatabase,
                 SourceTable = sourceTable,
                 SourceSP = sourceSP,

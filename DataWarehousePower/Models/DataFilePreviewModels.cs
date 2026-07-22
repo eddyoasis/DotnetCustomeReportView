@@ -10,6 +10,7 @@ namespace DataWarehousePower.Models
     public class DataFilePreviewRequest
     {
         public string? UserId { get; set; }
+        public string? UserDepartment { get; set; }
         public string? SourceDatabase { get; set; }
         public string? SourceTable { get; set; }
         public string? SourceSP { get; set; }
