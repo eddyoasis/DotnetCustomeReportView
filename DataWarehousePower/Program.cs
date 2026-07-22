@@ -45,6 +45,7 @@ builder.Services.AddScoped<IDataFileManageRepository, DataFileManageRepository>(
 builder.Services.AddScoped<IReportConnectionStringRepository, ReportConnectionStringRepository>();
 builder.Services.AddScoped<ISnowflakeConnectionStringRepository, SnowflakeConnectionStringRepository>();
 builder.Services.AddScoped<IDepartmentConnectionRepository, DepartmentConnectionRepository>();
+builder.Services.AddScoped<IDepartmentSnowflakeConnectionRepository, DepartmentSnowflakeConnectionRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IDWSchemeRepository, DWSchemeRepository>();
 builder.Services.AddScoped<ISnowflakeRepository, SnowflakeRepository>();
@@ -68,6 +69,7 @@ builder.Services.AddScoped<IDataFileManageService, DataFileManageService>();
 builder.Services.AddScoped<IReportConnectionStringService, ReportConnectionStringService>();
 builder.Services.AddScoped<ISnowflakeConnectionStringService, SnowflakeConnectionStringService>();
 builder.Services.AddScoped<IDepartmentConnectionService, DepartmentConnectionService>();
+builder.Services.AddScoped<IDepartmentSnowflakeConnectionService, DepartmentSnowflakeConnectionService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDWSchemeService, DWSchemeService>();
 builder.Services.AddScoped<ISnowflakeService, SnowflakeService>();

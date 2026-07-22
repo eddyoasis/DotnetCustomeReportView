@@ -29,6 +29,7 @@ namespace DataWarehousePower.Data
         public DbSet<ScheduledReportJob>   ScheduledReportJobs   { get; set; }
         public DbSet<Department>           Departments           { get; set; }
         public DbSet<SnowflakeConnectionString> SnowflakeConnectionStrings { get; set; }
+        public DbSet<DepartmentSnowflakeConnection> DepartmentSnowflakeConnections { get; set; }
         public DbSet<ReportConnectionString> ReportConnectionStrings { get; set; }
         public DbSet<DepartmentConnection> DepartmentConnections { get; set; }
         public DbSet<DWScheme>             DWSchemes             { get; set; }
