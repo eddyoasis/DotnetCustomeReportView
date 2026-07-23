@@ -1267,7 +1267,8 @@ namespace DataWarehousePower.Repositories
             }
 
             int safeTake = Math.Clamp(take, 1, 100);
-            string normalizedDatabase = sourceDatabase.Trim();
+            //string normalizedDatabase = sourceDatabase.Trim();
+            string normalizedDatabase = _context.Database.GetDbConnection().Database;
             string normalizedTable = sourceTable.Trim();
             string normalizedColumn = columnName.Trim();
             string normalizedSearch = (search ?? string.Empty).Trim();
