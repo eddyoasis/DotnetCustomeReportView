@@ -102,6 +102,7 @@ builder.Services.AddSession(options =>
 builder.Services.Configure<HangfireOptions>(
     builder.Configuration.GetSection(HangfireOptions.SectionName));
 builder.Services.AddScoped<IAuditLogCleanupJob, AuditLogCleanupJob>();
+builder.Services.AddScoped<IDataFileSchemaSyncJob, DataFileSchemaSyncJob>();
 builder.Services.AddHangfire(configuration =>
 {
     string connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -331,6 +332,18 @@ RecurringJob.AddOrUpdate<IAuditLogCleanupJob>(
     {
         TimeZone = hangfireTimeZone
     });
+
+if (!string.IsNullOrWhiteSpace(hangfireOptions.DataFileSchemaSyncCron))
+{
+    RecurringJob.AddOrUpdate<IDataFileSchemaSyncJob>(
+        "datafile-schema-sync",
+        job => job.SyncAllDataFilesAsync(),
+        hangfireOptions.DataFileSchemaSyncCron,
+        new RecurringJobOptions
+        {
+            TimeZone = hangfireTimeZone
+        });
+}
 
 using (IServiceScope scope = app.Services.CreateScope())
 {

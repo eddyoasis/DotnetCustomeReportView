@@ -10,6 +10,8 @@ public sealed class HangfireOptions
 
     public string AuditLogCleanupCron { get; set; } = "0 2 * * *";
 
+    public string DataFileSchemaSyncCron { get; set; } = "0 3 * * *";
+
     public int AuditLogRetentionDays { get; set; } = 90;
 
     public string ScheduledExportOutputDirectory { get; set; } = "ScheduledExports";
