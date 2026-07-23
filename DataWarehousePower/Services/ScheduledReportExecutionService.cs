@@ -72,6 +72,7 @@ public sealed class ScheduledReportExecutionService(
             reportViewModel = await BuildDataFileReportViewModelAsync(
                 dataFileDefinitionId: job.DataFileDefinitionId.Value,
                 userId: job.CreatedByUserId,
+                userDepartment: job.CreatedByUserDepartment,
                 schemaTemplate: job.SchemaTemplate,
                 dataFileFilterColumns: dataFileFilterColumns,
                 recurringDataDateColumn: job.RecurringDataDateColumn,
@@ -240,6 +241,7 @@ public sealed class ScheduledReportExecutionService(
             {
                 rows = await reportRepository.GetDataFileDataFromTableSnowflakeAsync(
                     userId,
+                    userDepartment,
                     dataFile.SourceTable,
                     dataFileExecFilterColumns,
                     dataFile.SourceDatabase,
@@ -364,6 +366,8 @@ public sealed class ScheduledReportExecutionService(
             if (useSnowflakeForDataFile)
             {
                 rows = await reportRepository.GetDataFileDataFromTableSnowflakeAsync(
+                    userId,
+                    userDepartment,
                     dataFile.SourceTable,
                     dataFile.Columns,
                     dataFile.SourceDatabase,

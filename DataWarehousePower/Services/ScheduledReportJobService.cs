@@ -325,7 +325,8 @@ public sealed class ScheduledReportJobService(
             CreatedUtc = DateTime.UtcNow,
             HangfireJobId = generatedJobName,
             RecurringDataDateColumn = form.RecurringDataDateColumn,
-            FilterColumnDataJson = form.FilterColumnDataJson
+            FilterColumnDataJson = form.FilterColumnDataJson,
+            CreatedByUserDepartment = userDepartment
         };
 
         await scheduledJobRepository.AddAsync(entity);
@@ -383,6 +384,7 @@ public sealed class ScheduledReportJobService(
         entity.UpdatedUtc = DateTime.UtcNow;
         entity.RecurringDataDateColumn = form.RecurringDataDateColumn;
         entity.FilterColumnDataJson = form.FilterColumnDataJson;
+        entity.CreatedByUserDepartment = userDepartment;
 
         if (form.UpdatePassword)
         {

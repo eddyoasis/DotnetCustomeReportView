@@ -80,6 +80,8 @@ public class ScheduledReportJob
     [MaxLength(128)]
     public string CreatedByUsername { get; set; } = "System";
 
+    public string? CreatedByUserDepartment { get; set; } = "Information Technology";
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
     [MaxLength(128)]

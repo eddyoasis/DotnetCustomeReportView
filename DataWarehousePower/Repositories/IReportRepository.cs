@@ -21,6 +21,7 @@ namespace DataWarehousePower.Repositories
 
         Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableSnowflakeAsync(
             string userId,
+            string userDepartment,
             string sourceTable,
             IEnumerable<DataFileColumn> columnNames,
             string? sourceDatabase,
@@ -42,6 +43,7 @@ namespace DataWarehousePower.Repositories
             DateTime? dateTo);
 
         Task<List<Dictionary<string, object?>>> GetDataFileDataFromTableSnowflakeAsync(
+            string userDepartment,
             string sourceTable,
             IEnumerable<DataFileColumn> columnNames,
             string? sourceDatabase,
