@@ -20,6 +20,98 @@ namespace DataWarehousePower.Services
             _departmentSnowflakeConnectionService = departmentSnowflakeConnectionService;
         }
 
+        public async Task<List<string>> GetSourceDatabaseOptionsAsync(string? userDepartment, CancellationToken cancellationToken = default)
+        {
+            string? connectionString = await ResolveConnectionStringAsync(userDepartment);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return new();
+            }
+
+            const string sql = "SELECT CURRENT_DATABASE() AS NAME";
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(connectionString, sql, cancellationToken);
+
+            return rows
+                .Select(row => row.TryGetValue("NAME", out object? value) ? value?.ToString() : null)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        public async Task<List<string>> GetSourceTableOptionsAsync(string? userDepartment, string? sourceDatabase, CancellationToken cancellationToken = default)
+        {
+            string? connectionString = await ResolveConnectionStringAsync(userDepartment);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return new();
+            }
+
+            string database = await ResolveSourceDatabaseAsync(connectionString, sourceDatabase, cancellationToken);
+            string sql =
+                $"SELECT TABLE_NAME AS NAME FROM {QuoteIdentifier(database)}.INFORMATION_SCHEMA.TABLES " +
+                "WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_TYPE IN ('BASE TABLE', 'VIEW') " +
+                "ORDER BY TABLE_NAME";
+
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(connectionString, sql, cancellationToken);
+
+            return rows
+                .Select(row => row.TryGetValue("NAME", out object? value) ? value?.ToString() : null)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => NormalizeSourceObjectName(value!))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        public Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? userDepartment, string? sourceDatabase, CancellationToken cancellationToken = default)
+            => Task.FromResult(new List<string>());
+
+        public async Task<List<string>> GetSourceColumnsAsync(string? userDepartment, string? sourceDatabase, string? sourceTable, string? sourceSP, CancellationToken cancellationToken = default)
+            => (await GetSourceColumnMetadataAsync(userDepartment, sourceDatabase, sourceTable, sourceSP, cancellationToken))
+                .Select(column => column.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList();
+
+        public async Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? userDepartment, string? sourceDatabase, string? sourceTable, string? sourceSP, CancellationToken cancellationToken = default)
+        {
+            if (!string.IsNullOrWhiteSpace(sourceSP))
+            {
+                return new();
+            }
+
+            string normalizedTable = NormalizeSourceTableName(sourceTable);
+            if (string.IsNullOrWhiteSpace(normalizedTable))
+            {
+                return new();
+            }
+
+            string? connectionString = await ResolveConnectionStringAsync(userDepartment);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return new();
+            }
+
+            string database = await ResolveSourceDatabaseAsync(connectionString, sourceDatabase, cancellationToken);
+            string sql =
+                $"SELECT COLUMN_NAME AS NAME, DATA_TYPE FROM {QuoteIdentifier(database)}.INFORMATION_SCHEMA.COLUMNS " +
+                $"WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_NAME = '{EscapeSqlLiteral(normalizedTable)}' " +
+                "ORDER BY ORDINAL_POSITION";
+
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(connectionString, sql, cancellationToken);
+
+            return rows
+                .Select(row => new SourceColumnMetadata
+                {
+                    Name = row.TryGetValue("NAME", out object? name) ? (name?.ToString() ?? string.Empty).Trim() : string.Empty,
+                    DataType = row.TryGetValue("DATA_TYPE", out object? dataType) ? dataType?.ToString()?.Trim() : null
+                })
+                .Where(column => !string.IsNullOrWhiteSpace(column.Name))
+                .ToList();
+        }
+
+        public Task<List<string>> GetSourceParametersAsync(string? userDepartment, string? sourceDatabase, string? sourceTable, string? sourceSP, CancellationToken cancellationToken = default)
+            => Task.FromResult(new List<string>());
+
         public async Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request, CancellationToken cancellationToken = default)
         {
             if (request is null)
@@ -498,6 +590,60 @@ namespace DataWarehousePower.Services
 
         private static string ToDecimalLiteral(decimal value)
             => value.ToString(CultureInfo.InvariantCulture);
+
+        private async Task<string?> ResolveConnectionStringAsync(string? userDepartment)
+        {
+            if (string.IsNullOrWhiteSpace(userDepartment))
+            {
+                return null;
+            }
+
+            string connectionString = await _departmentSnowflakeConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
+            return string.IsNullOrWhiteSpace(connectionString) ? null : connectionString;
+        }
+
+        private async Task<string> ResolveSourceDatabaseAsync(string connectionString, string? sourceDatabase, CancellationToken cancellationToken)
+        {
+            string normalized = (sourceDatabase ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                return normalized;
+            }
+
+            const string sql = "SELECT CURRENT_DATABASE() AS NAME";
+            IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(connectionString, sql, cancellationToken);
+            string? currentDatabase = rows
+                .Select(row => row.TryGetValue("NAME", out object? value) ? value?.ToString() : null)
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+            if (string.IsNullOrWhiteSpace(currentDatabase))
+            {
+                throw new InvalidOperationException("Unable to resolve the current Snowflake database.");
+            }
+
+            return currentDatabase.Trim();
+        }
+
+        private static string NormalizeSourceObjectName(string sourceObjectName)
+        {
+            string normalized = sourceObjectName.Trim();
+            return normalized.StartsWith("TBL_", StringComparison.OrdinalIgnoreCase)
+                ? normalized
+                : $"TBL_{normalized}";
+        }
+
+        private static string NormalizeSourceTableName(string? sourceTable)
+        {
+            string normalized = (sourceTable ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            return normalized.StartsWith("TBL_", StringComparison.OrdinalIgnoreCase)
+                ? normalized[4..]
+                : normalized;
+        }
 
         private static string BuildTableExpression(string? sourceDatabase, string sourceTable)
         {

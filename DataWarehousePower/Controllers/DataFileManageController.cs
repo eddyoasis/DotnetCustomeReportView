@@ -371,7 +371,7 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var sourceTableOptions = await _service.GetSourceTableOptionsAsync(sourceDatabase);
+                var sourceTableOptions = await GetSourceTableOptionsAsync(sourceDatabase);
                 var items = sourceTableOptions.Where(x => x.Contains("VW_")).ToList();
 
                 return Json(items);
@@ -381,6 +381,11 @@ namespace DataWarehousePower.Controllers
                 _logger.Warn($"Metadata access denied for source database {sourceDatabase}", ex);
                 return Json(Array.Empty<string>());
             }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.Warn($"Snowflake metadata access denied for source database {sourceDatabase}", ex);
+                return Json(Array.Empty<string>());
+            }
         }
 
         [HttpGet]
@@ -388,12 +393,17 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var items = await _service.GetSourceStoredProcedureOptionsAsync(sourceDatabase);
+                var items = await GetSourceStoredProcedureOptionsAsync(sourceDatabase);
                 return Json(items);
             }
             catch (SqlException ex) when (ex.Number is 916 or 229)
             {
                 _logger.Warn($"Stored procedure metadata access denied for source database {sourceDatabase}", ex);
+                return Json(Array.Empty<string>());
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.Warn($"Snowflake stored procedure metadata access denied for source database {sourceDatabase}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -403,12 +413,17 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var items = await _service.GetSourceColumnsAsync(sourceDatabase, sourceTable, sourceSP);
+                var items = await GetSourceColumnsAsync(sourceDatabase, sourceTable, sourceSP);
                 return Json(items);
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
             {
                 _logger.Warn($"Column metadata access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
+                return Json(Array.Empty<string>());
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.Warn($"Snowflake column metadata access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -418,12 +433,17 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var items = await _service.GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP);
+                var items = await GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP);
                 return Json(items);
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
             {
                 _logger.Warn($"Column metadata(type) access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
+                return Json(Array.Empty<SourceColumnMetadata>());
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.Warn($"Snowflake column metadata(type) access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
                 return Json(Array.Empty<SourceColumnMetadata>());
             }
         }
@@ -433,12 +453,17 @@ namespace DataWarehousePower.Controllers
         {
             try
             {
-                var items = await _service.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
+                var items = await GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
                 return Json(items);
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
             {
                 _logger.Warn($"Parameter metadata access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
+                return Json(Array.Empty<string>());
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.Warn($"Snowflake parameter metadata access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -531,40 +556,130 @@ namespace DataWarehousePower.Controllers
 
         private async Task PopulateSourceDatabaseOptionsAsync(DataFileManageFormViewModel vm)
         {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                string userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                vm.SourceDatabaseOptions = await _snowflakeService.GetSourceDatabaseOptionsAsync(userDepartment);
+                if (string.IsNullOrWhiteSpace(vm.SourceDatabase))
+                {
+                    vm.SourceDatabase = vm.SourceDatabaseOptions.FirstOrDefault();
+                }
+                return;
+            }
+
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync();
         }
 
         private async Task PopulateSourceDatabaseAsync(DataFileManageFormViewModel vm, string dbConnectionString)
         {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                await PopulateSourceDatabaseOptionsAsync(vm);
+                return;
+            }
+
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseAsync(dbConnectionString);
             vm.SourceDatabase = vm.SourceDatabaseOptions.FirstOrDefault();
         }
 
         private async Task PopulateSourceDatabaseOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
         {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                await PopulateSourceDatabaseOptionsAsync(vm);
+                return;
+            }
+
             vm.SourceDatabaseOptions = await _service.GetSourceDatabaseOptionsAsync(dbConnectionString);
         }
 
         private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm)
         {
-            var sourceTableOptions = await _service.GetSourceTableOptionsAsync(vm.SourceDatabase);
+            var sourceTableOptions = await GetSourceTableOptionsAsync(vm.SourceDatabase);
             vm.SourceTableOptions = sourceTableOptions.Where(x => x.Contains("VW_")).ToList();
         }
 
         private async Task PopulateSourceTableOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
         {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                await PopulateSourceTableOptionsAsync(vm);
+                return;
+            }
+
             var sourceTableOptions = await _service.GetSourceTableOptionsAsync(dbConnectionString, vm.SourceDatabase);
             vm.SourceTableOptions = sourceTableOptions.Where(x => x.Contains("VW_")).ToList();
         }
 
         private async Task PopulateSourceSPOptionsAsync(DataFileManageFormViewModel vm)
         {
-            vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(vm.SourceDatabase);
+            vm.SourceSPOptions = await GetSourceStoredProcedureOptionsAsync(vm.SourceDatabase);
         }
 
         private async Task PopulateSourceSPOptionsAsync(DataFileManageFormViewModel vm, string dbConnectionString)
         {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                await PopulateSourceSPOptionsAsync(vm);
+                return;
+            }
+
             vm.SourceSPOptions = await _service.GetSourceStoredProcedureOptionsAsync(dbConnectionString, vm.SourceDatabase);
+        }
+
+        private async Task<List<string>> GetSourceTableOptionsAsync(string? sourceDatabase)
+        {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                string userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                return await _snowflakeService.GetSourceTableOptionsAsync(userDepartment, sourceDatabase);
+            }
+
+            return await _service.GetSourceTableOptionsAsync(sourceDatabase);
+        }
+
+        private async Task<List<string>> GetSourceStoredProcedureOptionsAsync(string? sourceDatabase)
+        {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                string userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                return await _snowflakeService.GetSourceStoredProcedureOptionsAsync(userDepartment, sourceDatabase);
+            }
+
+            return await _service.GetSourceStoredProcedureOptionsAsync(sourceDatabase);
+        }
+
+        private async Task<List<string>> GetSourceColumnsAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                string userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                return await _snowflakeService.GetSourceColumnsAsync(userDepartment, sourceDatabase, sourceTable, sourceSP);
+            }
+
+            return await _service.GetSourceColumnsAsync(sourceDatabase, sourceTable, sourceSP);
+        }
+
+        private async Task<List<SourceColumnMetadata>> GetSourceColumnMetadataAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                string userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                return await _snowflakeService.GetSourceColumnMetadataAsync(userDepartment, sourceDatabase, sourceTable, sourceSP);
+            }
+
+            return await _service.GetSourceColumnMetadataAsync(sourceDatabase, sourceTable, sourceSP);
+        }
+
+        private async Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
+        {
+            if (_scheduledJobAppSetting.UseSnowflakeForDataFile)
+            {
+                string userDepartment = HttpHelper.ResolveUserDepartment(HttpContext);
+                return await _snowflakeService.GetSourceParametersAsync(userDepartment, sourceDatabase, sourceTable, sourceSP);
+            }
+
+            return await _service.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
         }
 
         private async Task PopulateDepartmentOptionsAsync(DataFileManageFormViewModel vm)
