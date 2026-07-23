@@ -165,6 +165,10 @@
                                        maxlength="128"
                                        placeholder="Search client code"
                                        autocomplete="off" />
+                                <div id="filter-client-code-loading" class="d-none small text-muted mb-2" aria-live="polite">
+                                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                                    Searching...
+                                </div>
                                 <div id="filter-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
                             </div>
                         </div>
@@ -583,6 +587,7 @@
         const filterClientCodeSearchInput = document.getElementById('filter-client-code-search');
         const filterClientCodeOptions = document.getElementById('filter-client-code-options');
         const filterClientCodeError = document.getElementById('filter-client-code-error');
+        const filterClientCodeLoading = document.getElementById('filter-client-code-loading');
         const filterClientCodeDropdown = filterClientCodeToggle ? bootstrap.Dropdown.getOrCreateInstance(filterClientCodeToggle) : null;
         const exportButton = document.getElementById('btn-export');
         const scheduleReportButton = document.getElementById('btn-schedule-report');
@@ -609,8 +614,11 @@
                     order = column.Order > 0 ? column.Order : index + 1
                 })
                 .ToList()));
-        const availableClientCodes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodes));
+        let availableClientCodes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableClientCodes));
+        const filterClientCodeValuesUrl = '@Url.Action("FilterValues", "Report")';
         let autoSaveTimer = null;
+        let clientCodeSearchTimer = null;
+        let clientCodeSearchToken = 0;
         const autoSaveStorageKey = `report:${reportId}:columnAutoSave`;
         let isAutoSaveEnabled = false;
 
@@ -1530,26 +1538,101 @@
             }
         }
 
+        function setClientCodeSearchLoading(isLoading) {
+            if (!filterClientCodeLoading) {
+                return;
+            }
+
+            filterClientCodeLoading.classList.toggle('d-none', !isLoading);
+        }
+
+        async function searchClientCodeOptionsAsync(searchValue) {
+            const currentToken = ++clientCodeSearchToken;
+            const normalizedSearch = (searchValue || '').trim();
+
+            setClientCodeSearchLoading(true);
+
+            try {
+                const url = new URL(filterClientCodeValuesUrl, window.location.origin);
+                url.searchParams.set('reportId', String(reportId));
+                url.searchParams.set('take', '50');
+
+                if (normalizedSearch) {
+                    url.searchParams.set('search', normalizedSearch);
+                }
+
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const values = await response.json();
+                if (currentToken !== clientCodeSearchToken) {
+                    return;
+                }
+
+                if (Array.isArray(values)) {
+                    const selectedValue = (filterClientCodeValueInput?.value || '').trim();
+                    availableClientCodes = values
+                        .map(value => String(value || '').trim())
+                        .filter(value => value.length > 0);
+
+                    if (selectedValue && !availableClientCodes.some(value =>
+                        value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0)) {
+                        availableClientCodes.push(selectedValue);
+                    }
+
+                    availableClientCodes = [...new Set(availableClientCodes)]
+                        .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }));
+                }
+            } catch {
+                // Keep current list when search request fails.
+            } finally {
+                if (currentToken === clientCodeSearchToken) {
+                    setClientCodeSearchLoading(false);
+                }
+            }
+
+            renderClientCodeOptions(searchValue);
+        }
+
+        function queueClientCodeSearch(searchValue) {
+            if (clientCodeSearchTimer) {
+                clearTimeout(clientCodeSearchTimer);
+            }
+
+            clientCodeSearchTimer = setTimeout(async () => {
+                clientCodeSearchTimer = null;
+                await searchClientCodeOptionsAsync(searchValue);
+            }, 500);
+        }
+
         if (filterClientCodeSearchInput) {
             renderClientCodeOptions(filterClientCodeSearchInput.value);
             filterClientCodeSearchInput.addEventListener('input', () => {
-                renderClientCodeOptions(filterClientCodeSearchInput.value);
+                queueClientCodeSearch(filterClientCodeSearchInput.value);
             });
 
             filterClientCodeSearchInput.addEventListener('focus', () => {
-                renderClientCodeOptions(filterClientCodeSearchInput.value);
+                queueClientCodeSearch(filterClientCodeSearchInput.value);
                 filterClientCodeDropdown?.show();
             });
 
             filterClientCodeSearchInput.addEventListener('click', () => {
-                renderClientCodeOptions(filterClientCodeSearchInput.value);
+                queueClientCodeSearch(filterClientCodeSearchInput.value);
                 filterClientCodeDropdown?.show();
             });
 
             filterClientCodeSearchInput.addEventListener('keydown', e => {
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    renderClientCodeOptions(filterClientCodeSearchInput.value);
+                    queueClientCodeSearch(filterClientCodeSearchInput.value);
                     filterClientCodeDropdown?.show();
                 }
             });
@@ -1560,7 +1643,7 @@
                 const initialClientCode = filterClientCodeValueInput.value.trim();
                 filterClientCodeToggle.textContent = initialClientCode || 'Select a client code';
                 filterClientCodeSearchInput.value = initialClientCode;
-                renderClientCodeOptions(initialClientCode);
+                queueClientCodeSearch(initialClientCode);
             }
         }
 

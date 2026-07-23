@@ -20,6 +20,8 @@ namespace DataWarehousePower.Services
 
         Task<List<string>> GetClientCodesByUserIdAsync(string userId);
 
+        Task<List<string>> GetClientCodeFilterValuesAsync(int reportId, string userId, string? search = null, int take = 50);
+
         Task<List<string>> GetDataFileSchemaTemplatesAsync(string userId, int dataFileDefinitionId);
 
         Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId);

@@ -21,6 +21,7 @@ namespace DataWarehousePower.Services
 
         private static readonly string[] _dateFromParameterAliases = ["DateFrom", "FilterDateFrom"];
         private static readonly string[] _dateToParameterAliases = ["DateTo", "FilterDateTo"];
+        private const string FixedClientCodeColumnName = "ACCOUNT_ID";
 
         private static readonly JsonSerializerOptions _jsonOpts =
             new() { PropertyNameCaseInsensitive = true };
@@ -29,6 +30,7 @@ namespace DataWarehousePower.Services
 
         private readonly IReportRepository              _reportRepo;
         private readonly IColumnPreferenceRepository    _prefRepo;
+        private readonly IDataFileManageService         _dataFileManageService;
         private readonly ILogger<ReportService>         _logger;
         private readonly ScheduledJob _scheduledJobAppSetting;
 
@@ -36,11 +38,13 @@ namespace DataWarehousePower.Services
             IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
             IReportRepository reportRepo,
             IColumnPreferenceRepository prefRepo,
+            IDataFileManageService dataFileManageService,
             ILogger<ReportService> logger)
         {
             _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _reportRepo = reportRepo;
             _prefRepo   = prefRepo;
+            _dataFileManageService = dataFileManageService;
             _logger     = logger;
         }
 
@@ -64,6 +68,61 @@ namespace DataWarehousePower.Services
         public async Task<List<string>> GetClientCodesByUserIdAsync(string userId)
         {
             return await _reportRepo.GetClientCodesByUserIdAsync(userId);
+        }
+
+        public async Task<List<string>> GetClientCodeFilterValuesAsync(int reportId, string userId, string? search = null, int take = 50)
+        {
+            if (reportId <= 0 || string.IsNullOrWhiteSpace(userId))
+            {
+                return new();
+            }
+
+            ReportDefinition? report = await _reportRepo.GetReportWithColumnsAsync(reportId);
+            if (report is null)
+            {
+                return new();
+            }
+
+            int effectiveTake = Math.Clamp(take, 1, Math.Max(1, _scheduledJobAppSetting.MaxDistinctRecord));
+            string normalizedSearch = (search ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(report.SourceTable) && string.IsNullOrWhiteSpace(report.SourceSP))
+            {
+                try
+                {
+                    return await _dataFileManageService.GetDistinctColumnValuesAsync(
+                        userId,
+                        report.SourceDatabase,
+                        report.SourceTable,
+                        report.SourceSP,
+                        FixedClientCodeColumnName,
+                        normalizedSearch,
+                        effectiveTake);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Falling back to repository client-code filter values for report {ReportId} (source table: {SourceTable}).",
+                        report.Id,
+                        report.SourceTable);
+                }
+            }
+
+            IEnumerable<string> fallbackValues = await _reportRepo.GetClientCodesByUserIdAsync(userId);
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                fallbackValues = fallbackValues.Where(value =>
+                    !string.IsNullOrWhiteSpace(value) &&
+                    value.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return fallbackValues
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Take(effectiveTake)
+                .ToList();
         }
 
         public Task<List<string>> GetSchemaTemplatesAsync(string userId, int reportId)
@@ -235,9 +294,10 @@ namespace DataWarehousePower.Services
 
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync(userDepartment);
+            List<string> resolvedClientCodes = await GetAvailableClientCodesForReportAsync(report, userId);
             List<string> availableClientCodes = BuildAvailableClientCodes(
                 normalizedClientCode,
-                await _reportRepo.GetClientCodesByUserIdAsync(userId));
+                resolvedClientCodes);
             List<string> savedSchemaTemplates = await _prefRepo.GetSchemaTemplatesAsync(userId, reportId);
             Dictionary<string, int> schemaTemplatePreferenceIds = await _prefRepo.GetSchemaTemplatePreferenceIdsAsync(userId, reportId);
             Dictionary<int, List<string>> reportSchemaTemplatesByReportId = await BuildReportSchemaTemplatesByReportIdAsync(userId, allReports);
@@ -523,6 +583,35 @@ namespace DataWarehousePower.Services
             }
 
             return schemaTemplatesByReportId;
+        }
+
+        private async Task<List<string>> GetAvailableClientCodesForReportAsync(
+            ReportDefinition report,
+            string userId)
+        {
+            if (!string.IsNullOrWhiteSpace(report.SourceTable) &&
+                string.IsNullOrWhiteSpace(report.SourceSP))
+            {
+                try
+                {
+                    return await _dataFileManageService.GetDistinctColumnValuesAsync(
+                        userId,
+                        report.SourceDatabase,
+                        report.SourceTable,
+                        report.SourceSP,
+                        FixedClientCodeColumnName,
+                        take: _scheduledJobAppSetting.MaxDistinctRecord);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Falling back to repository client-code lookup for report {ReportId} (source table: {SourceTable}) using database distinct-value lookup.",
+                        report.Id,
+                        report.SourceTable);
+                }
+            }
+
+            return await _reportRepo.GetClientCodesByUserIdAsync(userId);
         }
 
         private static string? FindClientCodeValue(Dictionary<string, object?> row)

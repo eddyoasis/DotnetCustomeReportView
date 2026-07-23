@@ -128,6 +128,32 @@ namespace DataWarehousePower.Controllers
             });
         }
 
+        [HttpGet]
+        public async Task<IActionResult> FilterValues([FromQuery] int reportId, [FromQuery] string? search = null, [FromQuery] int take = 50)
+        {
+            if (reportId <= 0)
+            {
+                return Json(Array.Empty<string>());
+            }
+
+            string userId = _prefService.ResolveUserId(HttpContext);
+            int effectiveTake = _scheduledJobAppSetting.MaxDistinctRecord;
+
+            try
+            {
+                List<string> values = await _reportService.GetClientCodeFilterValuesAsync(reportId, userId, search, effectiveTake);
+                return Json(values);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Report client-code filter values query failed for report {ReportId}",
+                    reportId);
+
+                return Json(Array.Empty<string>());
+            }
+        }
+
         // POST /Report/{id}/SavePreferences  (AJAX)
         [HttpPost]
         public async Task<IActionResult> SavePreferences(int id,
