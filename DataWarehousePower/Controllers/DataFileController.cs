@@ -69,9 +69,12 @@ namespace DataWarehousePower.Controllers
                 : listViewModel.DataFiles[0];
 
             List<DataFileColumn> syncedColumns = await RefreshColumnsFromSnowflakeAsync(selectedDataFile);
-            selectedDataFile.Columns = syncedColumns;
+            //selectedDataFile.Columns = syncedColumns;
+            selectedDataFile.Columns = syncedColumns.Where(x => !x.IsDeleted).ToList();
 
+            //List<ColumnDefinition> availableColumns = syncedColumns
             List<ColumnDefinition> availableColumns = syncedColumns
+                .Where(x => !x.IsDeleted)
                 .OrderBy(column => column.DisplayOrder)
                 .Select((column, index) => new ColumnDefinition
                 {

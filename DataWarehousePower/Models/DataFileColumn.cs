@@ -33,5 +33,7 @@ namespace DataWarehousePower.Models
         public string? MappingParameterFilter { get; set; }
 
         public int DisplayOrder { get; set; } = 1;
+
+        public bool IsDeleted { get; set; } = false;
     }
 }

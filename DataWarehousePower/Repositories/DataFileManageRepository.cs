@@ -1964,6 +1964,7 @@ namespace DataWarehousePower.Repositories
                         existingColumn.MappingParameter = column.MappingParameter;
                         existingColumn.MappingParameterFilter = column.MappingParameterFilter;
                         existingColumn.DisplayOrder = column.DisplayOrder;
+                        existingColumn.IsDeleted = column.IsDeleted;
                     }
                 }
             }

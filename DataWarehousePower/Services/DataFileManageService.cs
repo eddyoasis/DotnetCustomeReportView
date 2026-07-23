@@ -218,7 +218,8 @@ namespace DataWarehousePower.Services
                     DefaultLabel = column.DefaultLabel,
                     MappingParameter = column.MappingParameter,
                     MappingParameterFilter = column.MappingParameterFilter,
-                    DisplayOrder = column.DisplayOrder
+                    DisplayOrder = column.DisplayOrder,
+                    IsDeleted = column.IsDeleted
                 }).ToList()
             };
 
@@ -244,7 +245,7 @@ namespace DataWarehousePower.Services
             };
 
             var activeColumns = form.Columns
-                .Where(column => !column.IsDeleted)
+                //.Where(column => !column.IsDeleted)
                 .Select(column => new DataFileColumn
                 {
                     Id = column.Id,
@@ -253,14 +254,17 @@ namespace DataWarehousePower.Services
                     DefaultLabel = column.DefaultLabel.Trim(),
                     MappingParameter = string.IsNullOrWhiteSpace(column.MappingParameter) ? null : column.MappingParameter.Trim(),
                     MappingParameterFilter = string.IsNullOrWhiteSpace(column.MappingParameterFilter) ? null : column.MappingParameterFilter.Trim(),
-                    DisplayOrder = column.DisplayOrder
+                    DisplayOrder = column.DisplayOrder,
+                    IsDeleted = column.IsDeleted
                 })
                 .ToList();
 
-            var deletedIds = form.Columns
-                .Where(column => column.IsDeleted && column.Id > 0)
-                .Select(column => column.Id)
-                .ToList();
+            var deletedIds = new List<int>();
+
+            //var deletedIds = form.Columns
+            //    .Where(column => column.IsDeleted && column.Id > 0)
+            //    .Select(column => column.Id)
+            //    .ToList();
 
             return (dataFile, activeColumns, deletedIds);
         }
