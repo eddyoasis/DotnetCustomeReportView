@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
+using log4net;
 using Snowflake.Data.Client;
 using System.Text.Json;
 
@@ -26,7 +27,8 @@ namespace DataWarehousePower.Controllers
         private readonly IColumnPreferenceService _prefService;
         private readonly IAuditLogService _auditLogService;
         private readonly ISnowflakeService _snowflakeService;
-        private readonly ILogger<DataFileManageController> _logger;
+        //private static readonly ILog _logger = LogManager.GetLogger(typeof(DataFileManageController));
+        private static readonly ILog _logger = LogManager.GetLogger("DataFileManage");
         private readonly GeneralAppSetting _generalAppSetting;
         private readonly ScheduledJob _scheduledJobAppSetting;
 
@@ -39,8 +41,7 @@ namespace DataWarehousePower.Controllers
             IColumnPreferenceService prefService,
             IAuditLogService auditLogService,
             ISnowflakeService snowflakeService,
-            IOptionsSnapshot<GeneralAppSetting> generalAppSetting,
-            ILogger<DataFileManageController> logger)
+            IOptionsSnapshot<GeneralAppSetting> generalAppSetting)
         {
             _scheduledJobAppSetting = scheduledJobAppSetting.Value;
             _service = service;
@@ -50,7 +51,6 @@ namespace DataWarehousePower.Controllers
             _prefService = prefService;
             _auditLogService = auditLogService;
             _snowflakeService = snowflakeService;
-            _logger = logger;
             _generalAppSetting = generalAppSetting.Value;
         }
 
@@ -335,7 +335,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to save data file definition");
+                _logger.Error("Failed to save data file definition", ex);
                 await _auditLogService.LogActionAsync(
                     actionType: form.Id == 0 ? "DataFileManageCreateFailed" : "DataFileManageUpdateFailed",
                     userId: userId,
@@ -378,7 +378,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (SqlException ex) when (ex.Number is 916 or 229)
             {
-                _logger.LogWarning(ex, "Metadata access denied for source database {SourceDatabase}", sourceDatabase);
+                _logger.Warn($"Metadata access denied for source database {sourceDatabase}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -393,7 +393,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (SqlException ex) when (ex.Number is 916 or 229)
             {
-                _logger.LogWarning(ex, "Stored procedure metadata access denied for source database {SourceDatabase}", sourceDatabase);
+                _logger.Warn($"Stored procedure metadata access denied for source database {sourceDatabase}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -408,9 +408,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
             {
-                _logger.LogWarning(ex,
-                    "Column metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
-                    sourceDatabase, sourceTable, sourceSP);
+                _logger.Warn($"Column metadata access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -425,9 +423,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
             {
-                _logger.LogWarning(ex,
-                    "Column metadata(type) access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
-                    sourceDatabase, sourceTable, sourceSP);
+                _logger.Warn($"Column metadata(type) access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
                 return Json(Array.Empty<SourceColumnMetadata>());
             }
         }
@@ -442,9 +438,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 11514)
             {
-                _logger.LogWarning(ex,
-                    "Parameter metadata access failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
-                    sourceDatabase, sourceTable, sourceSP);
+                _logger.Warn($"Parameter metadata access failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}", ex);
                 return Json(Array.Empty<string>());
             }
         }
@@ -477,12 +471,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (SnowflakeDbException ex)
             {
-                _logger.LogWarning(ex,
-                    "Snowflake mapping parameter values query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}, column {ColumnName}",
-                    sourceDatabase,
-                    sourceTable,
-                    sourceSP,
-                    columnName);
+                _logger.Warn($"Snowflake mapping parameter values query failed for source database {sourceDatabase}, source table {sourceTable}, source SP {sourceSP}, column {columnName}", ex);
 
                 return Json(Array.Empty<string>());
             }
@@ -515,29 +504,28 @@ namespace DataWarehousePower.Controllers
             }
             catch (ArgumentException ex)
             {
+                _logger.Error($"Snowflake preview query failed for source database {request?.SourceDatabase}, source table {request?.SourceTable}, source SP {request?.SourceSP}", ex);
                 return BadRequest(new { message = ex.Message });
             }
             catch (InvalidOperationException ex)
             {
+                _logger.Error($"Snowflake preview query failed for source database {request?.SourceDatabase}, source table {request?.SourceTable}, source SP {request?.SourceSP}", ex);
                 return BadRequest(new { message = ex.Message });
             }
             catch (SnowflakeDbException ex)
             {
-                _logger.LogWarning(ex,
-                    "Snowflake preview query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
-                    request?.SourceDatabase,
-                    request?.SourceTable,
-                    request?.SourceSP);
+                _logger.Warn($"Snowflake preview query failed for source database {request?.SourceDatabase}, source table {request?.SourceTable}, source SP {request?.SourceSP}", ex);
                 return BadRequest(new { message = "Failed to load preview data from Snowflake." });
             }
             catch (SqlException ex) when (ex.Number is 916 or 229 or 911 or 11514)
             {
-                _logger.LogWarning(ex,
-                    "Preview query failed for source database {SourceDatabase}, source table {SourceTable}, source SP {SourceSP}",
-                    request?.SourceDatabase,
-                    request?.SourceTable,
-                    request?.SourceSP);
+                _logger.Warn($"Preview query failed for source database {request?.SourceDatabase}, source table {request?.SourceTable}, source SP {request?.SourceSP}", ex);
                 return BadRequest(new { message = "Failed to load preview data due to source access restrictions." });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Snowflake preview query failed for source database {request?.SourceDatabase}, source table {request?.SourceTable}, source SP {request?.SourceSP}", ex);
+                return BadRequest(new { message = ex.Message });
             }
         }
 
@@ -798,7 +786,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to delete data file definition {DataFileDefinitionId}", id);
+                _logger.Error($"Failed to delete data file definition {id}", ex);
                 await _auditLogService.LogActionAsync(
                     actionType: "DataFileManageDeleteFailed",
                     userId: userId,
@@ -864,7 +852,7 @@ namespace DataWarehousePower.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to toggle active status for data file definition {DataFileDefinitionId}", id);
+                _logger.Error($"Failed to toggle active status for data file definition {id}", ex);
                 await _auditLogService.LogActionAsync(
                     actionType: "DataFileManageToggleActiveFailed",
                     userId: userId,
