@@ -28,6 +28,7 @@ namespace DataWarehousePower.Repositories
             DateTime? dateTo);
         Task<DataFilePreviewResult> GetPreviewDataAsync(DataFilePreviewRequest request);
         Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP);
+        Task<List<DataFileColumn>> SyncDataFileColumnsAsync(int dataFileDefinitionId, IReadOnlyList<SourceColumnMetadata> sourceColumns);
         Task<List<DataFileDefinition>> GetAllWithColumnsAsync();
         Task<List<DataFileDefinition>> GetAllWithColumnsAsync(string userId);
         Task<List<DataFileDefinition>> GetAllWithColumnsAsync(string userId, string userDepartment);

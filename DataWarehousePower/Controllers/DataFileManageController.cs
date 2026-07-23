@@ -122,18 +122,14 @@ namespace DataWarehousePower.Controllers
 
                 if (isITDepartment)
                 {
-                    await PopulateSourceDatabaseOptionsAsync(vm);
                     await PopulateSourceTableOptionsAsync(vm);
-                    await PopulateSourceSPOptionsAsync(vm);
 
                 }
                 else
                 {
                     var departmentConnection = await _departmentConnectionService.GetConnectionStringByUserDepartmentAsync(userDepartment);
 
-                    await PopulateSourceDatabaseAsync(vm, departmentConnection);
                     await PopulateSourceTableOptionsAsync(vm, departmentConnection);
-                    await PopulateSourceSPOptionsAsync(vm, departmentConnection);
                 }
 
                 await PopulateDepartmentOptionsAsync(vm);

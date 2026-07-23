@@ -161,6 +161,9 @@ namespace DataWarehousePower.Services
         public Task<List<string>> GetSourceParametersAsync(string? sourceDatabase, string? sourceTable, string? sourceSP)
             => _repository.GetSourceParametersAsync(sourceDatabase, sourceTable, sourceSP);
 
+        public Task<List<DataFileColumn>> SyncDataFileColumnsAsync(int dataFileDefinitionId, IReadOnlyList<SourceColumnMetadata> sourceColumns)
+            => _repository.SyncDataFileColumnsAsync(dataFileDefinitionId, sourceColumns);
+
         public async Task<DataFileManageFormViewModel> GetFormViewModelAsync(int id)
         {
             DataFileDefinition? dataFile = await _repository.GetByIdWithColumnsAsync(id);

@@ -68,7 +68,10 @@ namespace DataWarehousePower.Controllers
                 ? listViewModel.DataFiles.FirstOrDefault(dataFile => dataFile.Id == id.Value) ?? listViewModel.DataFiles[0]
                 : listViewModel.DataFiles[0];
 
-            List<ColumnDefinition> availableColumns = selectedDataFile.Columns
+            List<DataFileColumn> syncedColumns = await RefreshColumnsFromSnowflakeAsync(selectedDataFile);
+            selectedDataFile.Columns = syncedColumns;
+
+            List<ColumnDefinition> availableColumns = syncedColumns
                 .OrderBy(column => column.DisplayOrder)
                 .Select((column, index) => new ColumnDefinition
                 {
@@ -558,5 +561,59 @@ namespace DataWarehousePower.Controllers
 
         private string? ResolveUserDepartment()
             => HttpContext.Session.GetString("UserDepartment");
+
+        private async Task<List<DataFileColumn>> RefreshColumnsFromSnowflakeAsync(DataFileDefinition dataFile)
+        {
+            if (!_scheduledJobAppSetting.UseSnowflakeForDataFile ||
+                string.IsNullOrWhiteSpace(dataFile.SourceTable) ||
+                !string.IsNullOrWhiteSpace(dataFile.SourceSP))
+            {
+                return dataFile.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .ThenBy(column => column.Id)
+                    .ToList();
+            }
+
+            string userDepartment = ResolveUserDepartment() ?? string.Empty;
+
+            List<SourceColumnMetadata> sourceColumns;
+            try
+            {
+                sourceColumns = await _snowflakeService.GetSourceColumnMetadataAsync(
+                    userDepartment,
+                    dataFile.SourceDatabase,
+                    dataFile.SourceTable,
+                    dataFile.SourceSP);
+            }
+            catch (SnowflakeDbException ex)
+            {
+                _logger.LogWarning(ex, "Snowflake column metadata refresh failed for data file {DataFileId}", dataFile.Id);
+                return dataFile.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .ThenBy(column => column.Id)
+                    .ToList();
+            }
+
+            if (sourceColumns.Count == 0)
+            {
+                return dataFile.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .ThenBy(column => column.Id)
+                    .ToList();
+            }
+
+            try
+            {
+                return await _service.SyncDataFileColumnsAsync(dataFile.Id, sourceColumns);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist refreshed Snowflake columns for data file {DataFileId}", dataFile.Id);
+                return dataFile.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .ThenBy(column => column.Id)
+                    .ToList();
+            }
+        }
     }
 }

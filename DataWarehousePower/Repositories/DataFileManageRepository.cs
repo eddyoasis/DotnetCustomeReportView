@@ -1759,6 +1759,104 @@ namespace DataWarehousePower.Repositories
         private static string EscapeSqlIdentifier(string value)
             => value.Replace("]", "]]", StringComparison.Ordinal);
 
+        public async Task<List<DataFileColumn>> SyncDataFileColumnsAsync(int dataFileDefinitionId, IReadOnlyList<SourceColumnMetadata> sourceColumns)
+        {
+            if (dataFileDefinitionId <= 0)
+            {
+                return new();
+            }
+
+            DataFileDefinition? dataFileDefinition = await _context.DataFileDefinitions
+                .Include(definition => definition.Columns)
+                .FirstOrDefaultAsync(definition => definition.Id == dataFileDefinitionId);
+
+            if (dataFileDefinition is null)
+            {
+                return new();
+            }
+
+            if (sourceColumns is null || sourceColumns.Count == 0)
+            {
+                return dataFileDefinition.Columns
+                    .OrderBy(column => column.DisplayOrder)
+                    .ThenBy(column => column.Id)
+                    .ToList();
+            }
+
+            List<DataFileColumn> existingColumns = dataFileDefinition.Columns
+                .OrderBy(column => column.DisplayOrder)
+                .ThenBy(column => column.Id)
+                .ToList();
+
+            Dictionary<string, DataFileColumn> existingColumnsByName = existingColumns
+                .Where(column => !string.IsNullOrWhiteSpace(column.PropertyName))
+                .GroupBy(column => column.PropertyName.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            HashSet<string> liveColumnNames = new(StringComparer.OrdinalIgnoreCase);
+            bool hasChanges = false;
+            int nextDisplayOrder = existingColumns.Count == 0 ? 0 : existingColumns.Max(column => column.DisplayOrder);
+
+            foreach (SourceColumnMetadata sourceColumn in sourceColumns)
+            {
+                string propertyName = (sourceColumn.Name ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(propertyName) || !liveColumnNames.Add(propertyName))
+                {
+                    continue;
+                }
+
+                if (existingColumnsByName.TryGetValue(propertyName, out DataFileColumn? existingColumn))
+                {
+                    string normalizedDataType = (sourceColumn.DataType ?? string.Empty).Trim();
+
+                    if (!existingColumn.PropertyName.Equals(propertyName, StringComparison.Ordinal) ||
+                        !string.Equals(existingColumn.PropertyType, normalizedDataType, StringComparison.Ordinal))
+                    {
+                        hasChanges = true;
+                    }
+
+                    existingColumn.PropertyName = propertyName;
+                    existingColumn.PropertyType = string.IsNullOrWhiteSpace(normalizedDataType)
+                        ? existingColumn.PropertyType
+                        : normalizedDataType;
+                    continue;
+                }
+
+                dataFileDefinition.Columns.Add(new DataFileColumn
+                {
+                    DataFileDefinitionId = dataFileDefinitionId,
+                    PropertyName = propertyName,
+                    PropertyType = (sourceColumn.DataType ?? string.Empty).Trim(),
+                    DefaultLabel = propertyName,
+                    DisplayOrder = ++nextDisplayOrder
+                });
+                hasChanges = true;
+            }
+
+            List<DataFileColumn> removedColumns = existingColumns
+                .Where(column => !liveColumnNames.Contains(column.PropertyName))
+                .ToList();
+
+            if (removedColumns.Count > 0)
+            {
+                _context.DataFileColumns.RemoveRange(removedColumns);
+                hasChanges = true;
+            }
+
+            if (hasChanges)
+            {
+                dataFileDefinition.ModifiedAt = DateTimeHelper.GetCurrentLocalTime();
+                await _context.SaveChangesAsync();
+            }
+
+            return await _context.DataFileColumns
+                .AsNoTracking()
+                .Where(column => column.DataFileDefinitionId == dataFileDefinitionId)
+                .OrderBy(column => column.DisplayOrder)
+                .ThenBy(column => column.Id)
+                .ToListAsync();
+        }
+
         public async Task<List<DataFileDefinition>> GetAllWithColumnsAsync()
             => await _context.DataFileDefinitions
                 .AsNoTracking()

@@ -3,6 +3,7 @@ using DataWarehousePower.Models;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Data.Common;
 
 namespace DataWarehousePower.Services
 {
@@ -47,7 +48,11 @@ namespace DataWarehousePower.Services
                 return new();
             }
 
-            string database = await ResolveSourceDatabaseAsync(connectionString, sourceDatabase, cancellationToken);
+            var connectionStringBuilder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            string snowflakeDBName = connectionStringBuilder["db"].ToString();
+
+            //string database = await ResolveSourceDatabaseAsync(connectionString, sourceDatabase, cancellationToken);
+            string database = await ResolveSourceDatabaseAsync(connectionString, snowflakeDBName, cancellationToken);
             string sql =
                 $"SELECT TABLE_NAME AS NAME FROM {QuoteIdentifier(database)}.INFORMATION_SCHEMA.TABLES " +
                 "WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_TYPE IN ('BASE TABLE', 'VIEW') " +
@@ -91,7 +96,11 @@ namespace DataWarehousePower.Services
                 return new();
             }
 
-            string database = await ResolveSourceDatabaseAsync(connectionString, sourceDatabase, cancellationToken);
+            var connectionStringBuilder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            string snowflakeDBName = connectionStringBuilder["db"].ToString();
+
+            //string database = await ResolveSourceDatabaseAsync(connectionString, sourceDatabase, cancellationToken);
+            string database = await ResolveSourceDatabaseAsync(connectionString, snowflakeDBName, cancellationToken);
             string sql =
                 $"SELECT COLUMN_NAME AS NAME, DATA_TYPE FROM {QuoteIdentifier(database)}.INFORMATION_SCHEMA.COLUMNS " +
                 $"WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_NAME = '{EscapeSqlLiteral(normalizedTable)}' " +
