@@ -91,12 +91,14 @@ namespace DataWarehousePower.Controllers
                 normalizedSchemaTemplate,
                 availableColumns);
 
-            List<string> availableClientCodes = (await _reportRepository.GetClientCodesByUserIdAsync(userId))
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            List<string> availableClientCodes = new List<string>();
+
+            //List<string> availableClientCodes = (await _reportRepository.GetClientCodesByUserIdAsync(userId))
+            //    .Where(value => !string.IsNullOrWhiteSpace(value))
+            //    .Select(value => value.Trim())
+            //    .Distinct(StringComparer.OrdinalIgnoreCase)
+            //    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            //    .ToList();
 
             if (!string.IsNullOrWhiteSpace(normalizedClientCode) &&
                 !availableClientCodes.Contains(normalizedClientCode, StringComparer.OrdinalIgnoreCase))

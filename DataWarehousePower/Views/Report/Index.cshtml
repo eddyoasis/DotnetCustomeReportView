@@ -1648,6 +1648,8 @@
         }
 
         const reportDataSection = document.getElementById('report-data-section');
+        let activeReportLoadRequestId = 0;
+        let activeReportLoadTargetUrl = '';
 
         function setReportDataLoading(isLoading) {
             if (!reportDataSection) {
@@ -1669,10 +1671,20 @@
                 return;
             }
 
+            const normalizedTargetUrl = new URL(targetUrl, window.location.origin).toString();
+            if (activeReportLoadRequestId > 0 &&
+                normalizedTargetUrl.localeCompare(activeReportLoadTargetUrl, undefined, { sensitivity: 'accent' }) === 0) {
+                return;
+            }
+
+            const requestId = activeReportLoadRequestId + 1;
+            activeReportLoadRequestId = requestId;
+            activeReportLoadTargetUrl = normalizedTargetUrl;
+
             try {
                 setReportDataLoading(true);
 
-                const response = await fetch(targetUrl, {
+                const response = await fetch(normalizedTargetUrl, {
                     method: 'GET',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
@@ -1692,15 +1704,25 @@
                     throw new Error('Report data section not found in response.');
                 }
 
+                if (requestId !== activeReportLoadRequestId) {
+                    return;
+                }
+
                 reportDataSection.innerHTML = nextDataSection.innerHTML;
 
                 if (pushHistory) {
-                    window.history.pushState({ reportDataUrl: targetUrl }, '', targetUrl);
+                    window.history.pushState({ reportDataUrl: normalizedTargetUrl }, '', normalizedTargetUrl);
                 }
             } catch {
-                window.location.href = targetUrl;
+                if (requestId === activeReportLoadRequestId) {
+                    window.location.href = normalizedTargetUrl;
+                }
             } finally {
-                setReportDataLoading(false);
+                if (requestId === activeReportLoadRequestId) {
+                    activeReportLoadRequestId = 0;
+                    activeReportLoadTargetUrl = '';
+                    setReportDataLoading(false);
+                }
             }
         }
 

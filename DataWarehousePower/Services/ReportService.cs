@@ -294,7 +294,8 @@ namespace DataWarehousePower.Services
 
             // All reports for sidebar navigation
             var allReports = await _reportRepo.GetAllReportsAsync(userDepartment);
-            List<string> resolvedClientCodes = await GetAvailableClientCodesForReportAsync(report, userId);
+            //List<string> resolvedClientCodes = await GetAvailableClientCodesForReportAsync(report, userId);
+            List<string> resolvedClientCodes = new List<string>();
             List<string> availableClientCodes = BuildAvailableClientCodes(
                 normalizedClientCode,
                 resolvedClientCodes);
