@@ -163,7 +163,8 @@ public sealed class ScheduledReportJobService(
 
     public async Task<ScheduledJobFormViewModel> GetCreateFormAsync(string userId, string? userDepartment = null)
     {
-        List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
+        //List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
+        List<string> availableClientCodes = new List<string>();
         List<string> availableClientCodeFolders = await reportRepository.GetClientCodeFoldersByUserIdAsync(userId);
 
         List<ReportDefinitionLookupItem> availableReports = new List<ReportDefinitionLookupItem>();
@@ -225,7 +226,8 @@ public sealed class ScheduledReportJobService(
             ?? throw new InvalidOperationException($"Scheduled job {id} was not found.");
 
         List<ReportDefinitionLookupItem> availableReports = await GetReportLookupAsync(userDepartment);
-        List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
+        List<string> availableClientCodes = new List<string>();
+        //List<string> availableClientCodes = await reportRepository.GetClientCodesByUserIdAsync(userId);
         List<string> availableClientCodeFolders = await reportRepository.GetClientCodeFoldersByUserIdAsync(userId);
         Dictionary<int, List<string>> availableSchemaTemplatesByReportId = await GetClientCodesLookupAsync(userId, availableReports);
         Dictionary<int, List<ScheduledJobParameterInputViewModel>> availableParametersByReportId =

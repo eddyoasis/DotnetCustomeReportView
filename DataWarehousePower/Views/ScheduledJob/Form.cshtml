@@ -317,7 +317,7 @@
                         <option value="">-- Select client code --</option>
                         @foreach (string availableClientCode in Model.AvailableClientCodes ?? new List<string>())
                         {
-                            <option value="@availableClientCode" selected="@(availableClientCode.Equals(Model.ClientCode ?? string.Empty, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@availableClientCode</option>
+                            <option value="@availableClientCode">@availableClientCode</option>
                         }
                     </select>
                     
@@ -328,14 +328,14 @@
                                 data-bs-toggle="dropdown"
                                 data-bs-auto-close="outside"
                                 aria-expanded="false">
-                            @(string.IsNullOrWhiteSpace(Model.ClientCode) ? "-- Select client code --" : Model.ClientCode)
+                            Select client code(s)
                         </button>
                         <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
                             <input id="scheduled-job-client-code-search"
                                    type="text"
                                    class="form-control form-control-sm mb-2"
                                    maxlength="128"
-                                   placeholder="Search client code"
+                                   placeholder="Search client codes"
                                    autocomplete="off" />
                             <div id="scheduled-job-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
                         </div>
@@ -2629,7 +2629,83 @@
             const scheduledJobClientCodeOptions = document.getElementById('scheduled-job-client-code-options');
             const scheduledJobClientCodeError = document.getElementById('scheduled-job-client-code-error');
             const scheduledJobClientCodeSelect = document.getElementById('scheduled-job-client-code-select');
+            const scheduledJobClientCodeAllToken = '__ALL__';
+            const scheduledJobClientCodeAllLabel = 'All client codes';
             //const clientCodeFieldInput = document.getElementById('ClientCode');
+
+            function parseScheduledJobClientCodeSelection(rawValue) {
+                const tokens = String(rawValue || '')
+                    .split(/[,;|]/)
+                    .map(token => token.trim())
+                    .filter(token => token.length > 0);
+
+                const isAllSelected = tokens.some(token =>
+                    token.localeCompare(scheduledJobClientCodeAllToken, undefined, { sensitivity: 'accent' }) === 0 ||
+                    token.localeCompare('ALL', undefined, { sensitivity: 'accent' }) === 0);
+
+                if (isAllSelected) {
+                    return {
+                        isAllSelected: true,
+                        selectedValues: []
+                    };
+                }
+
+                return {
+                    isAllSelected: false,
+                    selectedValues: [...new Set(tokens)]
+                        .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }))
+                };
+            }
+
+            function serializeScheduledJobClientCodeSelection(selectedValues, isAllSelected) {
+                if (isAllSelected) {
+                    return scheduledJobClientCodeAllToken;
+                }
+
+                const normalizedValues = [...new Set((selectedValues || [])
+                    .map(value => String(value || '').trim())
+                    .filter(value => value.length > 0))]
+                    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }));
+
+                return normalizedValues.join(',');
+            }
+
+            function getScheduledJobClientCodeLabel(selectionState) {
+                if (selectionState.isAllSelected) {
+                    return scheduledJobClientCodeAllLabel;
+                }
+
+                if (selectionState.selectedValues.length === 1) {
+                    return selectionState.selectedValues[0];
+                }
+
+                if (selectionState.selectedValues.length > 1) {
+                    return `${selectionState.selectedValues.length} selected`;
+                }
+
+                return 'Select client code(s)';
+            }
+
+            function syncScheduledJobClientCodeSelection(selectionState) {
+                const serializedValue = serializeScheduledJobClientCodeSelection(selectionState.selectedValues, selectionState.isAllSelected);
+
+                if (scheduledJobClientCodeValueInput) {
+                    scheduledJobClientCodeValueInput.value = serializedValue;
+                }
+
+                if (clientCodeFieldInput) {
+                    clientCodeFieldInput.value = serializedValue;
+                }
+
+                if (scheduledJobClientCodeToggle) {
+                    scheduledJobClientCodeToggle.textContent = getScheduledJobClientCodeLabel(selectionState);
+                }
+
+                if (scheduledJobClientCodeError) {
+                    scheduledJobClientCodeError.textContent = '';
+                    scheduledJobClientCodeError.style.display = 'none';
+                }
+            }
 
             function renderScheduledJobClientCodeOptions(searchText = '') {
                 if (!scheduledJobClientCodeOptions || !scheduledJobClientCodeSelect) {
@@ -2639,33 +2715,76 @@
                 scheduledJobClientCodeOptions.innerHTML = '';
                 const filterLower = (searchText || '').toLowerCase();
                 let hasMatches = false;
+                const selectionState = parseScheduledJobClientCodeSelection(scheduledJobClientCodeValueInput?.value || '');
+                const selectedSet = new Set(selectionState.selectedValues.map(value => value.toLowerCase()));
+
+                const allButton = document.createElement('button');
+                allButton.type = 'button';
+                allButton.className = `list-group-item list-group-item-action py-1 px-2${selectionState.isAllSelected ? ' active' : ''}`;
+                allButton.innerHTML = `<div class="d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" ${selectionState.isAllSelected ? 'checked' : ''} tabindex="-1" aria-hidden="true" /><span>${scheduledJobClientCodeAllLabel}</span></div>`;
+                allButton.addEventListener('click', event => {
+                    event.preventDefault();
+                    syncScheduledJobClientCodeSelection({ isAllSelected: true, selectedValues: [] });
+                    renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput?.value || '');
+                });
+                scheduledJobClientCodeOptions.appendChild(allButton);
 
                 const options = Array.from(scheduledJobClientCodeSelect.options || [])
                     .filter(opt => opt.value !== '')
-                    .filter(opt => !filterLower || opt.textContent.toLowerCase().includes(filterLower));
+                    .filter(opt => {
+                        const optionText = (opt.textContent || '').toLowerCase();
+                        const isSelected = selectedSet.has((opt.value || '').toLowerCase());
+                        return isSelected || !filterLower || optionText.includes(filterLower);
+                    });
 
                 options.forEach(opt => {
                     hasMatches = true;
                     const button = document.createElement('button');
                     button.type = 'button';
-                    button.className = `list-group-item list-group-item-action ${opt.value === (scheduledJobClientCodeValueInput?.value || '') ? 'active' : ''}`;
-                    button.textContent = opt.textContent;
+                    const isSelected = selectedSet.has((opt.value || '').toLowerCase());
+                    button.className = `list-group-item list-group-item-action py-1 px-2${isSelected ? ' active' : ''}`;
+                    const optionRow = document.createElement('div');
+                    optionRow.className = 'd-flex align-items-center gap-2';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input m-0';
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = isSelected;
+                    checkbox.tabIndex = -1;
+                    checkbox.setAttribute('aria-hidden', 'true');
+
+                    const label = document.createElement('span');
+                    label.textContent = opt.textContent || '';
+
+                    optionRow.appendChild(checkbox);
+                    optionRow.appendChild(label);
+                    button.appendChild(optionRow);
                     button.dataset.value = opt.value;
 
                     button.addEventListener('click', (e) => {
                         e.preventDefault();
-                        scheduledJobClientCodeValueInput.value = opt.value;
-                        if (clientCodeFieldInput) {
-                            clientCodeFieldInput.value = opt.value;
-                        }
-                        scheduledJobClientCodeToggle.textContent = opt.textContent;
-                        scheduledJobClientCodeSearchInput.value = '';
-                        renderScheduledJobClientCodeOptions();
 
-                        const bsDropdown = bootstrap.Dropdown.getInstance(scheduledJobClientCodeToggle);
-                        if (bsDropdown) {
-                            bsDropdown.hide();
+                        const nextSelection = parseScheduledJobClientCodeSelection(scheduledJobClientCodeValueInput?.value || '');
+
+                        if (nextSelection.isAllSelected) {
+                            nextSelection.isAllSelected = false;
+                            nextSelection.selectedValues = [opt.value];
+                        } else {
+                            const existingIndex = nextSelection.selectedValues.findIndex(value =>
+                                value.localeCompare(opt.value, undefined, { sensitivity: 'accent' }) === 0);
+
+                            if (existingIndex >= 0) {
+                                nextSelection.selectedValues.splice(existingIndex, 1);
+                            } else {
+                                nextSelection.selectedValues.push(opt.value);
+                            }
                         }
+
+                        nextSelection.selectedValues = [...new Set(nextSelection.selectedValues)]
+                            .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }));
+
+                        syncScheduledJobClientCodeSelection(nextSelection);
+                        renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput?.value || '');
                     });
 
                     scheduledJobClientCodeOptions.appendChild(button);
@@ -2683,6 +2802,17 @@
                 scheduledJobClientCodeSearchInput.addEventListener('input', () => {
                     renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput.value);
                 });
+            }
+
+            if (scheduledJobClientCodeToggle) {
+                scheduledJobClientCodeToggle.addEventListener('click', () => {
+                    renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput?.value || '');
+                });
+            }
+
+            if (scheduledJobClientCodeValueInput) {
+                const initialSelection = parseScheduledJobClientCodeSelection(scheduledJobClientCodeValueInput.value);
+                syncScheduledJobClientCodeSelection(initialSelection);
             }
 
             renderScheduledJobClientCodeOptions();
