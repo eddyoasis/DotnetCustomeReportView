@@ -44,7 +44,7 @@ public sealed class DataFileSchemaSyncJob(
         int syncedCount = 0;
         int skippedCount = 0;
 
-        foreach (DataFileDefinition dataFile in dataFiles.Where(x => x.UserId == "SGC0006"))
+        foreach (DataFileDefinition dataFile in dataFiles)
         {
             if (string.IsNullOrWhiteSpace(dataFile.SourceTable) || !string.IsNullOrWhiteSpace(dataFile.SourceSP))
             {

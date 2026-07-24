@@ -1849,12 +1849,14 @@ namespace DataWarehousePower.Repositories
                 await _context.SaveChangesAsync();
             }
 
-            return await _context.DataFileColumns
-                .AsNoTracking()
-                .Where(column => column.DataFileDefinitionId == dataFileDefinitionId)
-                .OrderBy(column => column.DisplayOrder)
-                .ThenBy(column => column.Id)
-                .ToListAsync();
+            return new List<DataFileColumn>();
+
+            //return await _context.DataFileColumns
+            //    .AsNoTracking()
+            //    .Where(column => column.DataFileDefinitionId == dataFileDefinitionId)
+            //    .OrderBy(column => column.DisplayOrder)
+            //    .ThenBy(column => column.Id)
+            //    .ToListAsync();
         }
 
         public async Task<List<DataFileDefinition>> GetAllWithColumnsAsync()
