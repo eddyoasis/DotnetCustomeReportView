@@ -1888,7 +1888,7 @@ namespace DataWarehousePower.Repositories
                 .ToListAsync();
 
             return datafiles
-                    .Where(dataFile => dataFile.UserId == userId || IsVisibleToDepartment(dataFile.Departments, userDepartment, userDepartmentId))
+                    .Where(dataFile => (string.IsNullOrEmpty(dataFile.Departments) && dataFile.UserId == userId) || IsVisibleToDepartment(dataFile.Departments, userDepartment, userDepartmentId))
                     .ToList();
         }
 
@@ -2026,7 +2026,8 @@ namespace DataWarehousePower.Repositories
         {
             if (string.IsNullOrWhiteSpace(reportDepartments))
             {
-                return true;
+                //return true;
+                return false;
             }
 
             if (string.IsNullOrWhiteSpace(userDepartment))

@@ -241,6 +241,7 @@ app.UseStatusCodePages(async context =>
     var response = context.HttpContext.Response;
     var user = context.HttpContext.User;
     bool isInteractiveNavigation = IsInteractiveBrowserNavigation(request);
+    string challengeRequestKey = $"{request.PathBase}{request.Path}{request.QueryString}";
 
     // Clear stale marker once authentication succeeds.
     if (user?.Identity?.IsAuthenticated == true && request.Cookies.ContainsKey(ChallengeCookieName))
@@ -266,14 +267,14 @@ app.UseStatusCodePages(async context =>
         }
 
         bool hasAuthorizationHeader = request.Headers.ContainsKey("Authorization");
-        bool hasChallengeMarker = request.Cookies.ContainsKey(ChallengeCookieName);
+        string? challengeMarker = request.Cookies[ChallengeCookieName];
 
         // Step 1: issue Negotiate challenge without redirect so domain users can auto-login.
-        if (!hasAuthorizationHeader && !hasChallengeMarker)
+        if (!hasAuthorizationHeader && string.IsNullOrWhiteSpace(challengeMarker))
         {
             response.Cookies.Append(
                 ChallengeCookieName,
-                "1",
+                challengeRequestKey,
                 new CookieOptions
                 {
                     HttpOnly = true,
@@ -286,9 +287,29 @@ app.UseStatusCodePages(async context =>
             return;
         }
 
-        // If credentials were attempted and still failed, or no credentials arrived after the
-        // initial challenge, redirect to Unauthorized page.
-        if (hasAuthorizationHeader || hasChallengeMarker)
+            // If the browser is still negotiating auth for a different page, refresh the marker
+            // and let that navigation continue instead of turning it into a false Unauthorized page.
+            if (!string.IsNullOrWhiteSpace(challengeMarker) &&
+                !string.Equals(challengeMarker, challengeRequestKey, StringComparison.OrdinalIgnoreCase))
+            {
+                response.Cookies.Append(
+                    ChallengeCookieName,
+                    challengeRequestKey,
+                    new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = request.IsHttps,
+                        IsEssential = true,
+                        SameSite = SameSiteMode.Lax,
+                        MaxAge = TimeSpan.FromMinutes(2)
+                    });
+
+                return;
+            }
+
+            // If credentials were attempted and still failed, or the same page retried after the
+            // initial challenge, redirect to Unauthorized page.
+            if (hasAuthorizationHeader || !string.IsNullOrWhiteSpace(challengeMarker))
         {
             response.Cookies.Delete(ChallengeCookieName);
             response.Redirect("/Home/Unauthorized");
