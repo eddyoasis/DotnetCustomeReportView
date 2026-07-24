@@ -353,6 +353,8 @@ namespace DataWarehousePower.Controllers
                 return BadRequest(new { success = false, error = "Export request is required." });
             }
 
+            string? userDepartment = ResolveUserDepartment();
+
             if (request.DateTo.HasValue)
                 request.DateTo = request.DateTo.Value.AddDays(1).AddSeconds(-1);
 
@@ -421,10 +423,11 @@ namespace DataWarehousePower.Controllers
 
             try
             {
-                DataFilePreviewResult preview = _scheduledJobAppSetting.UseSnowflakeForDataFile ? 
+                DataFilePreviewResult preview = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
                     await _snowflakeService.GetPreviewDataAsync(new DataFilePreviewRequest
                     {
                         UserId = userId,
+                        UserDepartment = userDepartment,
                         SourceDatabase = form.SourceDatabase,
                         SourceTable = form.SourceTable,
                         SourceSP = form.SourceSP,
