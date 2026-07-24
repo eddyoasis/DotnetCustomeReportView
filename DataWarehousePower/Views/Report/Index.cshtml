@@ -134,7 +134,7 @@
         @if (!Model.HasAppliedFilters)
         {
             <div class="alert alert-info border small py-2 px-3 mb-3">
-                Select a client code and click Apply to load report data.
+                Select one or more client codes (or All) and click Apply to load report data.
             </div>
         }
 
@@ -156,14 +156,14 @@
                                     data-bs-toggle="dropdown"
                                     data-bs-auto-close="outside"
                                     aria-expanded="false">
-                                @(string.IsNullOrWhiteSpace(Model.ClientCode) ? "Select a client code" : Model.ClientCode)
+                                Select client code(s)
                             </button>
                             <div class="dropdown-menu p-2 w-100" style="min-width: 240px;">
                                 <input id="filter-client-code-search"
                                        type="text"
                                        class="form-control form-control-sm mb-2"
                                        maxlength="128"
-                                       placeholder="Search client code"
+                                       placeholder="Search client codes"
                                        autocomplete="off" />
                                 <div id="filter-client-code-loading" class="d-none small text-muted mb-2" aria-live="polite">
                                     <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
@@ -471,7 +471,7 @@
                     {
                         <tr>
                             <td colspan="@Math.Max(1, Model.DisplayColumns.Count(c => c.IsVisible))" class="text-muted text-center py-4">
-                                Select a client code and click Apply to view data.
+                                Select one or more client codes (or All) and click Apply to view data.
                             </td>
                         </tr>
                     }
@@ -589,6 +589,8 @@
         const filterClientCodeError = document.getElementById('filter-client-code-error');
         const filterClientCodeLoading = document.getElementById('filter-client-code-loading');
         const filterClientCodeDropdown = filterClientCodeToggle ? bootstrap.Dropdown.getOrCreateInstance(filterClientCodeToggle) : null;
+        const clientCodeAllToken = '__ALL__';
+        const clientCodeAllLabel = 'All client codes';
         const exportButton = document.getElementById('btn-export');
         const scheduleReportButton = document.getElementById('btn-schedule-report');
         const exportFormatContainer = document.getElementById('export-format');
@@ -698,7 +700,7 @@
             }
 
             if (!requireClientCodeSelection()) {
-                exportStatus.textContent = 'Select a client code.';
+                exportStatus.textContent = 'Select one or more client codes, or choose All client codes.';
                 exportStatus.className = 'small align-self-center text-danger';
                 return;
             }
@@ -1481,16 +1483,83 @@
             return filterClientCodeValueInput?.value.trim() || '';
         }
 
+        function parseClientCodeSelection(rawValue) {
+            const tokens = String(rawValue || '')
+                .split(/[,;|]/)
+                .map(token => token.trim())
+                .filter(token => token.length > 0);
+
+            const isAllSelected = tokens.some(token =>
+                token.localeCompare(clientCodeAllToken, undefined, { sensitivity: 'accent' }) === 0 ||
+                token.localeCompare('ALL', undefined, { sensitivity: 'accent' }) === 0);
+
+            if (isAllSelected) {
+                return {
+                    isAllSelected: true,
+                    selectedValues: []
+                };
+            }
+
+            return {
+                isAllSelected: false,
+                selectedValues: [...new Set(tokens)]
+                    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }))
+            };
+        }
+
+        function serializeClientCodeSelection(selectedValues, isAllSelected) {
+            if (isAllSelected) {
+                return clientCodeAllToken;
+            }
+
+            const normalizedValues = [...new Set((selectedValues || [])
+                .map(value => String(value || '').trim())
+                .filter(value => value.length > 0))]
+                .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }));
+
+            return normalizedValues.join(',');
+        }
+
+        function getClientCodeSelectionLabel(selectionState) {
+            if (selectionState.isAllSelected) {
+                return clientCodeAllLabel;
+            }
+
+            if (selectionState.selectedValues.length === 1) {
+                return selectionState.selectedValues[0];
+            }
+
+            if (selectionState.selectedValues.length > 1) {
+                return `${selectionState.selectedValues.length} selected`;
+            }
+
+            return 'Select client code(s)';
+        }
+
+        function syncClientCodeUi(selectionState, options = {}) {
+            if (filterClientCodeValueInput) {
+                filterClientCodeValueInput.value = serializeClientCodeSelection(selectionState.selectedValues, selectionState.isAllSelected);
+            }
+
+            if (filterClientCodeToggle) {
+                filterClientCodeToggle.textContent = getClientCodeSelectionLabel(selectionState);
+            }
+
+            if (filterClientCodeSearchInput && Object.prototype.hasOwnProperty.call(options, 'searchValue')) {
+                filterClientCodeSearchInput.value = String(options.searchValue || '');
+            }
+        }
+
         function requireClientCodeSelection() {
-            const clientCode = getSelectedClientCode();
-            if (!clientCode) {
-                showClientCodeError('Select a client code.');
+            const selectionState = parseClientCodeSelection(getSelectedClientCode());
+            if (!selectionState.isAllSelected && selectionState.selectedValues.length === 0) {
+                showClientCodeError('Select one or more client codes, or choose All client codes.');
                 filterClientCodeSearchInput?.focus();
                 return '';
             }
 
             hideClientCodeError();
-            return clientCode;
+            return serializeClientCodeSelection(selectionState.selectedValues, selectionState.isAllSelected);
         }
 
         function renderClientCodeOptions(searchValue) {
@@ -1499,14 +1568,26 @@
             }
 
             const normalizedSearch = (searchValue || '').trim().toLocaleLowerCase();
-            const selectedValue = (filterClientCodeValueInput?.value || '').trim();
+            const selectionState = parseClientCodeSelection(filterClientCodeValueInput?.value || '');
+            const selectedSet = new Set(selectionState.selectedValues.map(value => value.toLocaleLowerCase()));
 
             filterClientCodeOptions.innerHTML = '';
+
+            const allOptionButton = document.createElement('button');
+            allOptionButton.type = 'button';
+            allOptionButton.className = `list-group-item list-group-item-action py-1 px-2${selectionState.isAllSelected ? ' active' : ''}`;
+            allOptionButton.innerHTML = `<div class="d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" ${selectionState.isAllSelected ? 'checked' : ''} tabindex="-1" aria-hidden="true" /><span>${clientCodeAllLabel}</span></div>`;
+            allOptionButton.addEventListener('click', () => {
+                syncClientCodeUi({ isAllSelected: true, selectedValues: [] });
+                hideClientCodeError();
+                renderClientCodeOptions(filterClientCodeSearchInput?.value || '');
+            });
+            filterClientCodeOptions.appendChild(allOptionButton);
 
             availableClientCodes.forEach(code => {
                 const normalizedCode = String(code || '');
                 const isMatch = !normalizedSearch || normalizedCode.toLocaleLowerCase().includes(normalizedSearch);
-                const isSelected = normalizedCode.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0;
+                const isSelected = selectedSet.has(normalizedCode.toLocaleLowerCase());
 
                 if (!isMatch && !isSelected) {
                     return;
@@ -1515,22 +1596,39 @@
                 const optionButton = document.createElement('button');
                 optionButton.type = 'button';
                 optionButton.className = `list-group-item list-group-item-action py-1 px-2${isSelected ? ' active' : ''}`;
-                optionButton.textContent = normalizedCode;
+                optionButton.innerHTML = `<div class="d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" ${isSelected ? 'checked' : ''} tabindex="-1" aria-hidden="true" /><span>${esc(normalizedCode)}</span></div>`;
                 optionButton.addEventListener('click', () => {
                     if (!filterClientCodeValueInput || !filterClientCodeToggle) {
                         return;
                     }
 
-                    filterClientCodeValueInput.value = normalizedCode;
-                    filterClientCodeToggle.textContent = normalizedCode;
-                    filterClientCodeSearchInput.value = normalizedCode;
+                    const nextSelection = parseClientCodeSelection(filterClientCodeValueInput.value);
+
+                    if (nextSelection.isAllSelected) {
+                        nextSelection.isAllSelected = false;
+                        nextSelection.selectedValues = [normalizedCode];
+                    } else {
+                        const existingIndex = nextSelection.selectedValues.findIndex(value =>
+                            value.localeCompare(normalizedCode, undefined, { sensitivity: 'accent' }) === 0);
+
+                        if (existingIndex >= 0) {
+                            nextSelection.selectedValues.splice(existingIndex, 1);
+                        } else {
+                            nextSelection.selectedValues.push(normalizedCode);
+                        }
+                    }
+
+                    nextSelection.selectedValues = [...new Set(nextSelection.selectedValues)]
+                        .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }));
+
+                    syncClientCodeUi(nextSelection);
                     hideClientCodeError();
-                    filterClientCodeDropdown?.hide();
+                    renderClientCodeOptions(filterClientCodeSearchInput?.value || '');
                 });
                 filterClientCodeOptions.appendChild(optionButton);
             });
 
-            if (!filterClientCodeOptions.children.length) {
+            if (filterClientCodeOptions.children.length === 1) {
                 const empty = document.createElement('div');
                 empty.className = 'text-muted small px-2 py-1';
                 empty.textContent = 'No matches';
@@ -1578,14 +1676,18 @@
                 }
 
                 if (Array.isArray(values)) {
-                    const selectedValue = (filterClientCodeValueInput?.value || '').trim();
+                    const selectionState = parseClientCodeSelection(filterClientCodeValueInput?.value || '');
                     availableClientCodes = values
                         .map(value => String(value || '').trim())
                         .filter(value => value.length > 0);
 
-                    if (selectedValue && !availableClientCodes.some(value =>
-                        value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0)) {
-                        availableClientCodes.push(selectedValue);
+                    if (!selectionState.isAllSelected) {
+                        selectionState.selectedValues.forEach(selectedValue => {
+                            if (!availableClientCodes.some(value =>
+                                value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0)) {
+                                availableClientCodes.push(selectedValue);
+                            }
+                        });
                     }
 
                     availableClientCodes = [...new Set(availableClientCodes)]
@@ -1640,10 +1742,12 @@
             filterClientCodeToggle.addEventListener('click', hideClientCodeError);
 
             if (filterClientCodeValueInput && filterClientCodeToggle) {
-                const initialClientCode = filterClientCodeValueInput.value.trim();
-                filterClientCodeToggle.textContent = initialClientCode || 'Select a client code';
-                filterClientCodeSearchInput.value = initialClientCode;
-                queueClientCodeSearch(initialClientCode);
+                const initialSelectionState = parseClientCodeSelection(filterClientCodeValueInput.value);
+                const initialSearchValue = initialSelectionState.isAllSelected
+                    ? ''
+                    : (initialSelectionState.selectedValues.length === 1 ? initialSelectionState.selectedValues[0] : '');
+                syncClientCodeUi(initialSelectionState, { searchValue: initialSearchValue });
+                queueClientCodeSearch(initialSearchValue);
             }
         }
 

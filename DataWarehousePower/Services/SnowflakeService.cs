@@ -201,7 +201,14 @@ namespace DataWarehousePower.Services
                     string clientCode = (request.ClientCode ?? string.Empty).Trim();
                     if (!string.IsNullOrWhiteSpace(clientCode))
                     {
-                        whereClauses.Add($"CAST({QuoteIdentifier(columnName)} AS STRING) ILIKE '%{EscapeSqlLiteral(clientCode)}%'");
+                        if (TryParseClientCodeFilter(clientCode, out List<string> selectedClientCodes))
+                        {
+                            whereClauses.Add(BuildClientCodeMultiSelectClause(columnName, selectedClientCodes));
+                        }
+                        else if (!IsAllClientCodeToken(clientCode))
+                        {
+                            whereClauses.Add($"CAST({QuoteIdentifier(columnName)} AS STRING) ILIKE '%{EscapeSqlLiteral(clientCode)}%'");
+                        }
                     }
 
                     continue;
@@ -576,6 +583,41 @@ namespace DataWarehousePower.Services
                 .ToList();
 
             return selectedValues.Count > 1;
+        }
+
+        private static bool IsAllClientCodeToken(string value)
+            => value.Equals("__ALL__", StringComparison.OrdinalIgnoreCase)
+               || value.Equals("ALL", StringComparison.OrdinalIgnoreCase);
+
+        private static bool TryParseClientCodeFilter(string value, out List<string> selectedValues)
+        {
+            selectedValues = (value ?? string.Empty)
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(item => item.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (selectedValues.Any(IsAllClientCodeToken))
+            {
+                selectedValues.Clear();
+                return false;
+            }
+
+            return selectedValues.Count > 1;
+        }
+
+        private static string BuildClientCodeMultiSelectClause(string columnName, IEnumerable<string> selectedValues)
+        {
+            List<string> predicates = new();
+            string escapedColumnName = QuoteIdentifier(columnName);
+
+            foreach (string selectedValue in selectedValues)
+            {
+                predicates.Add($"CAST({escapedColumnName} AS STRING) ILIKE '%{EscapeSqlLiteral(selectedValue)}%'");
+            }
+
+            return "(" + string.Join(" OR ", predicates) + ")";
         }
 
         private static string BuildMultiSelectStringClause(string columnName, IEnumerable<string> selectedValues)

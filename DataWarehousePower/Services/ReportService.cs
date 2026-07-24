@@ -22,6 +22,7 @@ namespace DataWarehousePower.Services
         private static readonly string[] _dateFromParameterAliases = ["DateFrom", "FilterDateFrom"];
         private static readonly string[] _dateToParameterAliases = ["DateTo", "FilterDateTo"];
         private const string FixedClientCodeColumnName = "ACCOUNT_ID";
+        private const string AllClientCodesToken = "__ALL__";
 
         private static readonly JsonSerializerOptions _jsonOpts =
             new() { PropertyNameCaseInsensitive = true };
@@ -240,7 +241,7 @@ namespace DataWarehousePower.Services
                 rows = _scheduledJobAppSetting.UseSnowflakeForDataFile ?
                     await _reportRepo.GetReportDataFromTableSnowflakeAsync(
                     userId,
-                    userDepartment,
+                    userDepartment ?? string.Empty,
                     report.SourceTable,
                     report.Columns,
                     report.SourceDatabase,
@@ -557,12 +558,37 @@ namespace DataWarehousePower.Services
             string? currentClientCode,
             IEnumerable<string> clientCodesByUserId)
             => clientCodesByUserId
-                .Append(currentClientCode ?? string.Empty)
+                .Concat(ParseSelectedClientCodes(currentClientCode))
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+        private static List<string> ParseSelectedClientCodes(string? clientCode)
+        {
+            if (string.IsNullOrWhiteSpace(clientCode))
+            {
+                return [];
+            }
+
+            List<string> selectedValues = clientCode
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .ToList();
+
+            if (selectedValues.Any(value => value.Equals(AllClientCodesToken, StringComparison.OrdinalIgnoreCase)
+                                            || value.Equals("ALL", StringComparison.OrdinalIgnoreCase)))
+            {
+                return [];
+            }
+
+            return selectedValues
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
         private static List<string> ExtractClientCodes(IEnumerable<Dictionary<string, object?>> rows)
             => rows.Select(FindClientCodeValue)
@@ -736,6 +762,13 @@ namespace DataWarehousePower.Services
         {
             if (mappedQueryKey.Equals("ClientCode", StringComparison.OrdinalIgnoreCase))
             {
+                if (!string.IsNullOrWhiteSpace(clientCode) &&
+                    (clientCode.Equals(AllClientCodesToken, StringComparison.OrdinalIgnoreCase)
+                     || clientCode.Equals("ALL", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return null;
+                }
+
                 return clientCode;
             }
 

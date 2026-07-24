@@ -362,35 +362,47 @@ namespace DataWarehousePower.Repositories
             int parameterIndex = 0;
 
             Dictionary<string, object?> parameters = new Dictionary<string, object?>();
+            List<string> selectedClientCodes = ParseClientCodeFilterValues(clientCode);
 
             string orderBySql = string.Empty;
 
-            foreach (var column in columns.Where(x => !string.IsNullOrEmpty(x.MappingParameter)))
+            foreach (var column in columns.Where(x =>
+                         !string.IsNullOrWhiteSpace(x.MappingParameter) &&
+                         !string.IsNullOrWhiteSpace(x.PropertyName)))
             {
+                string mappingParameter = column.MappingParameter ?? string.Empty;
+                string propertyName = column.PropertyName ?? string.Empty;
+
+                if (mappingParameter.Contains("ClientCode", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (selectedClientCodes.Count > 0)
+                    {
+                        whereClauses.Add(BuildClientCodePredicate(
+                            EscapeSqlIdentifier(propertyName),
+                            selectedClientCodes,
+                            ref parameterIndex,
+                            parameters));
+                    }
+
+                    continue;
+                }
+
                 string parameterName = $"@f{parameterIndex++}";
-
-                if (column.MappingParameter.Contains("ClientCode"))
+                string escapedColumnName = EscapeSqlIdentifier(propertyName);
+                if (dateFrom.HasValue)
                 {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
-                    parameters.Add(parameterName, $"%{clientCode}%");
+                    whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+                    parameters.Add(parameterName, dateFrom);
                 }
-                else
-                {
-                    string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
-                    if (dateFrom.HasValue)
-                    {
-                        whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
-                        parameters.Add(parameterName, dateFrom);
-                    }
 
-                    if (dateTo.HasValue)
-                    {
-                        string endParameterName = $"@f{parameterIndex++}";
-                        whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
-                        parameters.Add(endParameterName, dateTo);
-                    }
-                    orderBySql = $" ORDER BY {escapedColumnName}";
+                if (dateTo.HasValue)
+                {
+                    string endParameterName = $"@f{parameterIndex++}";
+                    whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+                    parameters.Add(endParameterName, dateTo);
                 }
+
+                orderBySql = $" ORDER BY {escapedColumnName}";
             }
 
             if (!string.IsNullOrEmpty(clintCodesForSql))
@@ -437,35 +449,47 @@ namespace DataWarehousePower.Repositories
             int parameterIndex = 0;
             
             Dictionary<string, object?> parameters = new Dictionary<string, object?>();
+            List<string> selectedClientCodes = ParseClientCodeFilterValues(clientCode);
 
             string orderBySql = string.Empty;
 
-            foreach (var column in columns.Where(x => !string.IsNullOrEmpty(x.MappingParameter)))
+            foreach (var column in columns.Where(x =>
+                         !string.IsNullOrWhiteSpace(x.MappingParameter) &&
+                         !string.IsNullOrWhiteSpace(x.PropertyName)))
             {
+                string mappingParameter = column.MappingParameter ?? string.Empty;
+                string propertyName = column.PropertyName ?? string.Empty;
+
+                if (mappingParameter.Contains("ClientCode", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (selectedClientCodes.Count > 0)
+                    {
+                        whereClauses.Add(BuildClientCodePredicate(
+                            EscapeSqlIdentifier(propertyName),
+                            selectedClientCodes,
+                            ref parameterIndex,
+                            parameters));
+                    }
+
+                    continue;
+                }
+
                 string parameterName = $"@f{parameterIndex++}";
-
-                if (column.MappingParameter.Contains("ClientCode"))
+                string escapedColumnName = EscapeSqlIdentifier(propertyName);
+                if (dateFrom.HasValue)
                 {
-                    whereClauses.Add($"CAST([{EscapeSqlIdentifier(column.PropertyName)}] AS nvarchar(4000)) LIKE {parameterName}");
-                    parameters.Add(parameterName, $"%{clientCode}%");
+                    whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
+                    parameters.Add(parameterName, dateFrom);
                 }
-                else
-                {
-                    string escapedColumnName = EscapeSqlIdentifier(column.PropertyName);
-                    if (dateFrom.HasValue)
-                    {
-                        whereClauses.Add($"[{escapedColumnName}] >= {parameterName}");
-                        parameters.Add(parameterName, dateFrom);
-                    }
 
-                    if (dateTo.HasValue)
-                    {
-                        string endParameterName = $"@f{parameterIndex++}";
-                        whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
-                        parameters.Add(endParameterName, dateTo);
-                    }
-                    orderBySql = $" ORDER BY {escapedColumnName}";
+                if (dateTo.HasValue)
+                {
+                    string endParameterName = $"@f{parameterIndex++}";
+                    whereClauses.Add($"[{escapedColumnName}] <= {endParameterName}");
+                    parameters.Add(endParameterName, dateTo);
                 }
+
+                orderBySql = $" ORDER BY {escapedColumnName}";
             }
 
             string whereSql = whereClauses.Count > 0
@@ -1008,7 +1032,8 @@ namespace DataWarehousePower.Repositories
                              !string.IsNullOrWhiteSpace(column.MappingParameter) &&
                              !column.MappingParameter.Contains("ClientCode", StringComparison.OrdinalIgnoreCase)))
                 {
-                    string mappingKey = mappedColumn.MappingParameter.Trim();
+                    string mappingParameter = mappedColumn.MappingParameter ?? string.Empty;
+                    string mappingKey = mappingParameter.Trim();
                     if (!parameters.ContainsKey(mappingKey))
                     {
                         parameters[mappingKey] = dateRangeFilter;
@@ -1124,6 +1149,52 @@ namespace DataWarehousePower.Repositories
             p.ParameterName = name;
             p.Value         = value ?? DBNull.Value;
             cmd.Parameters.Add(p);
+        }
+
+        private static bool IsAllClientCodeToken(string value)
+            => value.Equals("__ALL__", StringComparison.OrdinalIgnoreCase)
+               || value.Equals("ALL", StringComparison.OrdinalIgnoreCase);
+
+        private static List<string> ParseClientCodeFilterValues(string? clientCodeFilter)
+        {
+            if (string.IsNullOrWhiteSpace(clientCodeFilter))
+            {
+                return [];
+            }
+
+            List<string> values = clientCodeFilter
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .ToList();
+
+            if (values.Any(IsAllClientCodeToken))
+            {
+                return [];
+            }
+
+            return values
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string BuildClientCodePredicate(
+            string escapedColumnName,
+            IReadOnlyList<string> selectedClientCodes,
+            ref int parameterIndex,
+            IDictionary<string, object?> parameters)
+        {
+            List<string> predicates = new();
+
+            foreach (string selectedClientCode in selectedClientCodes)
+            {
+                string parameterName = $"@f{parameterIndex++}";
+                predicates.Add($"CAST([{escapedColumnName}] AS nvarchar(4000)) LIKE {parameterName}");
+                parameters[parameterName] = $"%{selectedClientCode}%";
+            }
+
+            return "(" + string.Join(" OR ", predicates) + ")";
         }
 
         private static string EscapeSqlIdentifier(string value)
