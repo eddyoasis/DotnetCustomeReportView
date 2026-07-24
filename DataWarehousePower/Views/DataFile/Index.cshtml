@@ -159,6 +159,7 @@
                 <div class="card-header fw-semibold">Column Filters</div>
                 <div class="card-body">
                     <form id="datafile-filter-form" method="get" action="@Url.Action("Index", "DataFile", new { id = selectedDataFile.Id })" class="row g-3">
+                        <input type="hidden" name="preview" value="1" />
                         <input type="hidden" id="filter-schema-template" name="schemaTemplate" value="@Model.SchemaTemplate" />
                         @if (!string.IsNullOrWhiteSpace(Model.Filter.Search))
                         {
@@ -765,7 +766,6 @@
             const initialSchemaTemplate = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplate));
             const initialPreferenceId = @Html.Raw(JsonSerializer.Serialize(Model.ActivePreferenceId));
             const schemaTemplatePreferenceIds = @Html.Raw(JsonSerializer.Serialize(Model.SchemaTemplatePreferenceIds));
-            const shouldAutoLoadPreview = @Html.Raw(JsonSerializer.Serialize(Model.HasAppliedFilters));
             const defaultColumnState = @Html.Raw(JsonSerializer.Serialize(
                 Model.AvailableColumns
                     .OrderBy(column => column.Order)
@@ -880,6 +880,11 @@
                 }
 
                 return 10;
+            }
+
+            function shouldLoadPreviewFromRequest() {
+                const currentUrl = new URL(window.location.href);
+                return currentUrl.searchParams.get('preview') === '1';
             }
 
             function renderPreviewPlaceholder(message) {
@@ -2439,7 +2444,7 @@
                 loadColumnStateFromDefaults();
             }
 
-            if (shouldAutoLoadPreview) {
+            if (shouldLoadPreviewFromRequest()) {
                 loadPreviewData(1);
             }
 
