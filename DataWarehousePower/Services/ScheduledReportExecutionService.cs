@@ -3,8 +3,6 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.Collections.Generic;
 using System.Text.Json;
 
 namespace DataWarehousePower.Services;
@@ -54,6 +52,7 @@ public sealed class ScheduledReportExecutionService(
             reportViewModel = await reportService.BuildReportViewModelAsync(
                 reportId: job.ReportDefinitionId.Value,
                 userId: job.CreatedByUserId,
+                userDepartment: job.CreatedByUserDepartment,
                 schemaTemplate: job.SchemaTemplate,
                 clientCode: job.ClientCode,
                 dateFrom: effectiveDateFrom,

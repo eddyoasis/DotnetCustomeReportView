@@ -337,6 +337,10 @@
                                    maxlength="128"
                                    placeholder="Search client codes"
                                    autocomplete="off" />
+                            <div id="scheduled-job-client-code-loading" class="d-none small text-muted mb-2" aria-live="polite">
+                                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                                Loading client codes...
+                            </div>
                             <div id="scheduled-job-client-code-options" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></div>
                         </div>
                     </div>
@@ -2627,10 +2631,17 @@
             const scheduledJobClientCodeToggle = document.getElementById('scheduled-job-client-code-toggle');
             const scheduledJobClientCodeSearchInput = document.getElementById('scheduled-job-client-code-search');
             const scheduledJobClientCodeOptions = document.getElementById('scheduled-job-client-code-options');
+            const scheduledJobClientCodeLoading = document.getElementById('scheduled-job-client-code-loading');
             const scheduledJobClientCodeError = document.getElementById('scheduled-job-client-code-error');
             const scheduledJobClientCodeSelect = document.getElementById('scheduled-job-client-code-select');
             const scheduledJobClientCodeAllToken = '__ALL__';
             const scheduledJobClientCodeAllLabel = 'All client codes';
+            const scheduledJobClientCodeValuesUrl = '@Url.Action("FilterValues", "Report")';
+            let scheduledJobClientCodeSearchTimer = null;
+            let scheduledJobClientCodeSearchToken = 0;
+            let availableClientCodes = [...(scheduledJobClientCodeSelect?.options || [])]
+                .map(option => String(option.value || '').trim())
+                .filter(value => value.length > 0);
             //const clientCodeFieldInput = document.getElementById('ClientCode');
 
             function parseScheduledJobClientCodeSelection(rawValue) {
@@ -2707,6 +2718,108 @@
                 }
             }
 
+            function getSelectedReportIdForClientCodeLookup() {
+                const reportId = Number.parseInt((reportDefinitionSelect?.value || '').trim(), 10);
+                return Number.isFinite(reportId) && reportId > 0 ? reportId : 0;
+            }
+
+            function setScheduledJobClientCodeLoading(isLoading) {
+                if (scheduledJobClientCodeLoading) {
+                    scheduledJobClientCodeLoading.classList.toggle('d-none', !isLoading);
+                }
+
+                if (!scheduledJobClientCodeOptions) {
+                    return;
+                }
+
+                scheduledJobClientCodeOptions.classList.toggle('column-filter-suggest-loading', !!isLoading);
+            }
+
+            function ensureScheduledJobClientCodeDropdownOpen() {
+                if (!scheduledJobClientCodeToggle || typeof bootstrap === 'undefined' || !bootstrap?.Dropdown) {
+                    return;
+                }
+
+                bootstrap.Dropdown.getOrCreateInstance(scheduledJobClientCodeToggle).show();
+            }
+
+            async function searchScheduledJobClientCodeOptionsAsync(searchText) {
+                const reportId = getSelectedReportIdForClientCodeLookup();
+                const currentToken = ++scheduledJobClientCodeSearchToken;
+                const normalizedSearch = (searchText || '').trim();
+                const selectionState = parseScheduledJobClientCodeSelection(scheduledJobClientCodeValueInput?.value || '');
+
+                if (!reportId) {
+                    renderScheduledJobClientCodeOptions(searchText);
+                    return;
+                }
+
+                setScheduledJobClientCodeLoading(true);
+
+                try {
+                    const url = new URL(scheduledJobClientCodeValuesUrl, window.location.origin);
+                    url.searchParams.set('reportId', String(reportId));
+                    url.searchParams.set('take', '50');
+
+                    if (normalizedSearch) {
+                        url.searchParams.set('search', normalizedSearch);
+                    }
+
+                    const response = await fetch(url.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const values = await response.json();
+                    if (currentToken !== scheduledJobClientCodeSearchToken) {
+                        return;
+                    }
+
+                    if (Array.isArray(values)) {
+                        const normalizedValues = values
+                            .map(value => String(value || '').trim())
+                            .filter(value => value.length > 0);
+
+                        if (!selectionState.isAllSelected) {
+                            selectionState.selectedValues.forEach(selectedValue => {
+                                if (!normalizedValues.some(value =>
+                                    value.localeCompare(selectedValue, undefined, { sensitivity: 'accent' }) === 0)) {
+                                    normalizedValues.push(selectedValue);
+                                }
+                            });
+                        }
+
+                        availableClientCodes = [...new Set(normalizedValues)]
+                            .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }));
+                    }
+                } catch {
+                    // Keep current list when search request fails.
+                } finally {
+                    if (currentToken === scheduledJobClientCodeSearchToken) {
+                        setScheduledJobClientCodeLoading(false);
+                    }
+                }
+
+                renderScheduledJobClientCodeOptions(searchText);
+            }
+
+            function queueScheduledJobClientCodeSearch(searchText) {
+                if (scheduledJobClientCodeSearchTimer) {
+                    clearTimeout(scheduledJobClientCodeSearchTimer);
+                }
+
+                scheduledJobClientCodeSearchTimer = setTimeout(async () => {
+                    scheduledJobClientCodeSearchTimer = null;
+                    await searchScheduledJobClientCodeOptionsAsync(searchText);
+                }, 300);
+            }
+
             function renderScheduledJobClientCodeOptions(searchText = '') {
                 if (!scheduledJobClientCodeOptions || !scheduledJobClientCodeSelect) {
                     return;
@@ -2729,10 +2842,10 @@
                 });
                 scheduledJobClientCodeOptions.appendChild(allButton);
 
-                const options = Array.from(scheduledJobClientCodeSelect.options || [])
-                    .filter(opt => opt.value !== '')
+                const options = availableClientCodes
+                    .map(value => ({ value, text: value }))
                     .filter(opt => {
-                        const optionText = (opt.textContent || '').toLowerCase();
+                        const optionText = (opt.text || '').toLowerCase();
                         const isSelected = selectedSet.has((opt.value || '').toLowerCase());
                         return isSelected || !filterLower || optionText.includes(filterLower);
                     });
@@ -2754,7 +2867,7 @@
                     checkbox.setAttribute('aria-hidden', 'true');
 
                     const label = document.createElement('span');
-                    label.textContent = opt.textContent || '';
+                    label.textContent = opt.text || '';
 
                     optionRow.appendChild(checkbox);
                     optionRow.appendChild(label);
@@ -2800,13 +2913,31 @@
 
             if (scheduledJobClientCodeSearchInput) {
                 scheduledJobClientCodeSearchInput.addEventListener('input', () => {
-                    renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput.value);
+                    queueScheduledJobClientCodeSearch(scheduledJobClientCodeSearchInput.value);
+                });
+
+                scheduledJobClientCodeSearchInput.addEventListener('focus', () => {
+                    queueScheduledJobClientCodeSearch(scheduledJobClientCodeSearchInput.value);
+                    ensureScheduledJobClientCodeDropdownOpen();
+                });
+
+                scheduledJobClientCodeSearchInput.addEventListener('click', () => {
+                    queueScheduledJobClientCodeSearch(scheduledJobClientCodeSearchInput.value);
+                    ensureScheduledJobClientCodeDropdownOpen();
+                });
+
+                scheduledJobClientCodeSearchInput.addEventListener('keydown', e => {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        queueScheduledJobClientCodeSearch(scheduledJobClientCodeSearchInput.value);
+                        ensureScheduledJobClientCodeDropdownOpen();
+                    }
                 });
             }
 
             if (scheduledJobClientCodeToggle) {
                 scheduledJobClientCodeToggle.addEventListener('click', () => {
-                    renderScheduledJobClientCodeOptions(scheduledJobClientCodeSearchInput?.value || '');
+                    queueScheduledJobClientCodeSearch(scheduledJobClientCodeSearchInput?.value || '');
                 });
             }
 
@@ -2815,7 +2946,7 @@
                 syncScheduledJobClientCodeSelection(initialSelection);
             }
 
-            renderScheduledJobClientCodeOptions();
+            queueScheduledJobClientCodeSearch(scheduledJobClientCodeSearchInput?.value || '');
 
             updateScheduleFields();
             updateJobActionFields();
