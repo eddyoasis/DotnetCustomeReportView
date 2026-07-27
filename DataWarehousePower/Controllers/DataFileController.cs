@@ -4,6 +4,7 @@ using DataWarehousePower.Models;
 using DataWarehousePower.Models.AppSettings;
 using DataWarehousePower.Repositories;
 using DataWarehousePower.Services;
+using log4net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -23,6 +24,7 @@ namespace DataWarehousePower.Controllers
         private readonly ISnowflakeService _snowflakeService;
         private readonly ILogger<DataFileController> _logger;
         private readonly ScheduledJob _scheduledJobAppSetting;
+        private static readonly ILog DataFileManageLogger = LogManager.GetLogger("DataFileManageLogger");
 
         public DataFileController(
             IOptionsSnapshot<ScheduledJob> scheduledJobAppSetting,
@@ -492,6 +494,8 @@ namespace DataWarehousePower.Controllers
                 string zipFileName = $"{dataFileName}_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm}).zip";
                 string zipSubFileName = $"{dataFileName}_format_({DateTimeHelper.GetCurrentLocalTime():yyyy-MM-dd_HHmm})";
 
+                DataFileManageLogger.Info("Start BuildPasswordProtectedZipAsync");
+
                 byte[] zipBytes = await _exportService.BuildPasswordProtectedZipAsync(
                     vm,
                     normalizedFormats,
@@ -499,6 +503,8 @@ namespace DataWarehousePower.Controllers
                     zipSubFileName,
                     null,
                     cancellationToken);
+
+                DataFileManageLogger.Info("End BuildPasswordProtectedZipAsync");
 
                 return File(zipBytes, "application/zip", zipFileName);
             }

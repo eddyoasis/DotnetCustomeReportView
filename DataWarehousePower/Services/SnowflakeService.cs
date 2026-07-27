@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Data.Common;
+using log4net;
 
 namespace DataWarehousePower.Services
 {
@@ -12,6 +13,7 @@ namespace DataWarehousePower.Services
         private static readonly Regex _identifierPattern = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
         private readonly ISnowflakeRepository _snowflakeRepository;
         private readonly IDepartmentSnowflakeConnectionService _departmentSnowflakeConnectionService;
+        private static readonly ILog DataFileManageLogger = LogManager.GetLogger("DataFileManageLogger");
 
         public SnowflakeService(
             IDepartmentSnowflakeConnectionService departmentSnowflakeConnectionService,
@@ -164,7 +166,7 @@ namespace DataWarehousePower.Services
             int page = request.Page <= 0 ? 1 : request.Page;
             if (request.IsExport)
             {
-                take = 1000000;
+                take = 500000;
             }
             else
             {
@@ -297,8 +299,9 @@ namespace DataWarehousePower.Services
                 : string.Empty;
 
             string countSql = $"SELECT COUNT(1) AS TOTAL_COUNT FROM {tableExpression}{whereClause}";
-            //IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(countSql, cancellationToken);
-            
+
+            DataFileManageLogger.Info($"Start ExecuteQueryAsync.countRows: {countSql}");
+
             IReadOnlyList<Dictionary<string, object?>> countRows = await _snowflakeRepository.ExecuteQueryAsync(snowflakeConnectionString, countSql, cancellationToken);
             int totalCount = 0;
             if (countRows.Count > 0 && countRows[0].TryGetValue("TOTAL_COUNT", out object? totalCountObj) && totalCountObj is not null)
@@ -306,11 +309,26 @@ namespace DataWarehousePower.Services
                 totalCount = Convert.ToInt32(totalCountObj, CultureInfo.InvariantCulture);
             }
 
-            string querySql =
+            DataFileManageLogger.Info($"End ExecuteQueryAsync.countRows");
+
+            string querySql = "";
+
+            if (request.IsExport)
+            {
+               querySql =
+                $"SELECT {selectColumns} FROM {tableExpression}{whereClause}";
+            }
+            else
+            {
+                querySql =
                 $"SELECT {selectColumns} FROM {tableExpression}{whereClause} LIMIT {take} OFFSET {offset}";
+            }
+
+            DataFileManageLogger.Info($"Start ExecuteQueryAsync.querySql: {querySql}");
 
             IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(snowflakeConnectionString, querySql, cancellationToken);
-            //IReadOnlyList<Dictionary<string, object?>> rows = await _snowflakeRepository.ExecuteQueryAsync(querySql, cancellationToken);
+
+            DataFileManageLogger.Info($"End ExecuteQueryAsync.querySql");
 
             return new DataFilePreviewResult
             {
